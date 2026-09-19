@@ -174,7 +174,17 @@ static inline bool configure_settings_and_acquire_lock(void)
         .l_whence = SEEK_SET
     };
 
-    return fcntl(handle, F_SETLK, &lockfd) != -1;
+    if (fcntl(handle, F_SETLK, &lockfd) == -1) {
+        lockfd.l_type = F_WRLCK;
+        if (fcntl(handle, F_GETLK, &lockfd) != -1 && lockfd.l_pid > 0) {
+            warn("yabai: another instance of yabai is already running (PID %d)! abort..\n", lockfd.l_pid);
+        } else {
+            warn("yabai: could not acquire lock-file! abort..\n");
+        }
+        return false;
+    }
+
+    return true;
 }
 #pragma clang diagnostic pop
 
@@ -285,7 +295,7 @@ int main(int argc, char **argv)
     }
 
     if (!configure_settings_and_acquire_lock()) {
-        error("yabai: could not acquire lock-file! abort..\n");
+        exit(0);
     }
 
     if (!event_loop_begin(&g_event_loop)) {

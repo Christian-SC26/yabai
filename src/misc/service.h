@@ -3,7 +3,9 @@
 
 #define _PATH_LAUNCHCTL   "/bin/launchctl"
 #define _NAME_YABAI_PLIST "com.asmvik.yabai"
+#define _LEGACY_NAME_YABAI_PLIST "com.koekeishiya.yabai"
 #define _PATH_YABAI_PLIST "%s/Library/LaunchAgents/"_NAME_YABAI_PLIST".plist"
+#define _PATH_LEGACY_YABAI_PLIST "%s/Library/LaunchAgents/"_LEGACY_NAME_YABAI_PLIST".plist"
 
 #define _YABAI_PLIST \
     "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" \
@@ -98,6 +100,50 @@ static char *populate_plist_path(void)
     return result;
 }
 
+static void service_cleanup_legacy(void)
+{
+    CFStringRef home_ref = (__bridge CFStringRef) NSHomeDirectoryForUser(NULL);
+    char *home = home_ref ? cfstring_copy(home_ref) : NULL;
+    if (!home) return;
+
+    int size = strlen(_PATH_LEGACY_YABAI_PLIST)-2 + strlen(home) + 1;
+    char *legacy_plist_path = malloc(size);
+    if (!legacy_plist_path) {
+        return;
+    }
+
+    memset(legacy_plist_path, 0, size);
+    snprintf(legacy_plist_path, size, _PATH_LEGACY_YABAI_PLIST, home);
+
+    char legacy_target[MAXLEN];
+    snprintf(legacy_target, sizeof(legacy_target), "gui/%d/%s", getuid(), _LEGACY_NAME_YABAI_PLIST);
+
+    char domain_target[MAXLEN];
+    snprintf(domain_target, sizeof(domain_target), "gui/%d", getuid());
+
+    bool has_file = file_exists(legacy_plist_path);
+
+    const char *const args_print[] = { _PATH_LAUNCHCTL, "print", legacy_target, NULL };
+    bool is_bootstrapped = (safe_exec((char *const*)args_print, true) == 0);
+
+    if (has_file || is_bootstrapped) {
+        warn("yabai: detected legacy service '%s', removing and disabling..\n", _LEGACY_NAME_YABAI_PLIST);
+
+        const char *const args_bootout[] = { _PATH_LAUNCHCTL, "bootout", domain_target, legacy_plist_path, NULL };
+        safe_exec((char *const*)args_bootout, true);
+
+        const char *const args_disable[] = { _PATH_LAUNCHCTL, "disable", legacy_target, NULL };
+        safe_exec((char *const*)args_disable, true);
+
+        if (has_file) {
+            unlink(legacy_plist_path);
+        }
+    }
+
+    free(legacy_plist_path);
+}
+
+
 static char *populate_plist(int *length)
 {
     char *user = getenv("USER");
@@ -170,6 +216,7 @@ static int service_install_internal(char *yabai_plist_path)
 
 static int service_install(void)
 {
+    service_cleanup_legacy();
     char *yabai_plist_path = populate_plist_path();
 
     if (file_exists(yabai_plist_path)) {
@@ -192,6 +239,7 @@ static int service_uninstall(void)
 
 static int service_start(void)
 {
+    service_cleanup_legacy();
     char *yabai_plist_path = populate_plist_path();
     if (!file_exists(yabai_plist_path)) {
         warn("yabai: service file '%s' is not installed! attempting installation..\n", yabai_plist_path);
@@ -249,6 +297,7 @@ static int service_start(void)
 
 static int service_restart(void)
 {
+    service_cleanup_legacy();
     char *yabai_plist_path = populate_plist_path();
     if (!file_exists(yabai_plist_path)) {
         error("yabai: service file '%s' is not installed! abort..\n", yabai_plist_path);
@@ -263,6 +312,7 @@ static int service_restart(void)
 
 static int service_stop(void)
 {
+    service_cleanup_legacy();
     char *yabai_plist_path = populate_plist_path();
     if (!file_exists(yabai_plist_path)) {
         error("yabai: service file '%s' is not installed! abort..\n", yabai_plist_path);
