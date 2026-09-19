@@ -739,7 +739,10 @@ static EVENT_HANDLER(WINDOW_RESIZED)
     }
 
     CGRect new_frame = window_ax_frame(window);
-    if (CGRectEqualToRect(new_frame, window->frame)) {
+    bool was_fullscreen = window_check_flag(window, WINDOW_FULLSCREEN);
+    bool is_fullscreen = window_is_fullscreen(window);
+
+    if (was_fullscreen == is_fullscreen && CGRectEqualToRect(new_frame, window->frame)) {
         debug("%s:DEBOUNCED %s %d\n", __FUNCTION__, window->application->name, window->id);
         return;
     }
@@ -747,16 +750,13 @@ static EVENT_HANDLER(WINDOW_RESIZED)
     debug("%s: %s %d\n", __FUNCTION__, window->application->name, window->id);
     event_signal_push(SIGNAL_WINDOW_RESIZED, window);
 
-    bool was_fullscreen = window_check_flag(window, WINDOW_FULLSCREEN);
-
-    bool is_fullscreen = window_is_fullscreen(window);
     if (is_fullscreen) {
         window_set_flag(window, WINDOW_FULLSCREEN);
     } else {
         window_clear_flag(window, WINDOW_FULLSCREEN);
     }
 
-    if (was_fullscreen != is_fullscreen) {
+    if (!was_fullscreen && is_fullscreen) {
         if (window_ax_can_move(window)) {
             window_set_flag(window, WINDOW_MOVABLE);
         } else {
@@ -774,12 +774,9 @@ static EVENT_HANDLER(WINDOW_RESIZED)
 
         if (window->subrole) CFRelease(window->subrole);
         window->subrole = window_ax_subrole(window);
-    }
 
-    bool windowed_fullscreen = CGRectEqualToRect(window->windowed_frame, window->frame);
-    window->frame = new_frame;
+        window->frame = new_frame;
 
-    if (!was_fullscreen && is_fullscreen) {
         struct view *view = window_manager_find_managed_window(&g_window_manager, window);
         if (view) {
             space_manager_untile_window(view, window);
@@ -789,11 +786,57 @@ static EVENT_HANDLER(WINDOW_RESIZED)
     } else if (was_fullscreen && !is_fullscreen) {
         window_manager_wait_for_native_fullscreen_transition(window);
 
-        if (window_manager_should_manage_window(window) && !window_manager_find_managed_window(&g_window_manager, window)) {
-            struct view *view = space_manager_tile_window_on_space(&g_space_manager, window, window_space(window->id));
-            window_manager_add_managed_window(&g_window_manager, window, view);
+        int attempts = 0;
+        while (!window_ax_can_move(window) && attempts++ < 15) {
+            usleep(20000);
+        }
+
+        if (window_ax_can_move(window)) {
+            window_set_flag(window, WINDOW_MOVABLE);
+        } else {
+            window_clear_flag(window, WINDOW_MOVABLE);
+        }
+
+        if (window_ax_can_resize(window)) {
+            window_set_flag(window, WINDOW_RESIZABLE);
+        } else {
+            window_clear_flag(window, WINDOW_RESIZABLE);
+        }
+
+        if (window->role) CFRelease(window->role);
+        window->role = window_ax_role(window);
+
+        if (window->subrole) CFRelease(window->subrole);
+        window->subrole = window_ax_subrole(window);
+
+        window->frame = window_ax_frame(window);
+
+        uint64_t sid = window_space(window->id);
+        if (!sid || !space_is_user(sid)) {
+            sid = space_manager_active_space();
+        }
+
+        if (window_manager_should_manage_window(window)) {
+            struct view *view = window_manager_find_managed_window(&g_window_manager, window);
+            if (!view) {
+                view = space_manager_tile_window_on_space(&g_space_manager, window, sid);
+                window_manager_add_managed_window(&g_window_manager, window, view);
+            }
+
+            if (view && view->layout != VIEW_FLOAT) {
+                view_update(view);
+                if (space_is_visible(view->sid)) {
+                    window_node_flush(view->root);
+                    view_clear_flag(view, VIEW_IS_DIRTY);
+                } else {
+                    view_set_flag(view, VIEW_IS_DIRTY);
+                }
+            }
         }
     } else if (!was_fullscreen == !is_fullscreen) {
+        bool windowed_fullscreen = CGRectEqualToRect(window->windowed_frame, window->frame);
+        window->frame = new_frame;
+
         if (g_mouse_state.current_action == MOUSE_MODE_MOVE && g_mouse_state.window == window) {
             g_mouse_state.window_frame.size = g_mouse_state.window->frame.size;
         }
