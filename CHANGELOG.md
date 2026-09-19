@@ -5,8 +5,18 @@ All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- Rule option `ffm=off` / `focus_follows_mouse=off` to exclude specific applications or windows from focus-follows-mouse [#2750](https://github.com/asmvik/yabai/issues/2750)
+- Full support for macOS 27 Golden Gate space switching and scripting addition injection into Dock.app [#2846](https://github.com/asmvik/yabai/issues/2846) [#2844](https://github.com/asmvik/yabai/issues/2844) [#2841](https://github.com/asmvik/yabai/issues/2841) [#2840](https://github.com/asmvik/yabai/issues/2840) [#2837](https://github.com/asmvik/yabai/issues/2837) [#2824](https://github.com/asmvik/yabai/issues/2824)
+- Automatic detection and cleanup of legacy `com.koekeishiya.yabai` launchd service on service install/start/restart/stop [#2808](https://github.com/asmvik/yabai/issues/2808)
+
 ### Changed
-- Run the mouse event tap on its own thread so clicks are no longer held or dropped while the main thread is blocked in an Accessibility request [#2829](https://github.com/asmvik/yabai/issues/2829)
+- Run the mouse event tap on its own thread with a dedicated CFRunLoop so clicks are no longer held or dropped while the main thread is blocked in an Accessibility request [#2829](https://github.com/asmvik/yabai/issues/2829)
+- Prevent launchd restart loop when another yabai instance is already running by detecting lock owner PID via `fcntl(F_GETLK)` and exiting cleanly with code 0 [#2808](https://github.com/asmvik/yabai/issues/2808)
+- Flush root view and validate space on window close to eliminate empty BSP gaps and clean up zombie windows [#2828](https://github.com/asmvik/yabai/issues/2828)
+- Fix windowed-fullscreen mode to respect `external_bar` top and bottom padding [#2776](https://github.com/asmvik/yabai/issues/2776)
+- Fix scratchpad `--toggle` jumping back to previous space by waiting for asynchronous space assignment before focusing with raise [#2807](https://github.com/asmvik/yabai/issues/2807)
+- Fix BSP retiling and geometry recalculation when exiting fullscreen or zoom-fullscreen [#2758](https://github.com/asmvik/yabai/issues/2758) [#2576](https://github.com/asmvik/yabai/issues/2576) [#2653](https://github.com/asmvik/yabai/issues/2653) [#2716](https://github.com/asmvik/yabai/issues/2716)
 - Fixed scripting-addition *add_space* pattern for macOS 26.6 Apple Silicon arm64 [#2799](https://github.com/asmvik/yabai/issues/2799)
 - Fixed minor memory leak on space destruction, and added a few missing null checks to SkyLight API calls [#2791](https://github.com/asmvik/yabai/issues/2791)
 
