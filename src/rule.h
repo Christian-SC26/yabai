@@ -34,6 +34,7 @@ struct rule_effects
     int manage;
     int sticky;
     int mff;
+    int ffm;
     int layer;
     int fullscreen;
     unsigned grid[6];

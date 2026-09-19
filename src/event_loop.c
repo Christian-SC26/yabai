@@ -13,24 +13,31 @@ volatile bool __pending_gesture;
 volatile uint64_t __last_gesture_time;
 volatile uint64_t __last_cmd_tab_time;
 
-static void update_window_notifications(void)
+void update_window_notifications(void)
 {
     int window_count = 0;
-    uint32_t window_list[1024] = {0};
+    int capacity = g_window_manager.window.count + 64;
+    uint32_t *window_list = malloc(sizeof(uint32_t) * capacity);
+    if (!window_list) return;
 
     if (workspace_is_macos_sequoia() || (workspace_is_macos_tahoe() || workspace_is_macos_goldengate())) {
         // NOTE(asmvik): Subscribe to all windows because of window_destroyed (and ordered) notifications
         table_for (struct window *window, g_window_manager.window, {
-            window_list[window_count++] = window->id;
+            if (window_count < capacity) {
+                window_list[window_count++] = window->id;
+            }
         })
     } else {
         // NOTE(asmvik): Subscribe to windows that have a feedback_border because of window_ordered notifications
         table_for (struct window_node *node, g_window_manager.insert_feedback, {
-            window_list[window_count++] = node->window_order[0];
+            if (window_count < capacity) {
+                window_list[window_count++] = node->window_order[0];
+            }
         })
     }
 
     SLSRequestNotificationsForWindows(g_connection, window_list, window_count);
+    free(window_list);
 }
 
 static void window_did_receive_focus(struct window_manager *wm, struct mouse_state *ms, struct window *window)
@@ -403,6 +410,7 @@ static EVENT_HANDLER(APPLICATION_FRONT_SWITCHED)
         g_window_manager.focused_window_id = 0;
         g_window_manager.focused_window_psn = application->psn;
         g_mouse_state.ffm_window_id = 0;
+        window_manager_validate_and_check_for_windows_on_space(&g_space_manager, &g_window_manager, g_space_manager.current_space_id);
         return;
     }
 
@@ -420,6 +428,7 @@ static EVENT_HANDLER(APPLICATION_FRONT_SWITCHED)
     window_did_receive_focus(&g_window_manager, &g_mouse_state, window);
     event_signal_push(SIGNAL_WINDOW_FOCUSED, window);
     __atomic_store_n(&__pending_window_focus, false, __ATOMIC_RELEASE);
+    window_manager_validate_and_check_for_windows_on_space(&g_space_manager, &g_window_manager, g_space_manager.current_space_id);
 }
 #pragma clang diagnostic pop
 
@@ -670,6 +679,7 @@ static EVENT_HANDLER(WINDOW_FOCUSED)
 
     window_did_receive_focus(&g_window_manager, &g_mouse_state, window);
     event_signal_push(SIGNAL_WINDOW_FOCUSED, window);
+    window_manager_validate_and_check_for_windows_on_space(&g_space_manager, &g_window_manager, g_space_manager.current_space_id);
 }
 
 static EVENT_HANDLER(WINDOW_MOVED)
@@ -1397,11 +1407,16 @@ static EVENT_HANDLER(MOUSE_MOVED)
     if (dt < 1250.0f) goto out;
 
     CGPoint point = CGEventGetLocation(context);
+
+    struct window *focused_window = window_manager_find_window(&g_window_manager, g_window_manager.focused_window_id);
+    if (focused_window && window_check_rule_flag(focused_window, WINDOW_RULE_FFM) && !window_check_rule_flag(focused_window, WINDOW_RULE_FFM_VALUE)) goto out;
+
     struct window *window = window_manager_find_window_at_point(&g_window_manager, point);
 
     if (window) {
         if (window->id == g_window_manager.focused_window_id) goto out;
         if (!window_manager_is_window_eligible(window))       goto out;
+        if (window_check_rule_flag(window, WINDOW_RULE_FFM) && !window_check_rule_flag(window, WINDOW_RULE_FFM_VALUE)) goto out;
 
         if (g_window_manager.ffm_mode == FFM_AUTOFOCUS) {
 

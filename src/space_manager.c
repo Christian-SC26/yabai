@@ -136,7 +136,7 @@ void space_manager_untile_window(struct view *view, struct window *window)
     if (!node) return;
 
     if (space_is_visible(view->sid)) {
-        window_node_flush(node);
+        window_node_flush(view->root);
     } else {
         view_set_flag(view, VIEW_IS_DIRTY);
     }

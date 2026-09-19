@@ -122,7 +122,9 @@ enum window_rule_flag
     WINDOW_RULE_MANAGED    = 0x01,
     WINDOW_RULE_FULLSCREEN = 0x02,
     WINDOW_RULE_MFF        = 0x04,
-    WINDOW_RULE_MFF_VALUE  = 0x08
+    WINDOW_RULE_MFF_VALUE  = 0x08,
+    WINDOW_RULE_FFM        = 0x10,
+    WINDOW_RULE_FFM_VALUE  = 0x20
 };
 
 static inline bool window_check_flag(struct window *w, enum window_flag x) { return w->flags & x; }

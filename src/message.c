@@ -206,6 +206,7 @@ extern bool g_verbose;
 #define ARGUMENT_RULE_KEY_MANAGE     "manage"
 #define ARGUMENT_RULE_KEY_STICKY     "sticky"
 #define ARGUMENT_RULE_KEY_MFF        "mouse_follows_focus"
+#define ARGUMENT_RULE_KEY_FFM        "focus_follows_mouse"
 #define ARGUMENT_RULE_KEY_SUB_LAYER  "sub-layer"
 #define ARGUMENT_RULE_KEY_FULLSCR    "native-fullscreen"
 #define ARGUMENT_RULE_KEY_GRID       "grid"
@@ -2743,13 +2744,24 @@ static bool parse_rule(FILE *rsp, char **message, struct rule *rule, struct toke
                 daemon_fail(rsp, "invalid value '%s' for key '%s'\n", value, key);
                 did_parse = false;
             }
-        } else if (string_equals(key, ARGUMENT_RULE_KEY_MFF)) {
+        } else if (string_equals(key, ARGUMENT_RULE_KEY_MFF) || string_equals(key, "mff")) {
             if (exclusion) unsupported_exclusion = key;
 
             if (string_equals(value, ARGUMENT_COMMON_VAL_ON)) {
                 rule->effects.mff = RULE_PROP_ON;
             } else if (string_equals(value, ARGUMENT_COMMON_VAL_OFF)) {
                 rule->effects.mff = RULE_PROP_OFF;
+            } else {
+                daemon_fail(rsp, "invalid value '%s' for key '%s'\n", value, key);
+                did_parse = false;
+            }
+        } else if (string_equals(key, ARGUMENT_RULE_KEY_FFM) || string_equals(key, "ffm")) {
+            if (exclusion) unsupported_exclusion = key;
+
+            if (string_equals(value, ARGUMENT_COMMON_VAL_ON)) {
+                rule->effects.ffm = RULE_PROP_ON;
+            } else if (string_equals(value, ARGUMENT_COMMON_VAL_OFF)) {
+                rule->effects.ffm = RULE_PROP_OFF;
             } else {
                 daemon_fail(rsp, "invalid value '%s' for key '%s'\n", value, key);
                 did_parse = false;

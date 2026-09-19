@@ -30,6 +30,7 @@ void rule_serialize(FILE *rsp, struct rule *rule, int index)
             "\t\"manage\":%s,\n"
             "\t\"sticky\":%s,\n"
             "\t\"mouse_follows_focus\":%s,\n"
+            "\t\"focus_follows_mouse\":%s,\n"
             "\t\"sub-layer\":\"%s\",\n"
             "\t\"native-fullscreen\":%s,\n"
             "\t\"grid\":\"%d:%d:%d:%d:%d:%d\",\n"
@@ -50,6 +51,7 @@ void rule_serialize(FILE *rsp, struct rule *rule, int index)
             json_optional_bool(rule->effects.manage),
             json_optional_bool(rule->effects.sticky),
             json_optional_bool(rule->effects.mff),
+            json_optional_bool(rule->effects.ffm),
             rule_effects_check_flag(&rule->effects, RULE_LAYER) ? layer_str[rule->effects.layer] : "",
             json_optional_bool(rule->effects.fullscreen),
             rule->effects.grid[0], rule->effects.grid[1],
@@ -98,6 +100,7 @@ void rule_combine_effects(struct rule_effects *effects, struct rule_effects *res
     if (effects->manage     != RULE_PROP_UD) result->manage     = effects->manage;
     if (effects->sticky     != RULE_PROP_UD) result->sticky     = effects->sticky;
     if (effects->mff        != RULE_PROP_UD) result->mff        = effects->mff;
+    if (effects->ffm        != RULE_PROP_UD) result->ffm        = effects->ffm;
     if (effects->fullscreen != RULE_PROP_UD) result->fullscreen = effects->fullscreen;
 
     if (effects->grid[0] != 0 && effects->grid[1] != 0) {
