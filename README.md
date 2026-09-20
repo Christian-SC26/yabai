@@ -56,8 +56,9 @@
 > * **Smooth Live 60 FPS Mouse Resizing & Real-Time Border Dragging** ([#2712](https://github.com/asmvik/yabai/issues/2712), [#2714](https://github.com/asmvik/yabai/issues/2714)):
 >   * Upgraded mouse drag rate-limiting from ~15 FPS (67.67 ms) to smooth 60 FPS (16 ms) with delta-distance thresholding;
 >   * Resizing tiled BSP windows now adjusts sibling fences in real-time as the cursor moves instead of waiting for mouse release.
-> * **Save & Restore BSP Layout Sessions** ([#902](https://github.com/asmvik/yabai/issues/902)):
->   * Added `yabai -m space --save-layout [<name|path>]`, `yabai -m space --load-layout [<name|path>]`, and `yabai -m space --dump-layout` to persist, dump, and recreate complex multi-window BSP tree layouts across reboots or workflows matching applications by name.
+> * **Save & Restore Workspace Sessions & Layouts** ([#902](https://github.com/asmvik/yabai/issues/902)):
+>   * Added `yabai -m space --save-session [<name|path>]`, `yabai -m space --load-session [<name|path>]`, and `yabai -m space --dump-session` to snapshot and restore your entire multi-display workspace (all spaces, space types, paddings, window trees, and open applications);
+>   * Added `yabai -m space --save-layout [<name|path>]`, `yabai -m space --load-layout [<name|path>]`, and `yabai -m space --dump-layout` for individual space layout templates.
 
 
 ## About

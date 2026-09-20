@@ -553,6 +553,29 @@ If an argument is not provided, loads from \f(CR~/.config/yabai/layouts/space_<I
 .RS 4
 Print the current BSP tree layout, padding, and gaps of the selected space as JSON to stdout.
 .RE
+.sp
+\fB\-\-save\-session\fP [\fI<NAME_OR_PATH>\fP]
+.RS 4
+Save the complete workspace session across all displays and spaces (layouts, paddings, gaps, and open applications) to a JSON file.
+.br
+If an argument is not provided, saves to \f(CR~/.config/yabai/layouts/session.json\fP.
+.br
+If a relative name without slash is provided, saves to \f(CR~/.config/yabai/layouts/<NAME>.json\fP.
+.RE
+.sp
+\fB\-\-load\-session\fP [\fI<NAME_OR_PATH>\fP]
+.RS 4
+Restore a full workspace session across all displays and spaces from a JSON file.
+.br
+Automatically migrates open application windows to their saved spaces, restores space layout types (\fIbsp\fP, \fIstack\fP, \fIfloat\fP), reconstructs BSP trees, and reapplies paddings and gaps.
+.br
+If an argument is not provided, loads from \f(CR~/.config/yabai/layouts/session.json\fP.
+.RE
+.sp
+\fB\-\-dump\-session\fP
+.RS 4
+Print the complete workspace session across all displays and spaces as JSON to stdout.
+.RE
 .SS "Window"
 .SS "General Syntax"
 .sp

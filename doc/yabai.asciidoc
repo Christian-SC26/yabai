@@ -371,6 +371,19 @@ COMMAND
 *--dump-layout*::
     Print the current BSP tree layout, padding, and gaps of the selected space as JSON to stdout.
 
+*--save-session* ['<NAME_OR_PATH>']::
+    Save the complete workspace session across all displays and spaces (layouts, paddings, gaps, and open applications) to a JSON file. +
+    If an argument is not provided, saves to `~/.config/yabai/layouts/session.json`. +
+    If a relative name without slash is provided (e.g. `work`), saves to `~/.config/yabai/layouts/<NAME>.json`.
+
+*--load-session* ['<NAME_OR_PATH>']::
+    Restore a full workspace session across all displays and spaces from a JSON file. +
+    Automatically migrates open application windows to their saved spaces, restores space layout types (`bsp`, `stack`, `float`), reconstructs BSP trees, and reapplies paddings and gaps. +
+    If an argument is not provided, loads from `~/.config/yabai/layouts/session.json`.
+
+*--dump-session*::
+    Print the complete workspace session across all displays and spaces as JSON to stdout.
+
 Window
 ~~~~~~
 
