@@ -36,10 +36,10 @@ $(OSAX_SRC): $(OSAX_PATH)/loader.m $(OSAX_PATH)/payload.m
 	rm -f $(OSAX_PATH)/loader
 
 man:
-	asciidoctor -b manpage $(DOC_PATH)/yabai.asciidoc -o $(DOC_PATH)/yabai.1
+	command -v asciidoctor >/dev/null 2>&1 && asciidoctor -b manpage $(DOC_PATH)/yabai.asciidoc -o $(DOC_PATH)/yabai.1 || true
 
 icon:
-	python3 $(SCRIPT_PATH)/seticon.py $(ASSET_PATH)/icon/2x/icon-512px@2x.png $(BUILD_PATH)/yabai
+	python3 $(SCRIPT_PATH)/seticon.py $(ASSET_PATH)/icon/2x/icon-512px@2x.png $(BUILD_PATH)/yabai || true
 
 publish:
 	sed -i '' "60s/^VERSION=.*/VERSION=\"$(shell $(BUILD_PATH)/yabai --version | cut -d "v" -f 2)\"/" $(SCRIPT_PATH)/install.sh
@@ -54,8 +54,13 @@ archive: man install sign icon
 	tar -cvzf $(BUILD_PATH)/$(shell $(BUILD_PATH)/yabai --version).tar.gz $(ARCH_PATH)
 	rm -rf $(ARCH_PATH)
 
+SIGN_IDENTITY ?= $(shell security find-identity -v -p codesigning 2>/dev/null | grep "Developer ID Application:" | head -n 1 | sed -e 's/.*"\([^"]*\)".*/\1/')
+ifeq ($(strip $(SIGN_IDENTITY)),)
+SIGN_IDENTITY := -
+endif
+
 sign:
-	codesign -fs "yabai-cert" $(BUILD_PATH)/yabai
+	codesign -fs "$(SIGN_IDENTITY)" --options runtime --timestamp $(BUILD_PATH)/yabai
 
 clean-build:
 	rm -rf $(BUILD_PATH)
