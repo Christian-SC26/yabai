@@ -364,19 +364,34 @@ static EVENT_HANDLER(APPLICATION_FRONT_SWITCHED)
     }
 
     if (g_space_manager.skip_window_focus_animation) {
-        uint64_t psn_sid = process_manager_active_space_for_psn(application->connection);
-
-        uint64_t last_cmd_tab_time = __atomic_load_n(&__last_cmd_tab_time, __ATOMIC_RELAXED);
-        float dt = ((float) read_os_timer() - last_cmd_tab_time) * (1000.0f / (float)read_os_freq());
-        if (dt > 1500.0f) {
-            CFTypeRef dummy = NULL;
-            AXUIElementCopyAttributeValue(application->ref, CFSTR("__fence"), &dummy);
+        uint32_t focused_wid = application_focused_window(application);
+        bool focused_on_visible_space = false;
+        if (focused_wid) {
+            if (window_is_sticky(focused_wid)) {
+                focused_on_visible_space = true;
+            } else {
+                uint64_t focused_sid = window_space(focused_wid);
+                if (focused_sid && space_is_visible(focused_sid)) {
+                    focused_on_visible_space = true;
+                }
+            }
         }
 
-        if (__atomic_load_n(&__pending_window_focus, __ATOMIC_RELAXED) == false) {
-            if (psn_sid && !space_is_visible(psn_sid)) {
-                SLSSpaceSetFrontPSN(g_connection, psn_sid, process->psn);
-                space_manager_focus_space_using_gesture(space_display_id(psn_sid), psn_sid);
+        if (!focused_on_visible_space) {
+            uint64_t psn_sid = process_manager_active_space_for_psn(application->connection);
+
+            uint64_t last_cmd_tab_time = __atomic_load_n(&__last_cmd_tab_time, __ATOMIC_RELAXED);
+            float dt = ((float) read_os_timer() - last_cmd_tab_time) * (1000.0f / (float)read_os_freq());
+            if (dt > 1500.0f) {
+                CFTypeRef dummy = NULL;
+                AXUIElementCopyAttributeValue(application->ref, CFSTR("__fence"), &dummy);
+            }
+
+            if (__atomic_load_n(&__pending_window_focus, __ATOMIC_RELAXED) == false) {
+                if (psn_sid && !space_is_visible(psn_sid)) {
+                    SLSSpaceSetFrontPSN(g_connection, psn_sid, process->psn);
+                    space_manager_focus_space_using_gesture(space_display_id(psn_sid), psn_sid);
+                }
             }
         }
     }
@@ -670,10 +685,13 @@ static EVENT_HANDLER(WINDOW_FOCUSED)
     debug("%s: %s %d\n", __FUNCTION__, window->application->name, window->id);
 
     if (g_space_manager.skip_window_focus_animation) {
-        uint64_t sid = window_space(window->id);
-        if (sid && !space_is_visible(sid)) {
-            SLSSpaceSetFrontPSN(g_connection, sid, window->application->psn);
-            space_manager_focus_space_using_gesture(space_display_id(sid), sid);
+        bool is_sticky = window_check_flag(window, WINDOW_STICKY) || window_is_sticky(window->id);
+        if (!is_sticky) {
+            uint64_t sid = window_space(window->id);
+            if (sid && !space_is_visible(sid)) {
+                SLSSpaceSetFrontPSN(g_connection, sid, window->application->psn);
+                space_manager_focus_space_using_gesture(space_display_id(sid), sid);
+            }
         }
     }
 

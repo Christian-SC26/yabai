@@ -208,7 +208,7 @@ void mouse_drop_action_warp(struct window_manager *wm, struct view *src_view, st
         window_node_capture_windows(src_node_rm, &window_list);
     }
 
-    if (src_node_rm != src_node_add && src_node_rm != src_node_add->parent) {
+    if (!src_node_rm || (src_node_rm != src_node_add && src_node_rm != src_node_add->parent)) {
         window_node_capture_windows(src_node_add, &window_list);
     }
 
