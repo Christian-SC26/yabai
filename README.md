@@ -47,6 +47,10 @@
 >   * Toggling `windowed-fullscreen` mode now honors configured top and bottom padding for external status bars (e.g., Sketchybar).
 > * **Per-App Focus-Follows-Mouse Exclusion Rule** ([#2750](https://github.com/asmvik/yabai/issues/2750)):
 >   * Added `ffm=off` / `focus_follows_mouse=off` rule option to prevent focus from jumping to or from excluded apps (such as virtual machines, games, or graphic editors) when the mouse passes over them.
+> * **Prevent Space Jump on Sticky & PiP Window Focus** ([#2825](https://github.com/asmvik/yabai/issues/2825)):
+>   * When `skip_window_focus_animation` is enabled, focusing or clicking sticky windows (such as YouTube Picture-in-Picture players in Safari/Chrome or floating utility overlays) no longer erroneously triggers a space-switching gesture to the application's background space.
+> * **Fix Frame Recalculation When Warping Sole Window Between Spaces** ([#2817](https://github.com/asmvik/yabai/issues/2817)):
+>   * When dragging and dropping the only window on a space to warp into a window on another display or space (`mouse_drop_action warp`), the target window and newly moved window now properly capture their geometries and animate smoothly instead of freezing at their old bounds.
 > * **Scratchpad Toggle Space Jumping Fix** ([#2807](https://github.com/asmvik/yabai/issues/2807)):
 >   * Synchronized window space movement before focus change, preventing yabai from snapping back to the previous space when toggling a scratchpad window.
 

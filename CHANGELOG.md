@@ -11,6 +11,8 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - Automatic detection and cleanup of legacy `com.koekeishiya.yabai` launchd service on service install/start/restart/stop [#2808](https://github.com/asmvik/yabai/issues/2808)
 
 ### Changed
+- Prevent space jump gestures when focusing sticky / Picture-in-Picture windows with `skip_window_focus_animation` enabled [#2825](https://github.com/asmvik/yabai/issues/2825)
+- Fix frame recalculation and animation when dragging the only window on a space into another space with `mouse_drop_action warp` [#2817](https://github.com/asmvik/yabai/issues/2817)
 - Run the mouse event tap on its own thread with a dedicated CFRunLoop so clicks are no longer held or dropped while the main thread is blocked in an Accessibility request [#2829](https://github.com/asmvik/yabai/issues/2829)
 - Prevent launchd restart loop when another yabai instance is already running by detecting lock owner PID via `fcntl(F_GETLK)` and exiting cleanly with code 0 [#2808](https://github.com/asmvik/yabai/issues/2808)
 - Flush root view and validate space on window close to eliminate empty BSP gaps and clean up zombie windows [#2828](https://github.com/asmvik/yabai/issues/2828)
