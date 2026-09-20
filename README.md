@@ -6,20 +6,20 @@
   <b>Tiling window management for the Mac.</b>
 </p>
 <p align="center">
-  <a href="https://github.com/asmvik/yabai/blob/master/LICENSE.txt">
-    <img src="https://img.shields.io/github/license/asmvik/yabai.svg?color=green" alt="License Badge">
+  <a href="https://github.com/Christian-SC26/yabai/blob/master/LICENSE.txt">
+    <img src="https://img.shields.io/github/license/Christian-SC26/yabai.svg?color=green" alt="License Badge">
   </a>
-  <a href="https://github.com/asmvik/yabai/blob/master/doc/yabai.asciidoc">
+  <a href="https://github.com/Christian-SC26/yabai/blob/master/doc/yabai.asciidoc">
     <img src="https://img.shields.io/badge/view-documentation-green.svg" alt="Documentation Badge">
   </a>
-  <a href="https://github.com/asmvik/yabai/wiki">
+  <a href="https://github.com/Christian-SC26/yabai/wiki">
     <img src="https://img.shields.io/badge/view-wiki-green.svg" alt="Wiki Badge">
   </a>
-  <a href="https://github.com/asmvik/yabai/blob/master/CHANGELOG.md">
+  <a href="https://github.com/Christian-SC26/yabai/blob/master/CHANGELOG.md">
     <img src="https://img.shields.io/badge/view-changelog-green.svg" alt="Changelog Badge">
   </a>
-  <a href="https://github.com/asmvik/yabai/releases">
-    <img src="https://img.shields.io/github/commits-since/asmvik/yabai/latest.svg?color=green" alt="Version Badge">
+  <a href="https://github.com/Christian-SC26/yabai/releases">
+    <img src="https://img.shields.io/github/commits-since/Christian-SC26/yabai/latest.svg?color=green" alt="Version Badge">
   </a>
 </p>
 
@@ -114,9 +114,9 @@ You acknowledge that you understand the potential risk that may come from disabl
 
 <!-- Project internal links -->
 [yabai-license]: LICENSE.txt
-[yabai-examples]: https://github.com/asmvik/yabai/tree/master/examples
-[yabai-wiki]: https://github.com/asmvik/yabai/wiki
-[yabai-docs]: https://github.com/asmvik/yabai/blob/master/doc/yabai.asciidoc
+[yabai-examples]: https://github.com/Christian-SC26/yabai/tree/master/examples
+[yabai-wiki]: https://github.com/Christian-SC26/yabai/wiki
+[yabai-docs]: https://github.com/Christian-SC26/yabai/blob/master/doc/yabai.asciidoc
 
 <!-- Links to other GitHub projects/users -->
 [gh-skhd]: https://github.com/asmvik/skhd

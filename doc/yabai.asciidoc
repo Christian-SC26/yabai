@@ -670,6 +670,10 @@ ARGUMENT
 *mouse_follows_focus='<BOOL_SEL>'*::
     When focusing the window, put the mouse at its center. Overrides the global *mouse_follows_focus* setting.
 
+*ffm='<BOOL_SEL>'* | *focus_follows_mouse='<BOOL_SEL>'*::
+    Override the global *focus_follows_mouse* setting for matching windows. +
+    Set to 'off' to prevent focus from jumping to or from the window when the mouse passes over it.
+
 *sub-layer='<LAYER>'*::
     Window is ordered within the given stacking sub-layer. +
     The window will no longer be eligible for automatic change in sub-layer when managed/unmanaged. +
