@@ -6,6 +6,8 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 ### Added
+- Save and restore BSP tree layout sessions via `yabai -m space --save-layout [<name|path>]`, `--load-layout [<name|path>]`, and `--dump-layout` [#902](https://github.com/asmvik/yabai/issues/902)
+- Smooth live 60 FPS mouse resizing with real-time BSP grid border dragging across sibling nodes [#2712](https://github.com/asmvik/yabai/issues/2712) [#2714](https://github.com/asmvik/yabai/issues/2714)
 - Rule option `ffm=off` / `focus_follows_mouse=off` to exclude specific applications or windows from focus-follows-mouse [#2750](https://github.com/asmvik/yabai/issues/2750)
 - Full support for macOS 27 Golden Gate space switching and scripting addition injection into Dock.app [#2846](https://github.com/asmvik/yabai/issues/2846) [#2844](https://github.com/asmvik/yabai/issues/2844) [#2841](https://github.com/asmvik/yabai/issues/2841) [#2840](https://github.com/asmvik/yabai/issues/2840) [#2837](https://github.com/asmvik/yabai/issues/2837) [#2824](https://github.com/asmvik/yabai/issues/2824)
 - Automatic detection and cleanup of legacy `com.koekeishiya.yabai` launchd service on service install/start/restart/stop [#2808](https://github.com/asmvik/yabai/issues/2808)

@@ -1211,6 +1211,7 @@ static EVENT_HANDLER(MOUSE_DOWN)
     }
 
     if (g_mouse_state.current_action == MOUSE_MODE_RESIZE) {
+        g_mouse_state.live_resized = false;
         CGPoint frame_mid = { CGRectGetMidX(g_mouse_state.window_frame), CGRectGetMidY(g_mouse_state.window_frame) };
         if (point.x < frame_mid.x) g_mouse_state.direction |= HANDLE_LEFT;
         if (point.y < frame_mid.y) g_mouse_state.direction |= HANDLE_TOP;
@@ -1292,12 +1293,15 @@ static EVENT_HANDLER(MOUSE_UP)
             mouse_drop_no_target(&g_space_manager, &g_window_manager, src_view, dst_view, g_mouse_state.window, a_node);
         }
     } else if (info.changed_position || info.changed_size) {
-        mouse_drop_try_adjust_bsp_grid(&g_window_manager, src_view, g_mouse_state.window, &info);
+        if (!g_mouse_state.live_resized) {
+            mouse_drop_try_adjust_bsp_grid(&g_window_manager, src_view, g_mouse_state.window, &info);
+        }
     }
 
 err:
     g_mouse_state.window = NULL;
 res:
+    g_mouse_state.live_resized = false;
     g_mouse_state.current_action = MOUSE_MODE_NONE;
 out:
     CFRelease(context);
@@ -1335,12 +1339,35 @@ static EVENT_HANDLER(MOUSE_DRAGGED)
     } else if (g_mouse_state.current_action == MOUSE_MODE_RESIZE) {
         uint64_t event_time = read_os_timer();
         float dt = ((float) event_time - g_mouse_state.last_moved_time) * (1000.0f / (float)read_os_freq());
-        if (dt < 67.67f) goto out;
+        if (dt < 16.0f) goto out;
 
         int dx = point.x - g_mouse_state.down_location.x;
         int dy = point.y - g_mouse_state.down_location.y;
+        if (abs(dx) < 2 && abs(dy) < 2) goto out;
 
-        window_manager_resize_window_relative_internal(g_mouse_state.window, g_mouse_state.window->frame, g_mouse_state.direction, dx, dy, false);
+        struct view *view = window_manager_find_managed_window(&g_window_manager, g_mouse_state.window);
+        if (view && view->layout == VIEW_BSP) {
+            uint8_t direction = 0;
+            if (dx != 0) {
+                if (g_mouse_state.direction & HANDLE_LEFT)  direction |= HANDLE_LEFT;
+                if (g_mouse_state.direction & HANDLE_RIGHT) direction |= HANDLE_RIGHT;
+            }
+            if (dy != 0) {
+                if (g_mouse_state.direction & HANDLE_TOP)    direction |= HANDLE_TOP;
+                if (g_mouse_state.direction & HANDLE_BOTTOM) direction |= HANDLE_BOTTOM;
+            }
+
+            if (direction != 0) {
+                enum window_op_error err = window_manager_resize_window_relative(&g_window_manager, g_mouse_state.window, direction, dx, dy, false);
+                if (err == WINDOW_OP_ERROR_SUCCESS) {
+                    g_mouse_state.live_resized = true;
+                } else {
+                    window_manager_resize_window_relative_internal(g_mouse_state.window, g_mouse_state.window->frame, g_mouse_state.direction, dx, dy, false);
+                }
+            }
+        } else {
+            window_manager_resize_window_relative_internal(g_mouse_state.window, g_mouse_state.window->frame, g_mouse_state.direction, dx, dy, false);
+        }
 
         g_mouse_state.last_moved_time = event_time;
         g_mouse_state.down_location = point;

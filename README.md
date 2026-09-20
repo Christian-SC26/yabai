@@ -53,6 +53,12 @@
 >   * When dragging and dropping the only window on a space to warp into a window on another display or space (`mouse_drop_action warp`), the target window and newly moved window now properly capture their geometries and animate smoothly instead of freezing at their old bounds.
 > * **Scratchpad Toggle Space Jumping Fix** ([#2807](https://github.com/asmvik/yabai/issues/2807)):
 >   * Synchronized window space movement before focus change, preventing yabai from snapping back to the previous space when toggling a scratchpad window.
+> * **Smooth Live 60 FPS Mouse Resizing & Real-Time Border Dragging** ([#2712](https://github.com/asmvik/yabai/issues/2712), [#2714](https://github.com/asmvik/yabai/issues/2714)):
+>   * Upgraded mouse drag rate-limiting from ~15 FPS (67.67 ms) to smooth 60 FPS (16 ms) with delta-distance thresholding;
+>   * Resizing tiled BSP windows now adjusts sibling fences in real-time as the cursor moves instead of waiting for mouse release.
+> * **Save & Restore BSP Layout Sessions** ([#902](https://github.com/asmvik/yabai/issues/902)):
+>   * Added `yabai -m space --save-layout [<name|path>]`, `yabai -m space --load-layout [<name|path>]`, and `yabai -m space --dump-layout` to persist, dump, and recreate complex multi-window BSP tree layouts across reboots or workflows matching applications by name.
+
 
 ## About
 

@@ -530,6 +530,29 @@ Label the selected space, allowing that label to be used as an alias in commands
 .br
 If the command is called without an argument it will try to remove a previously assigned label.
 .RE
+.sp
+\fB\-\-save\-layout\fP [\fI<NAME_OR_PATH>\fP]
+.RS 4
+Save the current BSP tree layout, padding, and gaps of the selected space to a JSON file.
+.br
+If an argument is not provided, saves to \f(CR~/.config/yabai/layouts/space_<INDEX>.json\fP.
+.br
+If a relative name without slash is provided, saves to \f(CR~/.config/yabai/layouts/<NAME>.json\fP.
+.RE
+.sp
+\fB\-\-load\-layout\fP [\fI<NAME_OR_PATH>\fP]
+.RS 4
+Restore a previously saved BSP layout onto the selected space.
+.br
+Matches managed windows to layout slots by application name and reconstructs the split tree, padding, and gaps.
+.br
+If an argument is not provided, loads from \f(CR~/.config/yabai/layouts/space_<INDEX>.json\fP.
+.RE
+.sp
+\fB\-\-dump\-layout\fP
+.RS 4
+Print the current BSP tree layout, padding, and gaps of the selected space as JSON to stdout.
+.RE
 .SS "Window"
 .SS "General Syntax"
 .sp

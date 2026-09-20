@@ -80,6 +80,7 @@ struct mouse_state
     CGRect window_frame;
     uint32_t ffm_window_id;
     uint8_t direction;
+    bool live_resized;
     struct window_node *feedback_node;
 };
 

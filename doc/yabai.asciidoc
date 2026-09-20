@@ -358,6 +358,19 @@ COMMAND
     Label the selected space, allowing that label to be used as an alias in commands that take a `SPACE_SEL` parameter. +
     If the command is called without an argument it will try to remove a previously assigned label.
 
+*--save-layout* ['<NAME_OR_PATH>']::
+    Save the current BSP tree layout, padding, and gaps of the selected space to a JSON file. +
+    If an argument is not provided, saves to `~/.config/yabai/layouts/space_<INDEX>.json`. +
+    If a relative name without slash is provided (e.g. `work`), saves to `~/.config/yabai/layouts/<NAME>.json`.
+
+*--load-layout* ['<NAME_OR_PATH>']::
+    Restore a previously saved BSP layout onto the selected space. +
+    Matches managed windows to layout slots by application name and reconstructs the split tree, padding, and gaps. +
+    If an argument is not provided, loads from `~/.config/yabai/layouts/space_<INDEX>.json`.
+
+*--dump-layout*::
+    Print the current BSP tree layout, padding, and gaps of the selected space as JSON to stdout.
+
 Window
 ~~~~~~
 

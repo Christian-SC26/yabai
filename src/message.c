@@ -110,8 +110,11 @@ extern bool g_verbose;
 #define COMMAND_SPACE_PADDING  "--padding"
 #define COMMAND_SPACE_GAP      "--gap"
 #define COMMAND_SPACE_TOGGLE   "--toggle"
-#define COMMAND_SPACE_LAYOUT   "--layout"
-#define COMMAND_SPACE_LABEL    "--label"
+#define COMMAND_SPACE_LAYOUT       "--layout"
+#define COMMAND_SPACE_LABEL        "--label"
+#define COMMAND_SPACE_SAVE_LAYOUT  "--save-layout"
+#define COMMAND_SPACE_LOAD_LAYOUT  "--load-layout"
+#define COMMAND_SPACE_DUMP_LAYOUT  "--dump-layout"
 
 #define ARGUMENT_SPACE_ROTATE_90    "90"
 #define ARGUMENT_SPACE_ROTATE_180   "180"
@@ -2038,6 +2041,27 @@ static void handle_domain_space(FILE *rsp, struct token domain, char *message)
                         daemon_fail(rsp, "the selected space was not associated with a label!\n");
                     }
                 }
+            }
+        } else if (token_equals(command, COMMAND_SPACE_SAVE_LAYOUT) || token_equals(command, "--save")) {
+            struct token value = get_token(&message);
+            char path[MAXLEN] = {0};
+            char err[512] = {0};
+            char *name_or_path = token_is_valid(value) ? value.text : NULL;
+            if (!layout_store_save(acting_sid, name_or_path, path, sizeof(path), err, sizeof(err))) {
+                daemon_fail(rsp, "yabai: %s\n", err);
+            }
+        } else if (token_equals(command, COMMAND_SPACE_LOAD_LAYOUT) || token_equals(command, "--load") || token_equals(command, "--restore-layout") || token_equals(command, "--restore")) {
+            struct token value = get_token(&message);
+            char path[MAXLEN] = {0};
+            char err[512] = {0};
+            char *name_or_path = token_is_valid(value) ? value.text : NULL;
+            if (!layout_store_restore(acting_sid, name_or_path, path, sizeof(path), err, sizeof(err))) {
+                daemon_fail(rsp, "yabai: %s\n", err);
+            }
+        } else if (token_equals(command, COMMAND_SPACE_DUMP_LAYOUT) || token_equals(command, "--dump")) {
+            char err[512] = {0};
+            if (!layout_store_dump(acting_sid, rsp, err, sizeof(err))) {
+                daemon_fail(rsp, "yabai: %s\n", err);
             }
         } else {
             daemon_fail(rsp, "unknown command '%.*s' for domain '%.*s'\n", command.length, command.text, domain.length, domain.text);
