@@ -31,7 +31,7 @@
 > This repository is an actively maintained fork created to provide timely fixes, critical stability improvements, and **macOS 27 (Golden Gate)** compatibility in the absence of upstream maintainer activity.
 >
 > **Issues resolved in this fork:**
-> * **macOS 27 (Golden Gate) Full Compatibility** ([#2846](https://github.com/asmvik/yabai/issues/2846), [#2844](https://github.com/asmvik/yabai/issues/2844), [#2841](https://github.com/asmvik/yabai/issues/2841), [#2840](https://github.com/asmvik/yabai/issues/2840), [#2837](https://github.com/asmvik/yabai/issues/2837), [#2824](https://github.com/asmvik/yabai/issues/2824)):
+> * **macOS 27 (Golden Gate) Full Compatibility** ([#2824](https://github.com/asmvik/yabai/issues/2824)):
 >   * Full support for instant space switching (`yabai -m space --focus <index>`) on macOS 27;
 >   * Updated Mach-O opcode scanner and payload injection for macOS 27 `Dock.app`;
 >   * Corrected `scripting_addition_perform_validation()` verification (`attrib = 0x7f`).
