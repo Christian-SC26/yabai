@@ -5,6 +5,8 @@ All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [7.1.26] - 2026-09-22
 ### Added
 - Save and restore multi-space workspace sessions via `yabai -m space --save-session [<name|path>]`, `--load-session [<name|path>]`, and `--dump-session`, as well as individual space layout templates via `--save-layout`, `--load-layout`, and `--dump-layout` [#902](https://github.com/asmvik/yabai/issues/902)
 - Smooth live 60 FPS mouse resizing with real-time BSP grid border dragging across sibling nodes [#2712](https://github.com/asmvik/yabai/issues/2712) [#2714](https://github.com/asmvik/yabai/issues/2714)
@@ -826,7 +828,8 @@ The *window_destroyed* signal is now triggered for windows that are implicitly d
 ### Added
 - First official release
 
-[Unreleased]: https://github.com/Christian-SC26/yabai/compare/v7.1.25...HEAD
+[Unreleased]: https://github.com/Christian-SC26/yabai/compare/v7.1.26...HEAD
+[7.1.26]: https://github.com/Christian-SC26/yabai/compare/v7.1.25...v7.1.26
 [7.1.25]: https://github.com/Christian-SC26/yabai/compare/v7.1.24...v7.1.25
 [7.1.24]: https://github.com/Christian-SC26/yabai/compare/v7.1.23...v7.1.24
 [7.1.23]: https://github.com/Christian-SC26/yabai/compare/v7.1.22...v7.1.23

@@ -19,7 +19,10 @@
     <img src="https://img.shields.io/badge/view-changelog-green.svg" alt="Changelog Badge">
   </a>
   <a href="https://github.com/Christian-SC26/yabai/releases">
-    <img src="https://img.shields.io/github/commits-since/Christian-SC26/yabai/latest.svg?color=green" alt="Version Badge">
+    <img src="https://img.shields.io/badge/Apple-Notarized-brightgreen.svg" alt="Notarized Badge">
+  </a>
+  <a href="https://github.com/Christian-SC26/yabai/releases">
+    <img src="https://img.shields.io/github/v/release/Christian-SC26/yabai?color=green" alt="Version Badge">
   </a>
 </p>
 
@@ -59,6 +62,9 @@
 > * **Save & Restore Workspace Sessions & Layouts** ([#902](https://github.com/asmvik/yabai/issues/902)):
 >   * Added `yabai -m space --save-session [<name|path>]`, `yabai -m space --load-session [<name|path>]`, and `yabai -m space --dump-session` to snapshot and restore your entire multi-display workspace (all spaces, space types, paddings, window trees, and open applications);
 >   * Added `yabai -m space --save-layout [<name|path>]`, `yabai -m space --load-layout [<name|path>]`, and `yabai -m space --dump-layout` for individual space layout templates.
+> * **🍏 Apple Developer ID Signed & Apple Notarized Binaries**:
+>   * Official release binaries published on the [GitHub Releases](https://github.com/Christian-SC26/yabai/releases) page are digitally signed with an official Apple Developer ID certificate using Hardened Runtime and ticketed by the Apple Notary Service (`xcrun notarytool`).
+>   * macOS Gatekeeper verifies the ticket automatically—no security blocks, quarantine prompts, or manual `xattr -d com.apple.quarantine` workarounds needed.
 
 
 ## About
@@ -73,6 +79,17 @@ Additional features of yabai include focus-follows-mouse, disabling animations f
 
 ## Installation and Configuration
 
+### Pre-built Signed & Notarized Binaries (Recommended)
+
+Universal release binaries (`arm64` Apple Silicon + `x86_64` Intel) are available on the [GitHub Releases](https://github.com/Christian-SC26/yabai/releases) page.
+- **Apple Notarized**: Every official release archive is signed with Apple Developer ID and fully notarized by Apple. Gatekeeper allows running them immediately.
+- Quick install via release installer script:
+  ```sh
+  curl -fsSL https://raw.githubusercontent.com/Christian-SC26/yabai/master/scripts/install.sh | sh
+  ```
+- Or download `yabai-v*.tar.gz` directly from [GitHub Releases](https://github.com/Christian-SC26/yabai/releases), extract it, and place `yabai` into your `$PATH` (e.g. `/usr/local/bin` or `~/.local/bin`).
+
+### Documentation and Configuration
 - The [&nearr;&nbsp;yabai&nbsp;wiki][yabai-wiki] has both brief and detailed installation instructions for multiple installation methods, and also explains how to uninstall yabai completely.
 - Sample configuration files can be found in the [&nearr;&nbsp;examples][yabai-examples] directory. Refer to the [&nearr;&nbsp;documentation][yabai-docs] or the wiki for further information.
 - Keyboard shortcuts can be defined with [&nearr;&nbsp;skhd][gh-skhd] or any other suitable software you may prefer.
