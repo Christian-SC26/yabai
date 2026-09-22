@@ -6,7 +6,12 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
-## [7.1.26] - 2026-09-22
+## [7.1.27] - 2026-09-22
+### Changed
+- Full support for macOS 27 beta 2 (macOS 27.2, build 26B5091g) Dock.app opcode offsets, pattern signatures, and updated `Dock.Spaces` selectors (`currentSpaceForDisplay:`)
+- Fix Dock crash (SIGABRT unrecognized selector) when switching spaces on macOS 27 beta 2
+- Add resilient fallback for display space lookup via `_displayUUID` and `currentSpace`
+
 ### Added
 - Save and restore multi-space workspace sessions via `yabai -m space --save-session [<name|path>]`, `--load-session [<name|path>]`, and `--dump-session`, as well as individual space layout templates via `--save-layout`, `--load-layout`, and `--dump-layout` [#902](https://github.com/asmvik/yabai/issues/902)
 - Smooth live 60 FPS mouse resizing with real-time BSP grid border dragging across sibling nodes [#2712](https://github.com/asmvik/yabai/issues/2712) [#2714](https://github.com/asmvik/yabai/issues/2714)

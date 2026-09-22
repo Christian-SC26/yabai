@@ -5,7 +5,9 @@
     __asm__("mov x0, %0\n""mov x1, %1\n""mov x2, %2\n""mov x20, %3\n" : :"r"(v0), "r"(v1), "r"(v2), "r"(v3) :"x0", "x1", "x2", "x20"); ((void (*)())(func))();
 
 uint64_t get_dock_spaces_offset(NSOperatingSystemVersion os_version) {
-    if (os_version.majorVersion == 26 || os_version.majorVersion == 27) {
+    if (os_version.majorVersion == 27) {
+        return 0x20000;
+    } else if (os_version.majorVersion == 26) {
         return 0x30000;
     } else if (os_version.majorVersion == 15) {
         return os_version.minorVersion >= 4 ? 0x1f0000 : 0x200000;
@@ -40,7 +42,7 @@ uint64_t get_dppm_offset(NSOperatingSystemVersion os_version) {
 
 uint64_t get_fix_animation_offset(NSOperatingSystemVersion os_version) {
     if (os_version.majorVersion == 27) {
-        return 0x210000;
+        return 0x150000;
     } else if (os_version.majorVersion == 26) {
         return 0x250000;
     } else if (os_version.majorVersion == 15) {
@@ -58,7 +60,7 @@ uint64_t get_fix_animation_offset(NSOperatingSystemVersion os_version) {
 
 uint64_t get_add_space_offset(NSOperatingSystemVersion os_version) {
     if (os_version.majorVersion == 27) {
-        return 0x210000;
+        return 0x150000;
     } else if (os_version.majorVersion == 26) {
         return 0x250000;
     } else if (os_version.majorVersion == 15) {
@@ -76,7 +78,7 @@ uint64_t get_add_space_offset(NSOperatingSystemVersion os_version) {
 
 uint64_t get_remove_space_offset(NSOperatingSystemVersion os_version) {
     if (os_version.majorVersion == 27) {
-        return 0x170000;
+        return 0x100000;
     } else if (os_version.majorVersion == 26) {
         return 0x1e0000;
     } else if (os_version.majorVersion == 15) {
@@ -147,8 +149,9 @@ const char *get_dock_spaces_pattern(NSOperatingSystemVersion os_version) {
 }
 
 const char *get_dppm_pattern(NSOperatingSystemVersion os_version) {
-    if (os_version.majorVersion == 26 || os_version.majorVersion == 27) {
-        //Pulling from function 'DPRemoteConnection::_handleEvent:'
+    if (os_version.majorVersion == 27) {
+        return "?? ?? 00 ?? 08 ?? ?? 91 00 01 40 F9 ?? 03 ?? AA ?? 03 ?? AA ?? ?? ?? 94";
+    } else if (os_version.majorVersion == 26) {
         return "?? ?? 00 ?? 08 ?? ?? 91 00 01 40 F9 E2 03 16 AA E3 03 19 AA ?? ?? ?? 94";
     } else if (os_version.majorVersion == 15) {
         return "?? 0F 00 ?? ?? ?? ?? 91 ?? 0E 00 ?? ?? ?? ?? F8 ?? 03 40 F9 ?? ?? ??";
@@ -220,7 +223,9 @@ const char *get_remove_space_pattern(NSOperatingSystemVersion os_version) {
 }
 
 const char *get_move_space_pattern(NSOperatingSystemVersion os_version) {
-    if (os_version.majorVersion == 26 || os_version.majorVersion == 27) {
+    if (os_version.majorVersion == 27) {
+        return "7F 23 03 D5 E3 03 1E AA ?? ?? ?? 97 FE 03 03 AA FD 7B 05 A9 FD 43 01 91 ?? ?? ?? D1 F3 03 14 AA F8 03 02 AA F5 03 01 AA F7 03 00 AA";
+    } else if (os_version.majorVersion == 26) {
         return "7F 23 03 D5 E3 03 1E AA ?? ?? ?? 97 FE 03 03 AA FD 7B ?? A9 FD ?? ?? 91 F6 03 14 AA";
     } else if (os_version.majorVersion == 15) {
         return "7F 23 03 D5 E3 03 1E AA ?? ?? FF 97 FE 03 03 AA FD 7B 06 A9 FD 83 01 91 F6 03 14 AA F4 03 02 AA FB 03 01 AA FA 03 00 AA ?? 13 00 ?? E8 ?? ?? F9 19 68 68 F8 E0 03 19 AA E1 03 16 AA";
@@ -241,7 +246,7 @@ const char *get_move_space_pattern(NSOperatingSystemVersion os_version) {
 
 const char *get_set_front_window_pattern(NSOperatingSystemVersion os_version) {
     if (os_version.majorVersion == 27) {
-        return "?? ?? ?? 34 7F 23 03 D5 FF C3 01 D1 ?? ?? ?? A9 ?? ?? ?? A9 ?? ?? ?? A9 FD 83 01 91 F3 03 01 AA F5 03 00 AA";
+        return "7F 23 03 D5 FF ?? ?? D1 F6 57 ?? A9 F4 4F ?? A9 FD 7B ?? A9 FD ?? ?? 91 F6 03 01 AA F5 03 00 AA";
     } else if (os_version.majorVersion == 26) {
         return "21 ?? ?? 34 7F 23 03 D5 FF ?? 01 D1 F6 ?? 04 A9 F4 ?? 05 A9 FD ?? 06 A9 FD ?? 01 91";
     } else if (os_version.majorVersion == 15) {
