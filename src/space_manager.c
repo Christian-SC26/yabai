@@ -1052,12 +1052,16 @@ enum space_op_error space_manager_focus_space(uint64_t sid)
             display_manager_focus_display(new_did, sid);
         }
     } else {
-        struct window *window = window_manager_find_window_on_space_by_rank_filtering_window(&g_window_manager, sid, 1, 0);
-        if (window) {
-            window_manager_focus_window_with_raise(&window->application->psn, window->id, window->ref);
-            window_manager_center_mouse(&g_window_manager, window);
+        CFStringRef uuid = display_uuid(new_did);
+        CGError err = uuid ? SLSManagedDisplaySetCurrentSpace(g_connection, uuid, sid) : kCGErrorFailure;
+        if (err == kCGErrorSuccess) {
             if (cur_did != new_did) {
                 display_manager_set_active_display_id(new_did);
+            }
+            struct window *window = window_manager_find_window_on_space_by_rank_filtering_window(&g_window_manager, sid, 1, 0);
+            if (window) {
+                window_manager_focus_window_with_raise(&window->application->psn, window->id, window->ref);
+                window_manager_center_mouse(&g_window_manager, window);
             }
         } else {
             space_manager_focus_space_using_gesture(new_did, sid);
@@ -1090,7 +1094,17 @@ enum space_op_error space_manager_switch_space(uint64_t sid)
         return SPACE_OP_ERROR_SUCCESS;
     }
 
-    return scripting_addition_focus_space(sid) ? SPACE_OP_ERROR_SUCCESS : SPACE_OP_ERROR_SCRIPTING_ADDITION;
+    bool disable_sa = getenv("YABAI_DISABLE_SA") != NULL || getenv("YABAI_SIMULATE_SIP_ON") != NULL;
+    if (!disable_sa && scripting_addition_focus_space(sid)) {
+        return SPACE_OP_ERROR_SUCCESS;
+    }
+
+    CFStringRef uuid = display_uuid(did);
+    if (uuid && SLSManagedDisplaySetCurrentSpace(g_connection, uuid, sid) == kCGErrorSuccess) {
+        return SPACE_OP_ERROR_SUCCESS;
+    }
+
+    return SPACE_OP_ERROR_SCRIPTING_ADDITION;
 }
 
 enum space_op_error space_manager_destroy_space(uint64_t sid)

@@ -494,7 +494,17 @@ enum space_op_error display_manager_focus_space(uint32_t did, uint64_t sid)
     uint32_t space_did = space_display_id(sid);
     if (space_did != did) return SPACE_OP_ERROR_SAME_DISPLAY;
 
-    return scripting_addition_focus_space(sid) ? SPACE_OP_ERROR_SUCCESS : SPACE_OP_ERROR_SCRIPTING_ADDITION;
+    bool disable_sa = getenv("YABAI_DISABLE_SA") != NULL || getenv("YABAI_SIMULATE_SIP_ON") != NULL;
+    if (!disable_sa && scripting_addition_focus_space(sid)) {
+        return SPACE_OP_ERROR_SUCCESS;
+    }
+
+    CFStringRef uuid = display_uuid(did);
+    if (uuid && SLSManagedDisplaySetCurrentSpace(g_connection, uuid, sid) == kCGErrorSuccess) {
+        return SPACE_OP_ERROR_SUCCESS;
+    }
+
+    return SPACE_OP_ERROR_SCRIPTING_ADDITION;
 }
 
 bool display_manager_begin(struct display_manager *dm)
