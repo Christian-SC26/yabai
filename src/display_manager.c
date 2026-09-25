@@ -453,9 +453,12 @@ out:
 
 void display_manager_set_active_display_id(uint32_t did)
 {
+    if (did == g_display_manager.current_display_id) return;
+
     CFStringRef uuid = display_uuid(did);
     SLSSetActiveMenuBarDisplayIdentifier(g_connection, uuid, uuid);
     CFRelease(uuid);
+    g_display_manager.current_display_id = did;
 }
 
 #pragma clang diagnostic push

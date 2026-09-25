@@ -1329,18 +1329,25 @@ void window_manager_focus_window_without_raise(ProcessSerialNumber *window_psn, 
     window_manager_make_key_window(window_psn, window_id);
 }
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
 void window_manager_focus_window_with_raise(ProcessSerialNumber *window_psn, uint32_t window_id, AXUIElementRef window_ref)
 {
     TIME_FUNCTION;
 
-#if 1
+    pid_t pid = 0;
+    GetProcessPID(window_psn, &pid);
+    if (pid > 0) {
+        NSRunningApplication *app = [NSRunningApplication runningApplicationWithProcessIdentifier:pid];
+        if (app) {
+            [app activateWithOptions:NSApplicationActivateIgnoringOtherApps];
+        }
+    }
+
     _SLPSSetFrontProcessWithOptions(window_psn, window_id, kCPSUserGenerated);
-    window_manager_make_key_window(window_psn, window_id);
     AXUIElementPerformAction(window_ref, kAXRaiseAction);
-#else
-    scripting_addition_focus_window(window_id);
-#endif
 }
+#pragma clang diagnostic pop
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"

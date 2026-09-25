@@ -654,9 +654,15 @@ uint64_t space_manager_last_space(void)
 
 uint64_t space_manager_active_space(void)
 {
-    uint32_t did = 0;
     struct window *window = window_manager_focused_window(&g_window_manager);
+    if (window && !window_check_flag(window, WINDOW_STICKY) && !window_is_sticky(window->id)) {
+        uint64_t w_sid = window_space(window->id);
+        if (w_sid && space_is_user(w_sid)) {
+            return w_sid;
+        }
+    }
 
+    uint32_t did = 0;
     if (window) did = window_display_id(window->id);
     if (!did)   did = display_manager_active_display_id();
     if (!did)   return 0;
@@ -1027,17 +1033,35 @@ enum space_op_error space_manager_focus_space(uint64_t sid)
     if (is_in_mc) return SPACE_OP_ERROR_IN_MISSION_CONTROL;
 
     uint64_t cur_sid = space_manager_active_space();
-    if (cur_sid == sid) return SPACE_OP_ERROR_SAME_SPACE;
+    if (cur_sid == sid) {
+        struct window *window = window_manager_find_window_on_space_by_rank_filtering_window(&g_window_manager, sid, 1, 0);
+        if (window && window != window_manager_focused_window(&g_window_manager)) {
+            window_manager_focus_window_with_raise(&window->application->psn, window->id, window->ref);
+        }
+        return SPACE_OP_ERROR_SUCCESS;
+    }
 
+    uint32_t cur_did = space_display_id(cur_sid);
     uint32_t new_did = space_display_id(sid);
     bool is_animating = display_manager_display_is_animating(new_did);
     if (is_animating) return SPACE_OP_ERROR_DISPLAY_IS_ANIMATING;
 
     bool disable_sa = getenv("YABAI_DISABLE_SA") != NULL || getenv("YABAI_SIMULATE_SIP_ON") != NULL;
     if (!disable_sa && scripting_addition_focus_space(sid)) {
-        display_manager_focus_display(new_did, sid);
+        if (cur_did != new_did) {
+            display_manager_focus_display(new_did, sid);
+        }
     } else {
-        space_manager_focus_space_using_gesture(new_did, sid);
+        struct window *window = window_manager_find_window_on_space_by_rank_filtering_window(&g_window_manager, sid, 1, 0);
+        if (window) {
+            window_manager_focus_window_with_raise(&window->application->psn, window->id, window->ref);
+            window_manager_center_mouse(&g_window_manager, window);
+            if (cur_did != new_did) {
+                display_manager_set_active_display_id(new_did);
+            }
+        } else {
+            space_manager_focus_space_using_gesture(new_did, sid);
+        }
     }
 
     return SPACE_OP_ERROR_SUCCESS;
