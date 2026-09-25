@@ -6,6 +6,12 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [7.1.28] - 2026-09-25
+### Changed
+- Native SIP-enabled space switching on macOS 27 (Golden Gate): `yabai -m space --focus <index|recent|prev|next>` now switches spaces natively via SkyLight SPI (`SLSManagedDisplaySetCurrentSpace`) without requiring SIP to be disabled or scripting addition to be injected
+- Updated space identifier resolution to prefer `ManagedSpaceID` before falling back to `id64` across displays and space management routines
+- Enhanced gesture fallback with raw IOHID payload serialization (field 4205) and corrected direction models for modern WindowServer compatibility
+
 ## [7.1.27] - 2026-09-22
 ### Changed
 - Full support for macOS 27 beta 2 (macOS 27.2, build 26B5091g) Dock.app opcode offsets, pattern signatures, and updated `Dock.Spaces` selectors (`currentSpaceForDisplay:`)

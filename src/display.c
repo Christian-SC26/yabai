@@ -239,7 +239,8 @@ uint64_t *display_space_list(uint32_t did, int *count)
 
         for (int j = 0; j < spaces_count; ++j) {
             CFDictionaryRef space_ref = CFArrayGetValueAtIndex(spaces_ref, j);
-            CFNumberRef sid_ref = CFDictionaryGetValue(space_ref, CFSTR("id64"));
+            CFNumberRef sid_ref = CFDictionaryGetValue(space_ref, CFSTR("ManagedSpaceID"));
+            if (!sid_ref) sid_ref = CFDictionaryGetValue(space_ref, CFSTR("id64"));
             CFNumberGetValue(sid_ref, CFNumberGetType(sid_ref), &space_list[j]);
         }
     }

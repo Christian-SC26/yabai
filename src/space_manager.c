@@ -504,7 +504,8 @@ int space_manager_mission_control_index(uint64_t sid)
 
         for (int j = 0; j < spaces_count; ++j) {
             CFDictionaryRef space_ref = CFArrayGetValueAtIndex(spaces_ref, j);
-            CFNumberRef sid_ref = CFDictionaryGetValue(space_ref, CFSTR("id64"));
+            CFNumberRef sid_ref = CFDictionaryGetValue(space_ref, CFSTR("ManagedSpaceID"));
+            if (!sid_ref) sid_ref = CFDictionaryGetValue(space_ref, CFSTR("id64"));
             CFNumberGetValue(sid_ref, CFNumberGetType(sid_ref), &result);
             if (sid == result) goto out;
 
@@ -534,7 +535,8 @@ uint64_t space_manager_mission_control_space(int desktop_id)
 
         for (int j = 0; j < spaces_count; ++j) {
             CFDictionaryRef space_ref = CFArrayGetValueAtIndex(spaces_ref, j);
-            CFNumberRef sid_ref = CFDictionaryGetValue(space_ref, CFSTR("id64"));
+            CFNumberRef sid_ref = CFDictionaryGetValue(space_ref, CFSTR("ManagedSpaceID"));
+            if (!sid_ref) sid_ref = CFDictionaryGetValue(space_ref, CFSTR("id64"));
             CFNumberGetValue(sid_ref, CFNumberGetType(sid_ref), &result);
             if (desktop_cnt == desktop_id) goto out;
 
@@ -952,23 +954,60 @@ bool space_manager_focus_space_using_gesture(uint32_t new_did, uint64_t new_sid)
     // Technique first observed in practice, and reverse-engineered from, BetterTouchTool.
     //
 
-    CGEventRef event_dock_control = CGEventCreate(NULL);
-    if (!event_dock_control) return false;
+    bool is_right = (new_index - cur_index) > 0;
 
-    float sign = (new_index - cur_index) > 0 ? 1.0 : -1.0;
-    CGEventSetIntegerValueField(event_dock_control, /* kCGSEventTypeField            */  55, /* kCGSEventDockControl       */ 30);
-    CGEventSetIntegerValueField(event_dock_control, /* kCGEventGestureHIDType        */ 110, /* kIOHIDEventTypeDockSwipe   */ 23);
-    CGEventSetIntegerValueField(event_dock_control, /* kCGEventGestureSwipeMotion    */ 123, /* kCGGestureMotionHorizontal */  1);
-    CGEventSetDoubleValueField(event_dock_control,  /* kCGEventGestureSwipeProgress  */ 124, sign);
-    CGEventSetDoubleValueField(event_dock_control,  /* kCGEventGestureSwipeVelocityX */ 129, sign * 9999.0);
+    if (iss_requires_event_augmentation()) {
+        const double progress = is_right ? -0.000016 : 0.000016;
+        const double modern_vel = is_right ? -2000.0 : 2000.0;
+        const int phases[3] = { /* Began */ 1, /* Changed */ 2, /* Ended */ 4 };
 
-    for (int i = 0; i < count; ++i) {
-        CGEventSetIntegerValueField(event_dock_control, /* kCGEventGesturePhase */ 132, /* kCGSGesturePhaseBegan */ 1);
-        CGEventPost(kCGSessionEventTap, event_dock_control);
-        CGEventSetIntegerValueField(event_dock_control, /* kCGEventGesturePhase */ 132, /* kCGSGesturePhaseEnded */ 4);
-        CGEventPost(kCGSessionEventTap, event_dock_control);
+        for (int i = 0; i < count; ++i) {
+            for (int p = 0; p < 3; ++p) {
+                int phase = phases[p];
+                CGEventRef ev = CGEventCreate(NULL);
+                if (!ev) continue;
+
+                CGEventSetIntegerValueField(ev, /* kCGSEventTypeField            */  55, /* kCGSEventDockControl       */ 30);
+                CGEventSetIntegerValueField(ev, /* kCGEventGestureHIDType        */ 110, /* kIOHIDEventTypeDockSwipe   */ 23);
+                CGEventSetIntegerValueField(ev, /* kCGEventGesturePhase          */ 132, phase);
+                CGEventSetDoubleValueField(ev,  /* kCGEventGestureSwipeProgress  */ 124, progress);
+                CGEventSetIntegerValueField(ev, /* kCGEventGestureSwipeMotion    */ 123, /* kCGGestureMotionHorizontal */  1);
+                CGEventSetIntegerValueField(ev, /* kCGEventGesturePhaseAlias     */ 134, phase);
+                CGEventSetDoubleValueField(ev,  /* kCGEventGestureZoomDeltaY     */ 138, 3.0);
+                CGEventSetDoubleValueField(ev,  /* kCGEventSourceUnixPIDAlias    */ 169, (double)mach_absolute_time());
+                CGEventSetDoubleValueField(ev,  /* kCGEventGestureSwipePositionX */ 125, 0.1);
+
+                if (phase == 4) {
+                    CGEventSetDoubleValueField(ev, /* kCGEventGestureSwipeVelocityX */ 129, modern_vel);
+                }
+
+                CGEventRef augmented = iss_augment_dock_swipe_event(ev);
+                CFRelease(ev);
+                if (!augmented) continue;
+
+                CGEventPost(kCGSessionEventTap, augmented);
+                CFRelease(augmented);
+            }
+        }
+    } else {
+        CGEventRef event_dock_control = CGEventCreate(NULL);
+        if (!event_dock_control) return false;
+
+        float sign = is_right ? 1.0 : -1.0;
+        CGEventSetIntegerValueField(event_dock_control, /* kCGSEventTypeField            */  55, /* kCGSEventDockControl       */ 30);
+        CGEventSetIntegerValueField(event_dock_control, /* kCGEventGestureHIDType        */ 110, /* kIOHIDEventTypeDockSwipe   */ 23);
+        CGEventSetIntegerValueField(event_dock_control, /* kCGEventGestureSwipeMotion    */ 123, /* kCGGestureMotionHorizontal */  1);
+        CGEventSetDoubleValueField(event_dock_control,  /* kCGEventGestureSwipeProgress  */ 124, sign);
+        CGEventSetDoubleValueField(event_dock_control,  /* kCGEventGestureSwipeVelocityX */ 129, sign * 9999.0);
+
+        for (int i = 0; i < count; ++i) {
+            CGEventSetIntegerValueField(event_dock_control, /* kCGEventGesturePhase */ 132, /* kCGSGesturePhaseBegan */ 1);
+            CGEventPost(kCGSessionEventTap, event_dock_control);
+            CGEventSetIntegerValueField(event_dock_control, /* kCGEventGesturePhase */ 132, /* kCGSGesturePhaseEnded */ 4);
+            CGEventPost(kCGSessionEventTap, event_dock_control);
+        }
+        CFRelease(event_dock_control);
     }
-    CFRelease(event_dock_control);
 
     if (focus_display) {
         display_manager_set_active_display_id(new_did);
@@ -1002,7 +1041,19 @@ enum space_op_error space_manager_focus_space(uint64_t sid)
             display_manager_focus_display(new_did, sid);
         }
     } else {
-        space_manager_focus_space_using_gesture(new_did, sid);
+        bool did_set = false;
+        CFStringRef uuid = display_uuid(new_did);
+        if (uuid) {
+            SLSManagedDisplaySetCurrentSpace(g_connection, uuid, sid);
+            did_set = (SLSManagedDisplayGetCurrentSpace(g_connection, uuid) == sid);
+            CFRelease(uuid);
+        }
+
+        if (did_set) {
+            display_manager_focus_display(new_did, sid);
+        } else {
+            space_manager_focus_space_using_gesture(new_did, sid);
+        }
     }
 
     return SPACE_OP_ERROR_SUCCESS;
@@ -1031,7 +1082,22 @@ enum space_op_error space_manager_switch_space(uint64_t sid)
         return SPACE_OP_ERROR_SUCCESS;
     }
 
-    return scripting_addition_focus_space(sid) ? SPACE_OP_ERROR_SUCCESS : SPACE_OP_ERROR_SCRIPTING_ADDITION;
+    if (scripting_addition_focus_space(sid)) {
+        return SPACE_OP_ERROR_SUCCESS;
+    }
+
+    CFStringRef uuid = display_uuid(did);
+    if (uuid) {
+        SLSManagedDisplaySetCurrentSpace(g_connection, uuid, sid);
+        bool did_set = (SLSManagedDisplayGetCurrentSpace(g_connection, uuid) == sid);
+        CFRelease(uuid);
+        if (did_set) {
+            display_manager_focus_display(did, sid);
+            return SPACE_OP_ERROR_SUCCESS;
+        }
+    }
+
+    return SPACE_OP_ERROR_SCRIPTING_ADDITION;
 }
 
 enum space_op_error space_manager_destroy_space(uint64_t sid)
