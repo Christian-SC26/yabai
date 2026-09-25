@@ -1036,7 +1036,8 @@ enum space_op_error space_manager_focus_space(uint64_t sid)
     bool is_animating = display_manager_display_is_animating(new_did);
     if (is_animating) return SPACE_OP_ERROR_DISPLAY_IS_ANIMATING;
 
-    if (scripting_addition_focus_space(sid)) {
+    bool disable_sa = getenv("YABAI_SIMULATE_SIP_ON") != NULL || getenv("YABAI_DISABLE_SA") != NULL;
+    if (!disable_sa && scripting_addition_focus_space(sid)) {
         if (focus_display) {
             display_manager_focus_display(new_did, sid);
         }
@@ -1082,7 +1083,8 @@ enum space_op_error space_manager_switch_space(uint64_t sid)
         return SPACE_OP_ERROR_SUCCESS;
     }
 
-    if (scripting_addition_focus_space(sid)) {
+    bool disable_sa = getenv("YABAI_SIMULATE_SIP_ON") != NULL || getenv("YABAI_DISABLE_SA") != NULL;
+    if (!disable_sa && scripting_addition_focus_space(sid)) {
         return SPACE_OP_ERROR_SUCCESS;
     }
 
