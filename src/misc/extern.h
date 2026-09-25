@@ -40,7 +40,6 @@ extern CGError CGSNewRegionWithRect(CGRect *rect, CFTypeRef *region);
 extern CFUUIDRef CGDisplayCreateUUIDFromDisplayID(uint32_t did);
 extern CFArrayRef SLSCopyManagedDisplays(int cid);
 extern uint64_t SLSManagedDisplayGetCurrentSpace(int cid, CFStringRef uuid);
-extern void SLSManagedDisplaySetCurrentSpace(int cid, CFStringRef uuid, uint64_t sid);
 extern CFStringRef SLSCopyActiveMenuBarDisplayIdentifier(int cid);
 extern CGError SLSSetActiveMenuBarDisplayIdentifier(int cid, CFStringRef uuid, CFStringRef repeat_uuid);
 extern CFStringRef SLSCopyBestManagedDisplayForPoint(int cid, CGPoint point);

@@ -1029,32 +1029,15 @@ enum space_op_error space_manager_focus_space(uint64_t sid)
     uint64_t cur_sid = space_manager_active_space();
     if (cur_sid == sid) return SPACE_OP_ERROR_SAME_SPACE;
 
-    uint32_t cur_did = space_display_id(cur_sid);
     uint32_t new_did = space_display_id(sid);
-    bool focus_display = cur_did != new_did;
-
     bool is_animating = display_manager_display_is_animating(new_did);
     if (is_animating) return SPACE_OP_ERROR_DISPLAY_IS_ANIMATING;
 
-    bool disable_sa = getenv("YABAI_SIMULATE_SIP_ON") != NULL || getenv("YABAI_DISABLE_SA") != NULL;
+    bool disable_sa = getenv("YABAI_DISABLE_SA") != NULL || getenv("YABAI_SIMULATE_SIP_ON") != NULL;
     if (!disable_sa && scripting_addition_focus_space(sid)) {
-        if (focus_display) {
-            display_manager_focus_display(new_did, sid);
-        }
+        display_manager_focus_display(new_did, sid);
     } else {
-        bool did_set = false;
-        CFStringRef uuid = display_uuid(new_did);
-        if (uuid) {
-            SLSManagedDisplaySetCurrentSpace(g_connection, uuid, sid);
-            did_set = (SLSManagedDisplayGetCurrentSpace(g_connection, uuid) == sid);
-            CFRelease(uuid);
-        }
-
-        if (did_set) {
-            display_manager_focus_display(new_did, sid);
-        } else {
-            space_manager_focus_space_using_gesture(new_did, sid);
-        }
+        space_manager_focus_space_using_gesture(new_did, sid);
     }
 
     return SPACE_OP_ERROR_SUCCESS;
@@ -1083,23 +1066,7 @@ enum space_op_error space_manager_switch_space(uint64_t sid)
         return SPACE_OP_ERROR_SUCCESS;
     }
 
-    bool disable_sa = getenv("YABAI_SIMULATE_SIP_ON") != NULL || getenv("YABAI_DISABLE_SA") != NULL;
-    if (!disable_sa && scripting_addition_focus_space(sid)) {
-        return SPACE_OP_ERROR_SUCCESS;
-    }
-
-    CFStringRef uuid = display_uuid(did);
-    if (uuid) {
-        SLSManagedDisplaySetCurrentSpace(g_connection, uuid, sid);
-        bool did_set = (SLSManagedDisplayGetCurrentSpace(g_connection, uuid) == sid);
-        CFRelease(uuid);
-        if (did_set) {
-            display_manager_focus_display(did, sid);
-            return SPACE_OP_ERROR_SUCCESS;
-        }
-    }
-
-    return SPACE_OP_ERROR_SCRIPTING_ADDITION;
+    return scripting_addition_focus_space(sid) ? SPACE_OP_ERROR_SUCCESS : SPACE_OP_ERROR_SCRIPTING_ADDITION;
 }
 
 enum space_op_error space_manager_destroy_space(uint64_t sid)
