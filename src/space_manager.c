@@ -964,7 +964,7 @@ bool space_manager_focus_space_using_gesture(uint32_t new_did, uint64_t new_sid)
 
     if (iss_requires_event_augmentation()) {
         const double progress = is_right ? -0.000016 : 0.000016;
-        const double modern_vel = is_right ? -2000.0 : 2000.0;
+        const double modern_vel = is_right ? -500.0 : 500.0;
         const int phases[3] = { /* Began */ 1, /* Changed */ 2, /* Ended */ 4 };
 
         for (int i = 0; i < count; ++i) {
@@ -993,6 +993,10 @@ bool space_manager_focus_space_using_gesture(uint32_t new_did, uint64_t new_sid)
 
                 CGEventPost(kCGSessionEventTap, augmented);
                 CFRelease(augmented);
+                usleep(1000);
+            }
+            if (i + 1 < count) {
+                usleep(25000);
             }
         }
     } else {
@@ -1052,20 +1056,7 @@ enum space_op_error space_manager_focus_space(uint64_t sid)
             display_manager_focus_display(new_did, sid);
         }
     } else {
-        CFStringRef uuid = display_uuid(new_did);
-        CGError err = uuid ? SLSManagedDisplaySetCurrentSpace(g_connection, uuid, sid) : kCGErrorFailure;
-        if (err == kCGErrorSuccess) {
-            if (cur_did != new_did) {
-                display_manager_set_active_display_id(new_did);
-            }
-            struct window *window = window_manager_find_window_on_space_by_rank_filtering_window(&g_window_manager, sid, 1, 0);
-            if (window) {
-                window_manager_focus_window_with_raise(&window->application->psn, window->id, window->ref);
-                window_manager_center_mouse(&g_window_manager, window);
-            }
-        } else {
-            space_manager_focus_space_using_gesture(new_did, sid);
-        }
+        space_manager_focus_space_using_gesture(new_did, sid);
     }
 
     return SPACE_OP_ERROR_SUCCESS;
@@ -1099,12 +1090,8 @@ enum space_op_error space_manager_switch_space(uint64_t sid)
         return SPACE_OP_ERROR_SUCCESS;
     }
 
-    CFStringRef uuid = display_uuid(did);
-    if (uuid && SLSManagedDisplaySetCurrentSpace(g_connection, uuid, sid) == kCGErrorSuccess) {
-        return SPACE_OP_ERROR_SUCCESS;
-    }
-
-    return SPACE_OP_ERROR_SCRIPTING_ADDITION;
+    space_manager_focus_space_using_gesture(did, sid);
+    return SPACE_OP_ERROR_SUCCESS;
 }
 
 enum space_op_error space_manager_destroy_space(uint64_t sid)

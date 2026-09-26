@@ -499,12 +499,8 @@ enum space_op_error display_manager_focus_space(uint32_t did, uint64_t sid)
         return SPACE_OP_ERROR_SUCCESS;
     }
 
-    CFStringRef uuid = display_uuid(did);
-    if (uuid && SLSManagedDisplaySetCurrentSpace(g_connection, uuid, sid) == kCGErrorSuccess) {
-        return SPACE_OP_ERROR_SUCCESS;
-    }
-
-    return SPACE_OP_ERROR_SCRIPTING_ADDITION;
+    space_manager_focus_space_using_gesture(did, sid);
+    return SPACE_OP_ERROR_SUCCESS;
 }
 
 bool display_manager_begin(struct display_manager *dm)
