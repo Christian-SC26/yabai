@@ -6,6 +6,14 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [7.1.29] - 2026-09-26
+### Changed
+- **Scripting Addition (SIP OFF) macOS 27 Enhancements**:
+  - Added support for `arm64e.x1` slice on modern Apple Silicon chips (M4 and newer) by wildcarding function prologues (`?? ?? ?? ??`) to match both `pacibsp` and `pacibsppc` instructions during `Dock.app` opcode scanning [#2832](https://github.com/asmvik/yabai/issues/2832)
+  - Corrected `currentSpaceForDisplay:` invocation in OSAX payload to pass `CGDirectDisplayID` resolved via `-[Spaces displayForSPID:]`, matching the macOS 27.2 `@20@0:8I16` signature
+  - Added NULL/nil guards across `do_space_move`, `do_space_destroy`, `do_space_create`, and `do_space_focus` to prevent `Dock.app` crashes when handling unknown or disappearing spaces
+  - Calibrated pattern scan offsets for `add_space`, `remove_space`, and space transition animation duration on macOS 27.2
+
 ## [7.1.28] - 2026-09-26
 ### Changed
 - **Clean Instant Space Switching with SIP Enabled on macOS 27 (Golden Gate)**:

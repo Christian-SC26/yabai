@@ -422,6 +422,7 @@ static inline uint64_t get_space_id(id space)
 
 static inline id space_for_display_with_id(CFStringRef display_uuid, uint64_t space_id)
 {
+    if (!display_uuid) return nil;
     NSArray *spaces_for_display = ((NSArray *(*)(id, SEL, CFStringRef)) objc_msgSend)(dock_spaces, @selector(spacesForDisplay:), display_uuid);
     for (id space in spaces_for_display) {
         if (space_id == get_space_id(space)) {
@@ -440,19 +441,30 @@ static inline id get_current_space_for_display_space(id display_space)
     return space;
 }
 
-static inline id current_space_for_display(CFStringRef display_uuid)
+static inline id current_space_for_display(CFStringRef display_uuid, uint64_t space_id)
 {
-    if ([dock_spaces respondsToSelector:@selector(currentSpaceForDisplay:)]) {
-        return ((id (*)(id, SEL, CFStringRef)) objc_msgSend)(dock_spaces, @selector(currentSpaceForDisplay:), display_uuid);
-    } else if (macOSSequoia) {
-        return ((id (*)(id, SEL, CFStringRef)) objc_msgSend)(dock_spaces, @selector(currentSpaceForDisplayUUID:), display_uuid);
-    } else {
-        return ((id (*)(id, SEL, CFStringRef)) objc_msgSend)(dock_spaces, @selector(currentSpaceforDisplayUUID:), display_uuid);
+    SEL selector = macOSSequoia ? @selector(currentSpaceForDisplayUUID:) : @selector(currentSpaceforDisplayUUID:);
+    if ([dock_spaces respondsToSelector:selector]) {
+        return ((id (*)(id, SEL, CFStringRef)) objc_msgSend)(dock_spaces, selector, display_uuid);
     }
+
+    //
+    // NOTE: macOS 27.2 replaced currentSpaceForDisplayUUID: with currentSpaceForDisplay:,
+    // which takes a CGDirectDisplayID instead of the display uuid string.
+    //
+
+    if ([dock_spaces respondsToSelector:@selector(displayForSPID:)] &&
+        [dock_spaces respondsToSelector:@selector(currentSpaceForDisplay:)]) {
+        uint32_t display_id = ((uint32_t (*)(id, SEL, uint64_t)) objc_msgSend)(dock_spaces, @selector(displayForSPID:), space_id);
+        return ((id (*)(id, SEL, uint32_t)) objc_msgSend)(dock_spaces, @selector(currentSpaceForDisplay:), display_id);
+    }
+
+    return nil;
 }
 
 static inline id display_space_for_display_uuid(CFStringRef display_uuid)
 {
+    if (!display_uuid) return nil;
     NSArray *display_spaces = get_ivar_value(dock_spaces, "_displaySpaces");
     if (display_spaces != nil) {
         for (id display_space in display_spaces) {
@@ -504,10 +516,17 @@ static void do_space_move(char *message)
     unpack(focus_dest_space);
 
     CFStringRef source_display_uuid = SLSCopyManagedDisplayForSpace(SLSMainConnectionID(), source_space_id);
+    if (!source_display_uuid) return;
+
+    CFStringRef dest_display_uuid = SLSCopyManagedDisplayForSpace(SLSMainConnectionID(), dest_space_id);
+    if (!dest_display_uuid) {
+        CFRelease(source_display_uuid);
+        return;
+    }
+
     id source_space = space_for_display_with_id(source_display_uuid, source_space_id);
     id source_display_space = display_space_for_display_uuid(source_display_uuid);
 
-    CFStringRef dest_display_uuid = SLSCopyManagedDisplayForSpace(SLSMainConnectionID(), dest_space_id);
     id dest_space = space_for_display_with_id(dest_display_uuid, dest_space_id);
     unsigned dest_display_id = ((unsigned (*)(id, SEL, id)) objc_msgSend)(dock_spaces, @selector(displayIDForSpace:), dest_space);
     id dest_display_space = display_space_for_display_uuid(dest_display_uuid);
@@ -555,10 +574,17 @@ static void do_space_destroy(char *message)
     unpack(space_id);
 
     CFStringRef display_uuid = SLSCopyManagedDisplayForSpace(SLSMainConnectionID(), space_id);
+    if (!display_uuid) return;
+
     uint64_t active_space_id = SLSManagedDisplayGetCurrentSpace(SLSMainConnectionID(), display_uuid);
 
     id space = space_for_display_with_id(display_uuid, space_id);
     id display_space = display_space_for_display_uuid(display_uuid);
+
+    if (space == nil || display_space == nil) {
+        CFRelease(display_uuid);
+        return;
+    }
 
     dispatch_sync(dispatch_get_main_queue(), ^{
         ((remove_space_call) remove_space_fp)(space, display_space, dock_spaces, space_id, space_id);
@@ -581,14 +607,18 @@ static void do_space_create(char *message)
     unpack(space_id);
 
     CFStringRef __block display_uuid = SLSCopyManagedDisplayForSpace(SLSMainConnectionID(), space_id);
+    if (!display_uuid) return;
+
     dispatch_sync(dispatch_get_main_queue(), ^{
-        Class space_class = objc_getClass("ManagedSpace");
-        if (space_class == nil) {
-            space_class = objc_getClass("Dock.ManagedSpace");
-        }
-        id new_space = [[space_class alloc] init];
         id display_space = display_space_for_display_uuid(display_uuid);
-        asm__call_add_space(new_space, display_space, add_space_fp);
+        if (display_space != nil) {
+            Class space_class = objc_getClass("ManagedSpace");
+            if (space_class == nil) {
+                space_class = objc_getClass("Dock.ManagedSpace");
+            }
+            id new_space = [[space_class alloc] init];
+            asm__call_add_space(new_space, display_space, add_space_fp);
+        }
         CFRelease(display_uuid);
     });
 }
@@ -602,7 +632,9 @@ static void do_space_focus(char *message)
 
     if (dest_space_id) {
         CFStringRef dest_display = SLSCopyManagedDisplayForSpace(SLSMainConnectionID(), dest_space_id);
-        id source_space = current_space_for_display(dest_display);
+        if (!dest_display) return;
+
+        id source_space = current_space_for_display(dest_display, dest_space_id);
         uint64_t source_space_id = get_space_id(source_space);
         if (source_space_id == 0) {
             source_space_id = SLSManagedDisplayGetCurrentSpace(SLSMainConnectionID(), dest_display);
