@@ -57,8 +57,8 @@ fi
 
 AUTHOR="Christian-SC26"
 NAME="yabai"
-VERSION="7.1.27"
-EXPECTED_HASH="cfc32e5fb0f698c42786aeeeaba2a5e961ede0df2517018b45cbd7c26fecd051"
+VERSION="7.1.28"
+EXPECTED_HASH="abd2d23fb52fc4ef1e4f3c11030e44fe6cbb4ab9f7f1d9501fac3e579b706a26"
 TMP_DIR="./${AUTHOR}-${NAME}-v${VERSION}-installer"
 
 mkdir $TMP_DIR

@@ -31,8 +31,12 @@
 > This repository is an actively maintained fork created to provide timely fixes, critical stability improvements, and **macOS 27 (Golden Gate)** compatibility in the absence of upstream maintainer activity.
 >
 > **Issues resolved in this fork:**
+> * **⚡ Instant Space Switching with SIP Enabled (SIP ON) on macOS 27 (Golden Gate)**:
+>   * Instant, glitch-free space switching (`yabai -m space --focus <index|recent|prev|next>`) out-of-the-box with **System Integrity Protection (SIP) fully enabled** — **no SIP disabling or scripting addition injection required**!
+>   * Employs reverse-engineered IOHIDSystemQueue fluid touch gesture serialization (field 4205 payload) directly into `Dock.app` with calibrated multi-step phase timing for instant multi-space jumps;
+>   * Completely avoids duplicate/ghost window rendering across spaces and eliminates menu bar stacking/artifacts by synchronizing through Dock's native space pipeline;
+>   * Seamlessly falls back to scripting addition payload when SIP is disabled.
 > * **macOS 27 (Golden Gate) Full Compatibility** ([#2824](https://github.com/asmvik/yabai/issues/2824)):
->   * Full support for instant space switching (`yabai -m space --focus <index>`) on macOS 27;
 >   * Updated Mach-O opcode scanner and payload injection for macOS 27 `Dock.app`;
 >   * Corrected `scripting_addition_perform_validation()` verification (`attrib = 0x7f`).
 > * **Dedicated Thread for Mouse Event Tap** ([#2829](https://github.com/asmvik/yabai/issues/2829)):
@@ -112,7 +116,7 @@ Please also take note of the following caveats.
 
 |Caveat|Note|
 |-:|:-|
-|System&nbsp;Integrity&nbsp;Protection (Optional)|System Integrity Protection can be (partially) disabled for yabai to inject a scripting addition into Dock.app for controlling windows with functions that require elevated privileges. This enables control of the window server, which is the sole owner of all window connections, and enables additional features of yabai.|
+|System&nbsp;Integrity&nbsp;Protection (Optional)|System Integrity Protection can be (partially) disabled if you wish to inject the scripting addition into Dock.app for advanced window server manipulation. Note: **Instant space switching (`yabai -m space --focus <index>`) works cleanly out-of-the-box with SIP fully enabled (SIP ON)** on macOS 27 Golden Gate without needing scripting addition injection.|
 |Code&nbsp;Signing|When building from source (or installing from HEAD), it is necessary to codesign the binary so it retains its accessibility and automation privileges when updated or rebuilt.|
 |Finder&nbsp;Desktop|Some people disable the Finder Desktop window using an undocumented defaults write command. This breaks focusing of empty spaces and should be avoided when using yabai. To re-activate the Finder Desktop, run: "defaults write com.apple.finder CreateDesktop -bool true".|
 |NSDocument-based&nbsp;Applications|Windows that utilize native macOS tabs such as Terminal and Finder, [do not behave correctly when creating tabs](https://github.com/asmvik/yabai/issues/68). Avoid creating tabs in these applications, consider alternatives that do not use NSDocument's tab system, or make these windows float using rules.|

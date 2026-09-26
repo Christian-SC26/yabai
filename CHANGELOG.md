@@ -6,11 +6,14 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
-## [7.1.28] - 2026-09-25
+## [7.1.28] - 2026-09-26
 ### Changed
-- Native SIP-enabled space switching on macOS 27 (Golden Gate): `yabai -m space --focus <index|recent|prev|next>` now switches spaces natively via SkyLight SPI (`SLSManagedDisplaySetCurrentSpace`) without requiring SIP to be disabled or scripting addition to be injected
-- Updated space identifier resolution to prefer `ManagedSpaceID` before falling back to `id64` across displays and space management routines
-- Enhanced gesture fallback with raw IOHID payload serialization (field 4205) and corrected direction models for modern WindowServer compatibility
+- **Clean Instant Space Switching with SIP Enabled on macOS 27 (Golden Gate)**:
+  - Instant space switching (`yabai -m space --focus <index|recent|prev|next>`) works fully out-of-the-box with System Integrity Protection (SIP) enabled, with no animation delay and without requiring SIP disabling or scripting addition injection.
+  - Implemented reverse-engineered IOHIDSystemQueue fluid touch gesture serialization (field 4205 payload) with calibrated polarity and multi-step phase timing (1ms phase, 25ms step intervals), ensuring seamless multi-space transitions (e.g., 1 -> 3, 4 -> 1).
+  - Fixed ghost window duplication and menu bar stacking artifacts by synchronizing transitions through Dock's native space pipeline rather than isolated display space switching.
+  - Automatically enables required horizontal trackpad gesture preference if missing, ensuring smooth gesture dispatch by `Dock.app`.
+  - Seamlessly falls back to scripting addition payload when running with SIP disabled.
 
 ## [7.1.27] - 2026-09-22
 ### Changed
