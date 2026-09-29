@@ -6,6 +6,12 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [7.1.30] - 2026-09-29
+### Fixed
+- **Mouse Handler Teardown Race & Crash Guard**:
+  - Explicitly retain the mouse handler thread's `CFRunLoopRef` on creation and release it only after `pthread_join()` in `mouse_handler_end()` ([#2](https://github.com/Christian-SC26/yabai/pull/2))
+  - Resolves a use-after-free crash (`EXC_BREAKPOINT / SIGTRAP` in `__CFCheckCFInfoPACSignature` / `CFRunLoopRemoveSource`) during rapid reconfiguration of `focus_follows_mouse` or mouse rules on modern macOS / Apple Silicon
+
 ## [7.1.29] - 2026-09-26
 ### Changed
 - **Scripting Addition (SIP OFF) macOS 27 Enhancements**:
