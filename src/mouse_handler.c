@@ -275,7 +275,7 @@ static void *mouse_handler_thread(void *context)
 {
     struct mouse_state *mouse_state = context;
 
-    mouse_state->runloop = CFRunLoopGetCurrent();
+    mouse_state->runloop = (CFRunLoopRef) CFRetain(CFRunLoopGetCurrent());
     CFRunLoopAddSource(mouse_state->runloop, mouse_state->runloop_source, kCFRunLoopCommonModes);
     dispatch_semaphore_signal(mouse_state->ready);
     CFRunLoopRun();
@@ -314,6 +314,7 @@ void mouse_handler_end(struct mouse_state *mouse_state)
     CFRunLoopRemoveSource(mouse_state->runloop, mouse_state->runloop_source, kCFRunLoopCommonModes);
     CFRunLoopStop(mouse_state->runloop);
     pthread_join(mouse_state->thread, NULL);
+    CFRelease(mouse_state->runloop);
     CFRelease(mouse_state->runloop_source);
     CFRelease(mouse_state->handle);
     __atomic_store_n(&mouse_state->handle, NULL, __ATOMIC_RELEASE);
