@@ -12,6 +12,8 @@ volatile bool __pending_window_focus;
 volatile bool __pending_gesture;
 volatile uint64_t __last_gesture_time;
 volatile uint64_t __last_cmd_tab_time;
+static uint32_t g_mission_control_prev_wid;
+static uint64_t g_mission_control_prev_sid;
 
 void update_window_notifications(void)
 {
@@ -684,15 +686,21 @@ static EVENT_HANDLER(WINDOW_FOCUSED)
 
     debug("%s: %s %d\n", __FUNCTION__, window->application->name, window->id);
 
+    bool is_sticky = window_check_flag(window, WINDOW_STICKY) || window_is_sticky(window->id);
+    uint64_t sid = window_space(window->id);
+
+    bool space_will_be_visible = false;
     if (g_space_manager.skip_window_focus_animation) {
-        bool is_sticky = window_check_flag(window, WINDOW_STICKY) || window_is_sticky(window->id);
-        if (!is_sticky) {
-            uint64_t sid = window_space(window->id);
-            if (sid && !space_is_visible(sid)) {
-                SLSSpaceSetFrontPSN(g_connection, sid, window->application->psn);
-                space_manager_focus_space_using_gesture(space_display_id(sid), sid);
-            }
+        if (!is_sticky && sid && !space_is_visible(sid)) {
+            SLSSpaceSetFrontPSN(g_connection, sid, window->application->psn);
+            space_manager_focus_space_using_gesture(space_display_id(sid), sid);
+            space_will_be_visible = true;
         }
+    }
+
+    if (!is_sticky && sid && !space_is_visible(sid) && !space_will_be_visible) {
+        debug("%s: %s %d is on invisible space %lld, skipping focus assignment\n", __FUNCTION__, window->application->name, window->id, sid);
+        return;
     }
 
     window_did_receive_focus(&g_window_manager, &g_mouse_state, window);
@@ -1552,9 +1560,18 @@ out:
     CFRelease(context);
 }
 
+static void mission_control_record_state(void)
+{
+    if (g_mission_control_mode == MISSION_CONTROL_MODE_INACTIVE) {
+        g_mission_control_prev_wid = g_window_manager.focused_window_id ? g_window_manager.focused_window_id : g_window_manager.last_window_id;
+        g_mission_control_prev_sid = g_space_manager.current_space_id;
+    }
+}
+
 static EVENT_HANDLER(MISSION_CONTROL_SHOW_ALL_WINDOWS)
 {
     debug("%s:\n", __FUNCTION__);
+    mission_control_record_state();
     g_mission_control_mode = MISSION_CONTROL_MODE_SHOW_ALL_WINDOWS;
     event_signal_push(SIGNAL_MISSION_CONTROL_ENTER, (void*)(uintptr_t)g_mission_control_mode);
 }
@@ -1562,6 +1579,7 @@ static EVENT_HANDLER(MISSION_CONTROL_SHOW_ALL_WINDOWS)
 static EVENT_HANDLER(MISSION_CONTROL_SHOW_FRONT_WINDOWS)
 {
     debug("%s:\n", __FUNCTION__);
+    mission_control_record_state();
     g_mission_control_mode = MISSION_CONTROL_MODE_SHOW_FRONT_WINDOWS;
     event_signal_push(SIGNAL_MISSION_CONTROL_ENTER, (void*)(uintptr_t)g_mission_control_mode);
 }
@@ -1569,6 +1587,7 @@ static EVENT_HANDLER(MISSION_CONTROL_SHOW_FRONT_WINDOWS)
 static EVENT_HANDLER(MISSION_CONTROL_SHOW_DESKTOP)
 {
     debug("%s:\n", __FUNCTION__);
+    mission_control_record_state();
     g_mission_control_mode = MISSION_CONTROL_MODE_SHOW_DESKTOP;
     event_signal_push(SIGNAL_MISSION_CONTROL_ENTER, (void*)(uintptr_t)g_mission_control_mode);
 }
@@ -1576,17 +1595,33 @@ static EVENT_HANDLER(MISSION_CONTROL_SHOW_DESKTOP)
 static EVENT_HANDLER(MISSION_CONTROL_ENTER)
 {
     debug("%s:\n", __FUNCTION__);
+    mission_control_record_state();
     g_mission_control_mode = MISSION_CONTROL_MODE_SHOW;
 
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 0.1f * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
-        event_loop_post(&g_event_loop, MISSION_CONTROL_CHECK_FOR_EXIT, NULL, 0);
-    });
+    if (!workspace_is_macos_monterey() &&
+        !workspace_is_macos_ventura() &&
+        !workspace_is_macos_sonoma() &&
+        !workspace_is_macos_sequoia() &&
+        !workspace_is_macos_tahoe() &&
+        !workspace_is_macos_goldengate()) {
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 0.1f * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
+            event_loop_post(&g_event_loop, MISSION_CONTROL_CHECK_FOR_EXIT, NULL, 0);
+        });
+    }
 
     event_signal_push(SIGNAL_MISSION_CONTROL_ENTER, (void*)(uintptr_t)g_mission_control_mode);
 }
 
 static EVENT_HANDLER(MISSION_CONTROL_CHECK_FOR_EXIT)
 {
+    if (workspace_is_macos_monterey() ||
+        workspace_is_macos_ventura() ||
+        workspace_is_macos_sonoma() ||
+        workspace_is_macos_sequoia() ||
+        (workspace_is_macos_tahoe() || workspace_is_macos_goldengate())) {
+        return;
+    }
+
     if (!mission_control_is_active()) return;
 
     CFArrayRef window_list = CGWindowListCopyWindowInfo(kCGWindowListOptionOnScreenOnly, 0);
@@ -1643,6 +1678,41 @@ static EVENT_HANDLER(MISSION_CONTROL_EXIT)
 
     event_signal_push(SIGNAL_MISSION_CONTROL_EXIT, (void*)(uintptr_t)g_mission_control_mode);
     g_mission_control_mode = MISSION_CONTROL_MODE_INACTIVE;
+
+    uint32_t prev_wid = g_mission_control_prev_wid;
+    uint64_t prev_sid = g_mission_control_prev_sid;
+    g_mission_control_prev_wid = 0;
+    g_mission_control_prev_sid = 0;
+
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 0.15f * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
+        uint64_t current_sid = space_manager_active_space();
+        struct view *view = space_manager_find_view(&g_space_manager, current_sid);
+        if (view_is_invalid(view)) {
+            view_update(view);
+        }
+
+        if (prev_sid && current_sid == prev_sid) {
+            struct window *restore_window = NULL;
+            if (prev_wid) {
+                struct window *prev_window = window_manager_find_window(&g_window_manager, prev_wid);
+                if (prev_window && !window_check_flag(prev_window, WINDOW_MINIMIZE)) {
+                    uint64_t win_sid = window_space(prev_window->id);
+                    if (win_sid == current_sid || window_is_sticky(prev_window->id)) {
+                        restore_window = prev_window;
+                    }
+                }
+            }
+
+            if (!restore_window) {
+                restore_window = window_manager_find_window_on_space_by_rank_filtering_window(&g_window_manager, current_sid, 1, 0);
+            }
+
+            if (restore_window) {
+                debug("%s: restoring focus to previous window %s %d on space %lld\n", __FUNCTION__, restore_window->application->name, restore_window->id, current_sid);
+                window_manager_focus_window_with_raise(&restore_window->application->psn, restore_window->id, restore_window->ref);
+            }
+        }
+    });
 }
 
 static EVENT_HANDLER(DOCK_DID_RESTART)

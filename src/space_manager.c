@@ -934,6 +934,18 @@ enum space_op_error space_manager_move_space_to_display(struct space_manager *sm
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
 bool space_manager_focus_space_using_gesture(uint32_t new_did, uint64_t new_sid)
 {
+    static uint64_t last_gesture_sid = 0;
+    static uint64_t last_gesture_time = 0;
+
+    uint64_t now = read_os_timer();
+    float dt = ((float) now - last_gesture_time) * (1000.0f / (float)read_os_freq());
+    if (last_gesture_sid == new_sid && dt < 600.0f) {
+        debug("%s: skipping duplicate gesture to space %lld (dt=%.1fms)\n", __FUNCTION__, new_sid, dt);
+        return true;
+    }
+    last_gesture_sid = new_sid;
+    last_gesture_time = now;
+
     int cur_index = space_manager_mission_control_index(display_space_id(new_did));
     int new_index = space_manager_mission_control_index(new_sid);
 
@@ -1269,7 +1281,7 @@ void space_manager_begin(struct space_manager *sm)
     sm->window_insertion_point = INSERT_FOCUSED;
     sm->window_zoom_persist = true;
     sm->labels = NULL;
-    sm->skip_window_focus_animation = false;
+    sm->skip_window_focus_animation = true;
     table_init(&sm->view, 23, hash_view, compare_view);
 
     int display_count;
