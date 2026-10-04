@@ -417,11 +417,10 @@ static EVENT_HANDLER(APPLICATION_FRONT_SWITCHED)
                     AXUIElementCopyAttributeValue(application->ref, CFSTR("__fence"), &dummy);
                 }
 
-                if (__atomic_load_n(&__pending_window_focus, __ATOMIC_RELAXED) == false) {
-                    SLSSpaceSetFrontPSN(g_connection, target_sid, process->psn);
-                    space_manager_focus_space_using_gesture(space_display_id(target_sid), target_sid);
-                }
+                SLSSpaceSetFrontPSN(g_connection, target_sid, process->psn);
+                space_manager_focus_space(target_sid);
             }
+
         }
     }
 
@@ -720,9 +719,10 @@ static EVENT_HANDLER(WINDOW_FOCUSED)
     if (g_space_manager.skip_window_focus_animation) {
         if (!is_sticky && sid && !space_is_visible(sid)) {
             SLSSpaceSetFrontPSN(g_connection, sid, window->application->psn);
-            space_manager_focus_space_using_gesture(space_display_id(sid), sid);
+            space_manager_focus_space(sid);
             space_will_be_visible = true;
         }
+
     }
 
     if (!is_sticky && sid && !space_is_visible(sid) && !space_will_be_visible) {

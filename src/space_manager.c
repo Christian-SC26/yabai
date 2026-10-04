@@ -938,9 +938,9 @@ bool space_manager_focus_space_using_gesture(uint32_t new_did, uint64_t new_sid)
     static uint64_t last_gesture_time = 0;
 
     uint64_t now = read_os_timer();
-    float dt = ((float) now - last_gesture_time) * (1000.0f / (float)read_os_freq());
-    if (last_gesture_sid == new_sid && dt < 200.0f) {
-        debug("%s: skipping duplicate gesture to space %lld (dt=%.1fms)\n", __FUNCTION__, new_sid, dt);
+    uint64_t dt_ms = (now > last_gesture_time) ? (now - last_gesture_time) / 1000000ULL : 0;
+    if (last_gesture_sid == new_sid && dt_ms < 50) {
+        debug("%s: skipping duplicate gesture to space %lld (dt=%llums)\n", __FUNCTION__, new_sid, dt_ms);
         return true;
     }
     last_gesture_sid = new_sid;
