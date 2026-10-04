@@ -12,11 +12,16 @@ typedef TEST_SIG(function);
 #define TEST_CHECK(r, e) if ((r) != (e)) { printf("                   \e[1;33m%s\e[m\e[1;31m#%d %s == %s\e[m \e[1;31m(%d == %d)\e[m\n", test_name, __LINE__, #r, #e, r, e); result = false; }
 
 #include "area.c"
+#include "structures.c"
 
 #define TEST_ENTRY(name) { #name, test_##name },
 #define TEST_LIST                                              \
     TEST_ENTRY(display_area_is_in_direction)                   \
-    TEST_ENTRY(closest_display_in_direction)
+    TEST_ENTRY(closest_display_in_direction)                   \
+    TEST_ENTRY(memory_pool_basic)                              \
+    TEST_ENTRY(memory_pool_wraparound_detection)               \
+    TEST_ENTRY(hashtable_stress_and_rehashing)                 \
+    TEST_ENTRY(app_active_space_resolution)
 
 static struct {
     char *name;
@@ -27,6 +32,12 @@ static struct {
 
 int main(int argc, char **argv)
 {
+    ts_init(MEGABYTES(8));
+    g_connection = SLSMainConnectionID();
+    window_manager_init(&g_window_manager);
+    display_manager_begin(&g_display_manager);
+    space_manager_begin(&g_space_manager);
+
     int succeeded = 0;
     int failed = 0;
     int total = array_count(tests);

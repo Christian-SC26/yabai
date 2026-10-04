@@ -107,7 +107,7 @@ uint64_t process_manager_active_space_for_psn(int connection)
 
     uint64_t set_tags = 0;
     uint64_t clear_tags = 0;
-    uint32_t options = 0x2;
+    uint32_t options = 0x7;
 
     CFArrayRef space_list_ref = cfarray_of_cfnumbers(space_list, sizeof(uint64_t), space_count, kCFNumberSInt64Type);
     CFArrayRef window_list_ref = SLSCopyWindowsWithOptionsAndTags(g_connection, connection, space_list_ref, options, &set_tags, &clear_tags);
@@ -128,9 +128,17 @@ uint64_t process_manager_active_space_for_psn(int connection)
 
         if (parent_wid == 0) {
             if (level == 0 || level == 3 || level == 8) {
-                if (((attributes & 0x2) || (tags & 0x400000000000000)) && (((tags & 0x1)) || ((tags & 0x2) && (tags & 0x80000000)))) {
-                    sid = window_space(wid);
-                    break;
+                struct window *window = window_manager_find_window(&g_window_manager, wid);
+                if (window) {
+                    if (!window_check_flag(window, WINDOW_STICKY) && !window_is_sticky(wid)) {
+                        sid = window_space(wid);
+                        if (sid) break;
+                    }
+                } else if (((attributes & 0x3) || (tags & 0x400000000000000)) && (((tags & 0x1)) || ((tags & 0x2) && (tags & 0x80000000)))) {
+                    if (!window_is_sticky(wid)) {
+                        sid = window_space(wid);
+                        if (sid) break;
+                    }
                 }
             }
         }

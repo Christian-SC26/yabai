@@ -367,32 +367,59 @@ static EVENT_HANDLER(APPLICATION_FRONT_SWITCHED)
 
     if (g_space_manager.skip_window_focus_animation) {
         uint32_t focused_wid = application_focused_window(application);
+        uint64_t target_sid = 0;
         bool focused_on_visible_space = false;
+
         if (focused_wid) {
             if (window_is_sticky(focused_wid)) {
                 focused_on_visible_space = true;
             } else {
                 uint64_t focused_sid = window_space(focused_wid);
-                if (focused_sid && space_is_visible(focused_sid)) {
-                    focused_on_visible_space = true;
+                if (focused_sid) {
+                    if (space_is_visible(focused_sid)) {
+                        focused_on_visible_space = true;
+                    } else {
+                        target_sid = focused_sid;
+                    }
                 }
             }
         }
 
         if (!focused_on_visible_space) {
-            uint64_t psn_sid = process_manager_active_space_for_psn(application->connection);
-
-            uint64_t last_cmd_tab_time = __atomic_load_n(&__last_cmd_tab_time, __ATOMIC_RELAXED);
-            float dt = ((float) read_os_timer() - last_cmd_tab_time) * (1000.0f / (float)read_os_freq());
-            if (dt > 1500.0f) {
-                CFTypeRef dummy = NULL;
-                AXUIElementCopyAttributeValue(application->ref, CFSTR("__fence"), &dummy);
+            if (!target_sid) {
+                target_sid = process_manager_active_space_for_psn(application->connection);
             }
 
-            if (__atomic_load_n(&__pending_window_focus, __ATOMIC_RELAXED) == false) {
-                if (psn_sid && !space_is_visible(psn_sid)) {
-                    SLSSpaceSetFrontPSN(g_connection, psn_sid, process->psn);
-                    space_manager_focus_space_using_gesture(space_display_id(psn_sid), psn_sid);
+            if (!target_sid) {
+                int win_count = 0;
+                struct window **win_list = window_manager_find_application_windows(&g_window_manager, application, &win_count);
+                for (int w = 0; w < win_count; ++w) {
+                    if (!window_is_sticky(win_list[w]->id) && !window_check_flag(win_list[w], WINDOW_STICKY)) {
+                        uint64_t w_sid = window_space(win_list[w]->id);
+                        if (w_sid) {
+                            if (space_is_visible(w_sid)) {
+                                focused_on_visible_space = true;
+                                target_sid = 0;
+                                break;
+                            } else if (!target_sid) {
+                                target_sid = w_sid;
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (!focused_on_visible_space && target_sid && !space_is_visible(target_sid)) {
+                uint64_t last_cmd_tab_time = __atomic_load_n(&__last_cmd_tab_time, __ATOMIC_RELAXED);
+                float dt = ((float) read_os_timer() - last_cmd_tab_time) * (1000.0f / (float)read_os_freq());
+                if (dt > 1500.0f) {
+                    CFTypeRef dummy = NULL;
+                    AXUIElementCopyAttributeValue(application->ref, CFSTR("__fence"), &dummy);
+                }
+
+                if (__atomic_load_n(&__pending_window_focus, __ATOMIC_RELAXED) == false) {
+                    SLSSpaceSetFrontPSN(g_connection, target_sid, process->psn);
+                    space_manager_focus_space_using_gesture(space_display_id(target_sid), target_sid);
                 }
             }
         }
