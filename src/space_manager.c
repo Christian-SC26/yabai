@@ -657,7 +657,7 @@ uint64_t space_manager_active_space(void)
     struct window *window = window_manager_focused_window(&g_window_manager);
     if (window && !window_check_flag(window, WINDOW_STICKY) && !window_is_sticky(window->id)) {
         uint64_t w_sid = window_space(window->id);
-        if (w_sid && space_is_user(w_sid)) {
+        if (w_sid && space_is_user(w_sid) && space_is_visible(w_sid)) {
             return w_sid;
         }
     }

@@ -400,8 +400,8 @@ static EVENT_HANDLER(APPLICATION_FRONT_SWITCHED)
 
     if (g_space_manager.skip_window_focus_animation) {
         uint64_t now = read_os_timer();
-        uint64_t last_space_time = __atomic_load_n(&__last_space_change_time, __ATOMIC_RELAXED);
-        uint64_t dt_space_ms = (now > last_space_time) ? (now - last_space_time) / 1000000ULL : 0;
+        static uint64_t s_last_switch_target_sid = 0;
+        static uint64_t s_last_switch_time = 0;
 
         uint64_t target_sid = 0;
 
@@ -422,10 +422,6 @@ static EVENT_HANDLER(APPLICATION_FRONT_SWITCHED)
                 }
             }
 
-            if (!target_sid) {
-                target_sid = process_manager_active_space_for_psn(application->connection);
-            }
-
             if (!target_sid && win_count > 0) {
                 for (int w = 0; w < win_count; ++w) {
                     if (!window_is_sticky(win_list[w]->id) && !window_check_flag(win_list[w], WINDOW_STICKY)) {
@@ -438,19 +434,39 @@ static EVENT_HANDLER(APPLICATION_FRONT_SWITCHED)
                 }
             }
 
-            if (!focused_on_visible_space && target_sid && !space_is_visible(target_sid)) {
-                if (dt_space_ms >= 350) {
-                    uint64_t last_cmd_tab_time = __atomic_load_n(&__last_cmd_tab_time, __ATOMIC_RELAXED);
-                    float dt = ((float) now - last_cmd_tab_time) * (1000.0f / (float)read_os_freq());
-                    if (dt > 1500.0f) {
-                        CFTypeRef dummy = NULL;
-                        AXUIElementCopyAttributeValue(application->ref, CFSTR("__fence"), &dummy);
-                    }
+            if (!target_sid && application->connection > 0) {
+                target_sid = process_manager_active_space_for_psn(application->connection);
+            }
 
-                    SLSSpaceSetFrontPSN(g_connection, target_sid, process->psn);
-                    space_manager_focus_space(target_sid);
+            if (!focused_on_visible_space && target_sid && !space_is_visible(target_sid)) {
+                bool gesture_in_progress = __atomic_load_n(&__pending_gesture, __ATOMIC_RELAXED);
+                uint64_t last_gesture_time = __atomic_load_n(&__last_gesture_time, __ATOMIC_RELAXED);
+                uint64_t dt_gesture_ms = (now > last_gesture_time) ? (now - last_gesture_time) / 1000000ULL : 0;
+
+                if (gesture_in_progress || dt_gesture_ms < 250) {
+                    debug("%s: suppressing space switch to %lld during trackpad gesture (in_prog=%d, dt=%llums)\n",
+                          __FUNCTION__, target_sid, gesture_in_progress, dt_gesture_ms);
                 } else {
-                    debug("%s: suppressing space switch to %lld during cooldown (dt=%llums)\n", __FUNCTION__, target_sid, dt_space_ms);
+                    uint64_t dt_ms = (now > s_last_switch_time) ? (now - s_last_switch_time) / 1000000ULL : 0;
+                    if (target_sid == s_last_switch_target_sid && dt_ms < 250) {
+                        debug("%s: suppressing duplicate space switch to %lld (dt=%llums)\n", __FUNCTION__, target_sid, dt_ms);
+                    } else if (target_sid != s_last_switch_target_sid && dt_ms < 60) {
+                        debug("%s: rate-limiting rapid space switch to %lld (dt=%llums < 60ms)\n", __FUNCTION__, target_sid, dt_ms);
+                    } else {
+                        s_last_switch_target_sid = target_sid;
+                        s_last_switch_time = now;
+                        __atomic_store_n(&__last_space_change_time, now, __ATOMIC_RELEASE);
+
+                        uint64_t last_cmd_tab_time = __atomic_load_n(&__last_cmd_tab_time, __ATOMIC_RELAXED);
+                        float dt = ((float) now - last_cmd_tab_time) * (1000.0f / (float)read_os_freq());
+                        if (dt > 1500.0f) {
+                            CFTypeRef dummy = NULL;
+                            AXUIElementCopyAttributeValue(application->ref, CFSTR("__fence"), &dummy);
+                        }
+
+                        SLSSpaceSetFrontPSN(g_connection, target_sid, process->psn);
+                        space_manager_focus_space(target_sid);
+                    }
                 }
             }
         }
@@ -746,23 +762,7 @@ static EVENT_HANDLER(WINDOW_FOCUSED)
     bool is_sticky = window_check_flag(window, WINDOW_STICKY) || window_is_sticky(window->id);
     uint64_t sid = window_space(window->id);
 
-    bool space_will_be_visible = false;
-    if (g_space_manager.skip_window_focus_animation) {
-        if (!is_sticky && sid && !space_is_visible(sid)) {
-            uint64_t now = read_os_timer();
-            uint64_t last_space_time = __atomic_load_n(&__last_space_change_time, __ATOMIC_RELAXED);
-            uint64_t dt_space_ms = (now > last_space_time) ? (now - last_space_time) / 1000000ULL : 0;
-            if (dt_space_ms >= 350) {
-                SLSSpaceSetFrontPSN(g_connection, sid, window->application->psn);
-                space_manager_focus_space(sid);
-                space_will_be_visible = true;
-            } else {
-                debug("%s: suppressing space switch to %lld during cooldown (dt=%llums)\n", __FUNCTION__, sid, dt_space_ms);
-            }
-        }
-    }
-
-    if (!is_sticky && sid && !space_is_visible(sid) && !space_will_be_visible) {
+    if (!is_sticky && sid && !space_is_visible(sid)) {
         debug("%s: %s %d is on invisible space %lld, skipping focus assignment\n", __FUNCTION__, window->application->name, window->id, sid);
         return;
     }

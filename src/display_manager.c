@@ -390,8 +390,11 @@ bool display_manager_display_is_animating(uint32_t did)
 
 int display_manager_active_display_count(void)
 {
-    uint32_t count;
+    uint32_t count = 0;
     CGGetActiveDisplayList(0, NULL, &count);
+    if (!count) {
+        CGGetOnlineDisplayList(0, NULL, &count);
+    }
     return (int)count;
 }
 
@@ -400,6 +403,9 @@ uint32_t *display_manager_active_display_list(int *count)
     int display_count = display_manager_active_display_count();
     uint32_t *result = ts_alloc_list(uint32_t, display_count);
     CGGetActiveDisplayList(display_count, result, (uint32_t*)count);
+    if (!*count) {
+        CGGetOnlineDisplayList(display_count, result, (uint32_t*)count);
+    }
     return result;
 }
 

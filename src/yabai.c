@@ -332,10 +332,9 @@ int main(int argc, char **argv)
             SLSRegisterConnectionNotifyProc(g_connection, connection_handler, 1327, NULL);
             SLSRegisterConnectionNotifyProc(g_connection, connection_handler, 1328, NULL);
         }
-    } else {
-        SLSRegisterConnectionNotifyProc(g_connection, connection_handler, 1204, NULL);
     }
 
+    SLSRegisterConnectionNotifyProc(g_connection, connection_handler, 1204, NULL);
     SLSRegisterConnectionNotifyProc(g_connection, connection_handler, 808, NULL);
     SLSRegisterConnectionNotifyProc(g_connection, connection_handler, 1202, NULL);
 

@@ -82,6 +82,7 @@ static bool process_is_being_debugged(pid_t pid)
 uint64_t process_manager_active_space_for_psn(int connection)
 {
     uint64_t sid = 0;
+    if (connection <= 0) return sid;
 
     int display_count;
     uint32_t *display_list = display_manager_active_display_list(&display_count);
