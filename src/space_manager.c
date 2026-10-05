@@ -935,16 +935,41 @@ enum space_op_error space_manager_move_space_to_display(struct space_manager *sm
 bool space_manager_focus_space_using_gesture(uint32_t new_did, uint64_t new_sid)
 {
     static uint64_t last_gesture_sid = 0;
+    static uint64_t prev_gesture_sid = 0;
     static uint64_t last_gesture_time = 0;
+    static int ping_pong_count = 0;
 
     uint64_t now = read_os_timer();
     uint64_t dt_ms = (now > last_gesture_time) ? (now - last_gesture_time) / 1000000ULL : 0;
-    if (last_gesture_sid == new_sid && dt_ms < 50) {
+
+    // Guard 1: Duplicate gesture to the same space within 350ms
+    if (last_gesture_sid == new_sid && dt_ms < 350) {
         debug("%s: skipping duplicate gesture to space %lld (dt=%llums)\n", __FUNCTION__, new_sid, dt_ms);
         return true;
     }
+
+    // Guard 2: Minimum physical gesture spacing (150ms) to prevent Dock queue storms
+    if (dt_ms < 150) {
+        debug("%s: rate-limiting gesture to space %lld (dt=%llums < 150ms)\n", __FUNCTION__, new_sid, dt_ms);
+        return false;
+    }
+
+    // Guard 3: Ping-pong oscillation breaker
+    if (new_sid == prev_gesture_sid && dt_ms < 400) {
+        ping_pong_count++;
+        if (ping_pong_count >= 2) {
+            debug("%s: ping-pong oscillation detected between spaces %lld and %lld! Blocking loop.\n",
+                  __FUNCTION__, last_gesture_sid, new_sid);
+            return false;
+        }
+    } else if (dt_ms >= 500) {
+        ping_pong_count = 0;
+    }
+
+    prev_gesture_sid = last_gesture_sid;
     last_gesture_sid = new_sid;
     last_gesture_time = now;
+    __atomic_store_n(&__last_space_change_time, now, __ATOMIC_RELEASE);
 
     int cur_index = space_manager_mission_control_index(display_space_id(new_did));
     int new_index = space_manager_mission_control_index(new_sid);
@@ -1059,8 +1084,19 @@ enum space_op_error space_manager_focus_space(uint64_t sid)
 
     uint32_t cur_did = space_display_id(cur_sid);
     uint32_t new_did = space_display_id(sid);
+
+    if (cur_did == new_did && display_space_id(new_did) == sid) {
+        struct window *window = window_manager_find_window_on_space_by_rank_filtering_window(&g_window_manager, sid, 1, 0);
+        if (window && window != window_manager_focused_window(&g_window_manager)) {
+            window_manager_focus_window_with_raise(&window->application->psn, window->id, window->ref);
+        }
+        return SPACE_OP_ERROR_SUCCESS;
+    }
+
     bool is_animating = display_manager_display_is_animating(new_did);
     if (is_animating) return SPACE_OP_ERROR_DISPLAY_IS_ANIMATING;
+
+    __atomic_store_n(&__last_space_change_time, read_os_timer(), __ATOMIC_RELEASE);
 
     bool disable_sa = getenv("YABAI_DISABLE_SA") != NULL || getenv("YABAI_SIMULATE_SIP_ON") != NULL;
     if (!disable_sa && scripting_addition_focus_space(sid)) {
@@ -1085,6 +1121,8 @@ enum space_op_error space_manager_switch_space(uint64_t sid)
     uint32_t cur_did = space_display_id(cur_sid);
     uint32_t did     = space_display_id(sid);
 
+    if (cur_did == did && display_space_id(did) == sid) return SPACE_OP_ERROR_SAME_SPACE;
+
     bool is_src_animating = display_manager_display_is_animating(cur_did);
     if (is_src_animating) return SPACE_OP_ERROR_DISPLAY_IS_ANIMATING;
 
@@ -1096,6 +1134,8 @@ enum space_op_error space_manager_switch_space(uint64_t sid)
         display_manager_focus_display(cur_did, cur_sid);
         return SPACE_OP_ERROR_SUCCESS;
     }
+
+    __atomic_store_n(&__last_space_change_time, read_os_timer(), __ATOMIC_RELEASE);
 
     bool disable_sa = getenv("YABAI_DISABLE_SA") != NULL || getenv("YABAI_SIMULATE_SIP_ON") != NULL;
     if (!disable_sa && scripting_addition_focus_space(sid)) {

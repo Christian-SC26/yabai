@@ -29,6 +29,8 @@ struct space_manager
     bool skip_window_focus_animation;
 };
 
+extern volatile uint64_t __last_space_change_time;
+
 enum space_op_error
 {
     SPACE_OP_ERROR_SUCCESS              = 0,

@@ -162,3 +162,32 @@ TEST_FUNC(app_active_space_resolution, {
     bool ok = run_app_active_space_resolution();
     TEST_CHECK(ok, true);
 })
+
+TEST_FUNC(space_gesture_guards, {
+    uint32_t did = display_manager_active_display_id();
+    uint64_t cur_sid = display_space_id(did);
+
+    // Test 1: Focusing current space must be immediate no-op
+    enum space_op_error err = space_manager_focus_space(cur_sid);
+    TEST_CHECK(err == SPACE_OP_ERROR_SUCCESS || err == SPACE_OP_ERROR_SAME_SPACE, true);
+
+    // Test 2: Rapid duplicate gesture to same space must be suppressed by Guard 1
+    uint64_t dummy_sid = 999901;
+    space_manager_focus_space_using_gesture(0, dummy_sid);
+    bool dup_res = space_manager_focus_space_using_gesture(0, dummy_sid);
+    TEST_CHECK(dup_res, true);
+
+    // Test 3: Rapid gesture to different space (<150ms) must be rate-limited by Guard 2
+    uint64_t other_sid = 999902;
+    bool rate_res = space_manager_focus_space_using_gesture(0, other_sid);
+    TEST_CHECK(rate_res, false);
+
+    // Test 4: Ping-pong oscillation breaker
+    usleep(160000);
+    space_manager_focus_space_using_gesture(0, other_sid);
+    usleep(160000);
+    space_manager_focus_space_using_gesture(0, dummy_sid);
+    usleep(160000);
+    bool pp_res = space_manager_focus_space_using_gesture(0, other_sid);
+    TEST_CHECK(pp_res, false);
+})

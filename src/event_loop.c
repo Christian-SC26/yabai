@@ -12,6 +12,7 @@ volatile bool __pending_window_focus;
 volatile bool __pending_gesture;
 volatile uint64_t __last_gesture_time;
 volatile uint64_t __last_cmd_tab_time;
+volatile uint64_t __last_space_change_time;
 static uint32_t g_mission_control_prev_wid;
 static uint64_t g_mission_control_prev_sid;
 
@@ -365,62 +366,93 @@ static EVENT_HANDLER(APPLICATION_FRONT_SWITCHED)
         return;
     }
 
-    if (g_space_manager.skip_window_focus_animation) {
-        uint32_t focused_wid = application_focused_window(application);
-        uint64_t target_sid = 0;
-        bool focused_on_visible_space = false;
+    for (int i = 0; i < buf_len(g_window_manager.applications_to_refresh); ++i) {
+        if (application == g_window_manager.applications_to_refresh[i]) {
+            debug("%s: %s has windows that are not yet resolved\n", __FUNCTION__, application->name);
+            window_manager_add_existing_application_windows(&g_space_manager, &g_window_manager, application, i);
+            break;
+        }
+    }
 
-        if (focused_wid) {
-            if (window_is_sticky(focused_wid)) {
-                focused_on_visible_space = true;
-            } else {
-                uint64_t focused_sid = window_space(focused_wid);
-                if (focused_sid) {
-                    if (space_is_visible(focused_sid)) {
-                        focused_on_visible_space = true;
-                    } else {
-                        target_sid = focused_sid;
+    uint32_t active_did = display_manager_active_display_id();
+    uint64_t active_sid = display_space_id(active_did);
+
+    int win_count = 0;
+    struct window **win_list = window_manager_find_application_windows(&g_window_manager, application, &win_count);
+    struct window *visible_win = NULL;
+    bool focused_on_visible_space = false;
+
+    for (int w = 0; w < win_count; ++w) {
+        struct window *win = win_list[w];
+        if (window_check_flag(win, WINDOW_STICKY) || window_is_sticky(win->id)) {
+            focused_on_visible_space = true;
+            if (!visible_win) visible_win = win;
+            break;
+        }
+        uint64_t w_sid = window_space(win->id);
+        if (w_sid && space_is_visible(w_sid)) {
+            focused_on_visible_space = true;
+            if (!visible_win || w_sid == active_sid) {
+                visible_win = win;
+            }
+        }
+    }
+
+    if (g_space_manager.skip_window_focus_animation) {
+        uint64_t now = read_os_timer();
+        uint64_t last_space_time = __atomic_load_n(&__last_space_change_time, __ATOMIC_RELAXED);
+        uint64_t dt_space_ms = (now > last_space_time) ? (now - last_space_time) / 1000000ULL : 0;
+
+        uint64_t target_sid = 0;
+
+        if (!focused_on_visible_space) {
+            uint32_t focused_wid = application_focused_window(application);
+            if (focused_wid) {
+                if (window_is_sticky(focused_wid)) {
+                    focused_on_visible_space = true;
+                } else {
+                    uint64_t focused_sid = window_space(focused_wid);
+                    if (focused_sid) {
+                        if (space_is_visible(focused_sid)) {
+                            focused_on_visible_space = true;
+                        } else {
+                            target_sid = focused_sid;
+                        }
                     }
                 }
             }
-        }
 
-        if (!focused_on_visible_space) {
             if (!target_sid) {
                 target_sid = process_manager_active_space_for_psn(application->connection);
             }
 
-            if (!target_sid) {
-                int win_count = 0;
-                struct window **win_list = window_manager_find_application_windows(&g_window_manager, application, &win_count);
+            if (!target_sid && win_count > 0) {
                 for (int w = 0; w < win_count; ++w) {
                     if (!window_is_sticky(win_list[w]->id) && !window_check_flag(win_list[w], WINDOW_STICKY)) {
                         uint64_t w_sid = window_space(win_list[w]->id);
                         if (w_sid) {
-                            if (space_is_visible(w_sid)) {
-                                focused_on_visible_space = true;
-                                target_sid = 0;
-                                break;
-                            } else if (!target_sid) {
-                                target_sid = w_sid;
-                            }
+                            target_sid = w_sid;
+                            break;
                         }
                     }
                 }
             }
 
             if (!focused_on_visible_space && target_sid && !space_is_visible(target_sid)) {
-                uint64_t last_cmd_tab_time = __atomic_load_n(&__last_cmd_tab_time, __ATOMIC_RELAXED);
-                float dt = ((float) read_os_timer() - last_cmd_tab_time) * (1000.0f / (float)read_os_freq());
-                if (dt > 1500.0f) {
-                    CFTypeRef dummy = NULL;
-                    AXUIElementCopyAttributeValue(application->ref, CFSTR("__fence"), &dummy);
+                if (dt_space_ms >= 350) {
+                    uint64_t last_cmd_tab_time = __atomic_load_n(&__last_cmd_tab_time, __ATOMIC_RELAXED);
+                    float dt = ((float) now - last_cmd_tab_time) * (1000.0f / (float)read_os_freq());
+                    if (dt > 1500.0f) {
+                        CFTypeRef dummy = NULL;
+                        AXUIElementCopyAttributeValue(application->ref, CFSTR("__fence"), &dummy);
+                    }
+
+                    SLSSpaceSetFrontPSN(g_connection, target_sid, process->psn);
+                    space_manager_focus_space(target_sid);
+                } else {
+                    debug("%s: suppressing space switch to %lld during cooldown (dt=%llums)\n", __FUNCTION__, target_sid, dt_space_ms);
                 }
-
-                SLSSpaceSetFrontPSN(g_connection, target_sid, process->psn);
-                space_manager_focus_space(target_sid);
             }
-
         }
     }
 
@@ -434,16 +466,26 @@ static EVENT_HANDLER(APPLICATION_FRONT_SWITCHED)
     g_process_manager.front_pid = process->pid;
     event_signal_push(SIGNAL_APPLICATION_FRONT_SWITCHED, NULL);
 
-    for (int i = 0; i < buf_len(g_window_manager.applications_to_refresh); ++i) {
-        if (application == g_window_manager.applications_to_refresh[i]) {
-            debug("%s: %s has windows that are not yet resolved\n", __FUNCTION__, application->name);
-            window_manager_add_existing_application_windows(&g_space_manager, &g_window_manager, application, i);
-            break;
+    uint32_t application_focused_window_id = application_focused_window(application);
+    struct window *window = window_manager_find_window(&g_window_manager, application_focused_window_id);
+    if (window) {
+        uint64_t w_sid = window_space(window->id);
+        if (w_sid && !space_is_visible(w_sid) && !window_check_flag(window, WINDOW_STICKY) && !window_is_sticky(window->id)) {
+            if (visible_win) {
+                debug("%s: %s focused window %d is on invisible space %lld, using visible window %d instead\n",
+                      __FUNCTION__, application->name, window->id, w_sid, visible_win->id);
+                window = visible_win;
+            } else {
+                debug("%s: %s focused window %d is on invisible space %lld and no visible window exists\n",
+                      __FUNCTION__, application->name, window->id, w_sid);
+                window = NULL;
+            }
         }
+    } else if (visible_win) {
+        window = visible_win;
     }
 
-    uint32_t application_focused_window_id = application_focused_window(application);
-    if (!application_focused_window_id) {
+    if (!window) {
         struct window *focused_window = window_manager_find_window(&g_window_manager, g_window_manager.focused_window_id);
         if (focused_window) {
             window_manager_set_window_opacity(&g_window_manager, focused_window, g_window_manager.normal_window_opacity);
@@ -454,17 +496,6 @@ static EVENT_HANDLER(APPLICATION_FRONT_SWITCHED)
         g_window_manager.focused_window_psn = application->psn;
         g_mouse_state.ffm_window_id = 0;
         window_manager_validate_and_check_for_windows_on_space(&g_space_manager, &g_window_manager, g_space_manager.current_space_id);
-        return;
-    }
-
-    struct window *window = window_manager_find_window(&g_window_manager, application_focused_window_id);
-    if (!window) {
-        struct window *focused_window = window_manager_find_window(&g_window_manager, g_window_manager.focused_window_id);
-        if (focused_window) {
-            window_manager_set_window_opacity(&g_window_manager, focused_window, g_window_manager.normal_window_opacity);
-        }
-
-        window_manager_add_lost_focused_event(&g_window_manager, application_focused_window_id);
         return;
     }
 
@@ -718,11 +749,17 @@ static EVENT_HANDLER(WINDOW_FOCUSED)
     bool space_will_be_visible = false;
     if (g_space_manager.skip_window_focus_animation) {
         if (!is_sticky && sid && !space_is_visible(sid)) {
-            SLSSpaceSetFrontPSN(g_connection, sid, window->application->psn);
-            space_manager_focus_space(sid);
-            space_will_be_visible = true;
+            uint64_t now = read_os_timer();
+            uint64_t last_space_time = __atomic_load_n(&__last_space_change_time, __ATOMIC_RELAXED);
+            uint64_t dt_space_ms = (now > last_space_time) ? (now - last_space_time) / 1000000ULL : 0;
+            if (dt_space_ms >= 350) {
+                SLSSpaceSetFrontPSN(g_connection, sid, window->application->psn);
+                space_manager_focus_space(sid);
+                space_will_be_visible = true;
+            } else {
+                debug("%s: suppressing space switch to %lld during cooldown (dt=%llums)\n", __FUNCTION__, sid, dt_space_ms);
+            }
         }
-
     }
 
     if (!is_sticky && sid && !space_is_visible(sid) && !space_will_be_visible) {
@@ -1099,6 +1136,7 @@ static EVENT_HANDLER(SLS_SPACE_DESTROYED)
 
 static EVENT_HANDLER(SPACE_CHANGED)
 {
+    __atomic_store_n(&__last_space_change_time, read_os_timer(), __ATOMIC_RELEASE);
     g_space_manager.last_space_id = g_space_manager.current_space_id;
     g_space_manager.current_space_id = space_manager_active_space();
 
@@ -1142,6 +1180,7 @@ static EVENT_HANDLER(DISPLAY_CHANGED)
         return;
     }
 
+    __atomic_store_n(&__last_space_change_time, read_os_timer(), __ATOMIC_RELEASE);
     g_display_manager.last_display_id = g_display_manager.current_display_id;
     g_display_manager.current_display_id = new_did;
 
