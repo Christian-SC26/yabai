@@ -11,7 +11,6 @@ extern int g_layer_below_window_level;
 volatile bool __pending_window_focus;
 volatile bool __pending_gesture;
 volatile uint64_t __last_gesture_time;
-volatile int __last_gesture_motion;
 volatile uint64_t __last_cmd_tab_time;
 volatile uint64_t __last_space_change_time;
 static uint32_t g_mission_control_prev_wid;
@@ -399,8 +398,6 @@ static EVENT_HANDLER(APPLICATION_FRONT_SWITCHED)
         }
     }
 
-    bool did_switch_spaces = false;
-
     if (g_space_manager.skip_window_focus_animation) {
         uint64_t now = read_os_timer();
         static uint64_t s_last_switch_target_sid = 0;
@@ -444,22 +441,17 @@ static EVENT_HANDLER(APPLICATION_FRONT_SWITCHED)
             if (!focused_on_visible_space && target_sid && !space_is_visible(target_sid)) {
                 bool gesture_in_progress = __atomic_load_n(&__pending_gesture, __ATOMIC_RELAXED);
                 uint64_t last_gesture_time = __atomic_load_n(&__last_gesture_time, __ATOMIC_RELAXED);
-                int last_gesture_motion = __atomic_load_n(&__last_gesture_motion, __ATOMIC_RELAXED);
                 uint64_t dt_gesture_ms = (now > last_gesture_time) ? (now - last_gesture_time) / 1000000ULL : 0;
-                uint64_t gesture_cooldown = (last_gesture_motion == 2) ? 600 : 250;
 
-                if (gesture_in_progress || dt_gesture_ms < gesture_cooldown) {
-                    debug("%s: suppressing space switch to %lld during trackpad gesture (in_prog=%d, motion=%d, dt=%llums < %llums)\n",
-                          __FUNCTION__, target_sid, gesture_in_progress, last_gesture_motion, dt_gesture_ms, gesture_cooldown);
-                    return;
+                if (gesture_in_progress || dt_gesture_ms < 250) {
+                    debug("%s: suppressing space switch to %lld during trackpad gesture (in_prog=%d, dt=%llums)\n",
+                          __FUNCTION__, target_sid, gesture_in_progress, dt_gesture_ms);
                 } else {
                     uint64_t dt_ms = (now > s_last_switch_time) ? (now - s_last_switch_time) / 1000000ULL : 0;
                     if (target_sid == s_last_switch_target_sid && dt_ms < 250) {
                         debug("%s: suppressing duplicate space switch to %lld (dt=%llums)\n", __FUNCTION__, target_sid, dt_ms);
-                        return;
                     } else if (target_sid != s_last_switch_target_sid && dt_ms < 60) {
                         debug("%s: rate-limiting rapid space switch to %lld (dt=%llums < 60ms)\n", __FUNCTION__, target_sid, dt_ms);
-                        return;
                     } else {
                         s_last_switch_target_sid = target_sid;
                         s_last_switch_time = now;
@@ -474,7 +466,6 @@ static EVENT_HANDLER(APPLICATION_FRONT_SWITCHED)
 
                         SLSSpaceSetFrontPSN(g_connection, target_sid, process->psn);
                         space_manager_focus_space(target_sid);
-                        did_switch_spaces = true;
                     }
                 }
             }
@@ -511,18 +502,6 @@ static EVENT_HANDLER(APPLICATION_FRONT_SWITCHED)
     }
 
     if (!window) {
-        if (!did_switch_spaces) {
-            uint32_t active_did = display_manager_active_display_id();
-            uint64_t active_sid = display_space_id(active_did);
-            struct window *top_win = window_manager_find_window_on_space_by_rank_filtering_window(&g_window_manager, active_sid, 1, 0);
-            if (top_win) {
-                debug("%s: application %s has no visible window on active space %lld and no space switch in flight, restoring focus to %s %d\n",
-                      __FUNCTION__, application->name, active_sid, top_win->application->name, top_win->id);
-                window_manager_focus_window_with_raise(&top_win->application->psn, top_win->id, top_win->ref);
-                return;
-            }
-        }
-
         struct window *focused_window = window_manager_find_window(&g_window_manager, g_window_manager.focused_window_id);
         if (focused_window) {
             window_manager_set_window_opacity(&g_window_manager, focused_window, g_window_manager.normal_window_opacity);
@@ -775,12 +754,6 @@ static EVENT_HANDLER(WINDOW_FOCUSED)
     }
 
     if (!application_is_frontmost(window->application)) {
-        uint64_t sid = window_space(window->id);
-        if (sid && space_is_visible(sid)) {
-            debug("%s: %s %d received focus but application is not frontmost, raising..\n",
-                  __FUNCTION__, window->application->name, window->id);
-            window_manager_focus_window_with_raise(&window->application->psn, window->id, window->ref);
-        }
         return;
     }
 
@@ -1194,18 +1167,6 @@ static EVENT_HANDLER(SPACE_CHANGED)
             window_node_flush(view->root);
             view_clear_flag(view, VIEW_IS_DIRTY);
         }
-
-        struct window *current_focused = window_manager_find_window(&g_window_manager, g_window_manager.focused_window_id);
-        bool focused_on_current_space = current_focused && (window_space(current_focused->id) == g_space_manager.current_space_id || window_is_sticky(current_focused->id));
-
-        if (!focused_on_current_space) {
-            struct window *top_win = window_manager_find_window_on_space_by_rank_filtering_window(&g_window_manager, g_space_manager.current_space_id, 1, 0);
-            if (top_win) {
-                debug("%s: space changed to %lld, focusing top window %s %d\n",
-                      __FUNCTION__, g_space_manager.current_space_id, top_win->application->name, top_win->id);
-                window_manager_focus_window_with_raise(&top_win->application->psn, top_win->id, top_win->ref);
-            }
-        }
     }
 
     event_signal_push(SIGNAL_SPACE_CHANGED, NULL);
@@ -1258,18 +1219,6 @@ static EVENT_HANDLER(DISPLAY_CHANGED)
         if (view_is_dirty(view)) {
             window_node_flush(view->root);
             view_clear_flag(view, VIEW_IS_DIRTY);
-        }
-
-        struct window *current_focused = window_manager_find_window(&g_window_manager, g_window_manager.focused_window_id);
-        bool focused_on_current_space = current_focused && (window_space(current_focused->id) == g_space_manager.current_space_id || window_is_sticky(current_focused->id));
-
-        if (!focused_on_current_space) {
-            struct window *top_win = window_manager_find_window_on_space_by_rank_filtering_window(&g_window_manager, g_space_manager.current_space_id, 1, 0);
-            if (top_win) {
-                debug("%s: display changed to %d (space %lld), focusing top window %s %d\n",
-                      __FUNCTION__, g_display_manager.current_display_id, g_space_manager.current_space_id, top_win->application->name, top_win->id);
-                window_manager_focus_window_with_raise(&top_win->application->psn, top_win->id, top_win->ref);
-            }
         }
     }
 

@@ -1,7 +1,6 @@
 extern struct event_loop g_event_loop;
 extern volatile bool __pending_gesture;
 extern volatile uint64_t __last_gesture_time;
-extern volatile int __last_gesture_motion;
 
 static inline uint8_t mouse_mod_from_cgflags(uint32_t cgflags)
 {
@@ -75,11 +74,9 @@ static MOUSE_HANDLER(mouse_handler)
                 int phase = CGEventGetIntegerValueField(event, /* kCGEventGesturePhase */ 132);
                 if (phase == /* kCGSGesturePhaseBegan */ 1) {
                     __atomic_store_n(&__pending_gesture, true, __ATOMIC_RELEASE);
-                    __atomic_store_n(&__last_gesture_motion, motion, __ATOMIC_RELEASE);
                 } else if (phase == /* kCGSGesturePhaseEnded */ 4 || phase == /* kCGSGesturePhaseCancelled */ 8) {
                     __atomic_store_n(&__pending_gesture, false, __ATOMIC_RELEASE);
                     __atomic_store_n(&__last_gesture_time, read_os_timer(), __ATOMIC_RELEASE);
-                    __atomic_store_n(&__last_gesture_motion, motion, __ATOMIC_RELEASE);
                 }
             }
         }
