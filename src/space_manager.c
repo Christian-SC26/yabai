@@ -944,6 +944,7 @@ bool space_manager_focus_space_using_gesture(uint32_t new_did, uint64_t new_sid)
 
     // Guard 1: Duplicate gesture to the same space within 350ms
     if (last_gesture_sid == new_sid && dt_ms < 350) {
+        last_gesture_time = now;
         debug("%s: skipping duplicate gesture to space %lld (dt=%llums)\n", __FUNCTION__, new_sid, dt_ms);
         return true;
     }
@@ -1074,24 +1075,12 @@ enum space_op_error space_manager_focus_space(uint64_t sid)
     if (is_in_mc) return SPACE_OP_ERROR_IN_MISSION_CONTROL;
 
     uint64_t cur_sid = space_manager_active_space();
-    if (cur_sid == sid) {
-        struct window *window = window_manager_find_window_on_space_by_rank_filtering_window(&g_window_manager, sid, 1, 0);
-        if (window && window != window_manager_focused_window(&g_window_manager)) {
-            window_manager_focus_window_with_raise(&window->application->psn, window->id, window->ref);
-        }
-        return SPACE_OP_ERROR_SUCCESS;
-    }
+    if (cur_sid == sid) return SPACE_OP_ERROR_SAME_SPACE;
 
     uint32_t cur_did = space_display_id(cur_sid);
     uint32_t new_did = space_display_id(sid);
 
-    if (cur_did == new_did && display_space_id(new_did) == sid) {
-        struct window *window = window_manager_find_window_on_space_by_rank_filtering_window(&g_window_manager, sid, 1, 0);
-        if (window && window != window_manager_focused_window(&g_window_manager)) {
-            window_manager_focus_window_with_raise(&window->application->psn, window->id, window->ref);
-        }
-        return SPACE_OP_ERROR_SUCCESS;
-    }
+    if (cur_did == new_did && display_space_id(new_did) == sid) return SPACE_OP_ERROR_SAME_SPACE;
 
     bool is_animating = display_manager_display_is_animating(new_did);
     if (is_animating) return SPACE_OP_ERROR_DISPLAY_IS_ANIMATING;

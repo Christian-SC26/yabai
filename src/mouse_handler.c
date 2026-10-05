@@ -70,7 +70,7 @@ static MOUSE_HANDLER(mouse_handler)
         int type = CGEventGetIntegerValueField(event, /* kCGEventGestureHIDType */ 110);
         if (type == /* kIOHIDEventTypeDockSwipe */ 23) {
             int motion = CGEventGetIntegerValueField(event, /* kCGEventGestureSwipeMotion */ 123);
-            if (motion == /* kCGGestureMotionHorizontal */ 1 || motion == /* kCGGestureMotionVertical */ 2) {
+            if (motion == /* kCGGestureMotionHorizontal */ 1) {
                 int phase = CGEventGetIntegerValueField(event, /* kCGEventGesturePhase */ 132);
                 if (phase == /* kCGSGesturePhaseBegan */ 1) {
                     __atomic_store_n(&__pending_gesture, true, __ATOMIC_RELEASE);
