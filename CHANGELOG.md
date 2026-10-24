@@ -6,6 +6,19 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [7.1.31] - 2026-10-25
+### Fixed
+- **Scripting Addition (SIP OFF) macOS 27 Handshake & Validation Compatibility**:
+  - Dynamically adapt expected capability mask based on the running macOS version (`OSAX_ATTRIB_REDUCED` = `0x4D` on macOS 27.2+, `OSAX_ATTRIB_ALL` = `0x7F` on macOS <= 27.1), resolving `--load-sa` validation failure (`payload (0x4D) doesn't support this macOS version!`) on macOS 27.2+ ([#3](https://github.com/Christian-SC26/yabai/issues/3))
+  - Restored verified hook patterns and offsets (`dppm`, `move_space`, `set_front_window`) for macOS 27.0 and 27.1 in `arm64_payload.m` while keeping them safely guarded on macOS 27.2+
+- **Focus & Menu Bar Owner Synchronization**:
+  - Synchronize menu bar application owner with the focused window across spaces to prevent menu bar title and status desynchronization
+  - Eliminate focus theft during rapid application switching and trackpad gestures
+- **Space Switching & Gesture Rate Limiting**:
+  - Ensure instant 1st-press responsiveness for space switching hotkeys
+  - Guard against runaway space switching loops and ping-pong oscillation during rapid multi-touch gestures
+  - Restore correct focus when dismissing Mission Control
+
 ## [7.1.30] - 2026-09-29
 ### Fixed
 - **Mouse Handler Teardown Race & Crash Guard**:
