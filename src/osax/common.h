@@ -14,13 +14,15 @@
 #define OSAX_ATTRIB_SET_WINDOW      0x20
 #define OSAX_ATTRIB_ANIM_TIME       0x40
 
-#define OSAX_ATTRIB_ALL             (OSAX_ATTRIB_DOCK_SPACES | \
-                                     OSAX_ATTRIB_DPPM | \
+#define OSAX_ATTRIB_REDUCED         (OSAX_ATTRIB_DOCK_SPACES | \
                                      OSAX_ATTRIB_ADD_SPACE | \
                                      OSAX_ATTRIB_REM_SPACE | \
-                                     OSAX_ATTRIB_MOV_SPACE | \
-                                     OSAX_ATTRIB_SET_WINDOW | \
                                      OSAX_ATTRIB_ANIM_TIME)
+
+#define OSAX_ATTRIB_ALL             (OSAX_ATTRIB_REDUCED | \
+                                     OSAX_ATTRIB_DPPM | \
+                                     OSAX_ATTRIB_MOV_SPACE | \
+                                     OSAX_ATTRIB_SET_WINDOW)
 
 enum sa_opcode
 {

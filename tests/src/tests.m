@@ -22,7 +22,8 @@ typedef TEST_SIG(function);
     TEST_ENTRY(memory_pool_wraparound_detection)               \
     TEST_ENTRY(hashtable_stress_and_rehashing)                 \
     TEST_ENTRY(app_active_space_resolution)                    \
-    TEST_ENTRY(space_gesture_guards)
+    TEST_ENTRY(space_gesture_guards)                            \
+    TEST_ENTRY(osax_expected_attributes_validation)
 
 static struct {
     char *name;

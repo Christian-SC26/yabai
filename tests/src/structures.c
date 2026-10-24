@@ -191,3 +191,31 @@ TEST_FUNC(space_gesture_guards, {
     bool pp_res = space_manager_focus_space_using_gesture(0, other_sid);
     TEST_CHECK(pp_res, false);
 })
+
+static bool run_osax_expected_attributes_validation(void)
+{
+    NSOperatingSystemVersion os_26_0 = { 26, 0, 0 };
+    NSOperatingSystemVersion os_27_0 = { 27, 0, 1 };
+    NSOperatingSystemVersion os_27_1 = { 27, 1, 0 };
+    NSOperatingSystemVersion os_27_2 = { 27, 2, 0 };
+    NSOperatingSystemVersion os_27_3 = { 27, 3, 0 };
+    NSOperatingSystemVersion os_28_0 = { 28, 0, 0 };
+
+    if (scripting_addition_expected_attrib_for_version(os_26_0) != (uint32_t)OSAX_ATTRIB_ALL) return false;
+    if (scripting_addition_expected_attrib_for_version(os_27_0) != (uint32_t)OSAX_ATTRIB_ALL) return false;
+    if (scripting_addition_expected_attrib_for_version(os_27_1) != (uint32_t)OSAX_ATTRIB_ALL) return false;
+    if (scripting_addition_expected_attrib_for_version(os_27_2) != (uint32_t)OSAX_ATTRIB_REDUCED) return false;
+    if (scripting_addition_expected_attrib_for_version(os_27_3) != (uint32_t)OSAX_ATTRIB_REDUCED) return false;
+    if (scripting_addition_expected_attrib_for_version(os_28_0) != (uint32_t)OSAX_ATTRIB_REDUCED) return false;
+
+    if ((uint32_t)OSAX_ATTRIB_REDUCED != (uint32_t)0x4D) return false;
+    if ((uint32_t)OSAX_ATTRIB_ALL != (uint32_t)0x7F) return false;
+    if ((0x4D & OSAX_ATTRIB_REDUCED) != OSAX_ATTRIB_REDUCED) return false;
+
+    return true;
+}
+
+TEST_FUNC(osax_expected_attributes_validation, {
+    bool ok = run_osax_expected_attributes_validation();
+    TEST_CHECK(ok, true);
+})

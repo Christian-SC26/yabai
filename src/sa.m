@@ -267,6 +267,21 @@ out:
     return result;
 }
 
+static uint32_t scripting_addition_expected_attrib_for_version(NSOperatingSystemVersion os_version)
+{
+    if (os_version.majorVersion > 27 || (os_version.majorVersion == 27 && os_version.minorVersion >= 2)) {
+        return OSAX_ATTRIB_REDUCED;
+    }
+
+    return OSAX_ATTRIB_ALL;
+}
+
+static uint32_t scripting_addition_expected_attrib(void)
+{
+    NSOperatingSystemVersion os_version = [[NSProcessInfo processInfo] operatingSystemVersion];
+    return scripting_addition_expected_attrib_for_version(os_version);
+}
+
 static int scripting_addition_perform_validation(void)
 {
     uint32_t attrib = 0;
@@ -279,7 +294,8 @@ static int scripting_addition_perform_validation(void)
     }
 
     if (string_equals(version, OSAX_VERSION)) {
-        if ((attrib & OSAX_ATTRIB_ALL) == OSAX_ATTRIB_ALL) {
+        uint32_t expected_attrib = scripting_addition_expected_attrib();
+        if ((attrib & expected_attrib) == expected_attrib) {
             notify("scripting-addition", "payload v%s", version);
             return 0;
         }
