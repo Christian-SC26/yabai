@@ -28,7 +28,20 @@ static MOUSE_HANDLER(mouse_handler)
         CFMachPortRef handle = __atomic_load_n(&mouse_state->handle, __ATOMIC_RELAXED);
         if (handle) CGEventTapEnable(handle, true);
     } break;
-    case kCGEventLeftMouseDown:
+    case kCGEventLeftMouseDown: {
+        extern volatile bool g_mission_control_mouse_clicked;
+        if (mission_control_is_active()) {
+            __atomic_store_n(&g_mission_control_mouse_clicked, true, __ATOMIC_RELEASE);
+        }
+        uint8_t mod = mouse_mod_from_cgflags(CGEventGetFlags(event));
+        event_loop_post(&g_event_loop, MOUSE_DOWN, (void *) CFRetain(event), mod);
+
+        if (mod == mouse_state->modifier) {
+            mouse_state->consume_mouse_click = true;
+            mouse_state->consumed_event = (CGEventRef) CFRetain(event);
+            return NULL;
+        }
+    } break;
     case kCGEventRightMouseDown: {
         uint8_t mod = mouse_mod_from_cgflags(CGEventGetFlags(event));
         event_loop_post(&g_event_loop, MOUSE_DOWN, (void *) CFRetain(event), mod);
@@ -70,10 +83,13 @@ static MOUSE_HANDLER(mouse_handler)
         int type = CGEventGetIntegerValueField(event, /* kCGEventGestureHIDType */ 110);
         if (type == /* kIOHIDEventTypeDockSwipe */ 23) {
             int motion = CGEventGetIntegerValueField(event, /* kCGEventGestureSwipeMotion */ 123);
-            if (motion == /* kCGGestureMotionHorizontal */ 1) {
+            if (motion == /* kCGGestureMotionHorizontal */ 1 || motion == /* kCGGestureMotionVertical */ 2) {
                 int phase = CGEventGetIntegerValueField(event, /* kCGEventGesturePhase */ 132);
                 if (phase == /* kCGSGesturePhaseBegan */ 1) {
                     __atomic_store_n(&__pending_gesture, true, __ATOMIC_RELEASE);
+                    if (motion == /* kCGGestureMotionVertical */ 2) {
+                        mission_control_record_state();
+                    }
                 } else if (phase == /* kCGSGesturePhaseEnded */ 4 || phase == /* kCGSGesturePhaseCancelled */ 8) {
                     __atomic_store_n(&__pending_gesture, false, __ATOMIC_RELEASE);
                     __atomic_store_n(&__last_gesture_time, read_os_timer(), __ATOMIC_RELEASE);

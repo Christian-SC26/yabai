@@ -364,6 +364,51 @@ static EVENT_HANDLER(APPLICATION_FRONT_SWITCHED)
         return;
     }
 
+    if (mission_control_is_active()) {
+        debug("%s: %s (%d) front switched during mission control, ignoring..\n", __FUNCTION__, process->name, process->pid);
+        return;
+    }
+
+    uint64_t now = read_os_timer();
+    uint64_t last_mc_exit = __atomic_load_n(&g_mission_control_exit_time, __ATOMIC_RELAXED);
+    uint64_t dt_mc_exit_ms = (now > last_mc_exit) ? (now - last_mc_exit) / 1000000ULL : 0;
+    bool mouse_clicked = __atomic_load_n(&g_mission_control_mouse_clicked, __ATOMIC_RELAXED);
+    uint32_t prev_wid = __atomic_load_n(&g_mission_control_prev_wid, __ATOMIC_RELAXED);
+    uint64_t prev_sid = __atomic_load_n(&g_mission_control_prev_sid, __ATOMIC_RELAXED);
+    pid_t prev_pid = __atomic_load_n(&g_mission_control_prev_pid, __ATOMIC_RELAXED);
+
+    if (dt_mc_exit_ms < 600 && !mouse_clicked) {
+        if (prev_pid && process->pid == prev_pid) {
+            debug("%s: %s (%d) matches prev_pid, allowing restoration after mission control exit..\n", __FUNCTION__, process->name, process->pid);
+        } else {
+            debug("%s: %s (%d) spurious front switch after mission control cancellation (prev_pid=%d), suppressing..\n",
+                  __FUNCTION__, process->name, process->pid, prev_pid);
+
+            struct window *restore_win = NULL;
+            if (prev_wid) {
+                restore_win = window_manager_find_window(&g_window_manager, prev_wid);
+            }
+            if (!restore_win && prev_sid) {
+                restore_win = window_manager_find_window_on_space_by_rank_filtering_window(&g_window_manager, prev_sid, 1, 0);
+            }
+
+            if (restore_win) {
+                debug("%s: forcing front process back to %s (%d) on space %lld\n",
+                      __FUNCTION__, restore_win->application->name, restore_win->id, prev_sid);
+                SLSSpaceSetFrontPSN(g_connection, prev_sid, restore_win->application->psn);
+                window_manager_focus_window_with_raise(&restore_win->application->psn, restore_win->id, restore_win->ref);
+                g_process_manager.last_front_pid = g_process_manager.front_pid;
+                g_process_manager.front_pid = restore_win->application->pid;
+                g_window_manager.last_window_id = g_window_manager.focused_window_id;
+                g_window_manager.focused_window_id = restore_win->id;
+                g_window_manager.focused_window_psn = restore_win->application->psn;
+            } else {
+                _SLPSSetFrontProcessWithOptions(&g_process_manager.finder_psn, 0, kCPSNoWindows);
+            }
+            return;
+        }
+    }
+
     for (int i = 0; i < buf_len(g_window_manager.applications_to_refresh); ++i) {
         if (application == g_window_manager.applications_to_refresh[i]) {
             debug("%s: %s has windows that are not yet resolved\n", __FUNCTION__, application->name);
@@ -440,16 +485,17 @@ static EVENT_HANDLER(APPLICATION_FRONT_SWITCHED)
                 bool gesture_in_progress = __atomic_load_n(&__pending_gesture, __ATOMIC_RELAXED);
                 uint64_t last_gesture_time = __atomic_load_n(&__last_gesture_time, __ATOMIC_RELAXED);
                 uint64_t dt_gesture_ms = (now > last_gesture_time) ? (now - last_gesture_time) / 1000000ULL : 0;
+                bool in_mc = mission_control_is_active();
 
-                if (gesture_in_progress || dt_gesture_ms < 250) {
-                    debug("%s: suppressing space switch to %lld during trackpad gesture (in_prog=%d, dt=%llums)\n",
-                          __FUNCTION__, target_sid, gesture_in_progress, dt_gesture_ms);
+                if (in_mc || gesture_in_progress || dt_gesture_ms < 400) {
+                    debug("%s: suppressing space switch to %lld during %s (in_prog=%d, dt=%llums, mc=%d)\n",
+                          __FUNCTION__, target_sid, in_mc ? "mission control" : "trackpad gesture", gesture_in_progress, dt_gesture_ms, in_mc);
                 } else {
                     uint64_t dt_ms = (now > s_last_switch_time) ? (now - s_last_switch_time) / 1000000ULL : 0;
                     if (target_sid == s_last_switch_target_sid && dt_ms < 250) {
                         debug("%s: suppressing duplicate space switch to %lld (dt=%llums)\n", __FUNCTION__, target_sid, dt_ms);
-                    } else if (target_sid != s_last_switch_target_sid && dt_ms < 60) {
-                        debug("%s: rate-limiting rapid space switch to %lld (dt=%llums < 60ms)\n", __FUNCTION__, target_sid, dt_ms);
+                    } else if (target_sid != s_last_switch_target_sid && dt_ms < 200) {
+                        debug("%s: rate-limiting rapid space switch to %lld (dt=%llums < 200ms)\n", __FUNCTION__, target_sid, dt_ms);
                     } else {
                         s_last_switch_target_sid = target_sid;
                         s_last_switch_time = now;
@@ -487,10 +533,35 @@ static EVENT_HANDLER(APPLICATION_FRONT_SWITCHED)
             window = visible_win;
         }
     } else if (!window && win_count > 0) {
-        window = win_list[0];
+        for (int w = 0; w < win_count; ++w) {
+            uint64_t sid = window_space(win_list[w]->id);
+            if (space_is_visible(sid) || window_is_sticky(win_list[w]->id) || window_check_flag(win_list[w], WINDOW_STICKY)) {
+                window = win_list[w];
+                break;
+            }
+        }
     }
 
     if (!window) {
+        if (dt_mc_exit_ms < 800) {
+            struct window *curr_win = window_manager_find_window_on_space_by_rank_filtering_window(&g_window_manager, g_space_manager.current_space_id, 1, 0);
+            if (curr_win) {
+                debug("%s: suppressing front switch to %s with no windows on current space %lld, restoring %s %d\n",
+                      __FUNCTION__, application->name, g_space_manager.current_space_id, curr_win->application->name, curr_win->id);
+                SLSSpaceSetFrontPSN(g_connection, g_space_manager.current_space_id, curr_win->application->psn);
+                window_manager_focus_window_with_raise(&curr_win->application->psn, curr_win->id, curr_win->ref);
+                g_process_manager.last_front_pid = g_process_manager.front_pid;
+                g_process_manager.front_pid = curr_win->application->pid;
+                g_window_manager.last_window_id = g_window_manager.focused_window_id;
+                g_window_manager.focused_window_id = curr_win->id;
+                g_window_manager.focused_window_psn = curr_win->application->psn;
+                return;
+            } else {
+                _SLPSSetFrontProcessWithOptions(&g_process_manager.finder_psn, 0, kCPSNoWindows);
+                return;
+            }
+        }
+
         struct window *focused_window = window_manager_find_window(&g_window_manager, g_window_manager.focused_window_id);
         if (focused_window) {
             window_manager_set_window_opacity(&g_window_manager, focused_window, g_window_manager.normal_window_opacity);
@@ -746,7 +817,34 @@ static EVENT_HANDLER(WINDOW_FOCUSED)
         return;
     }
 
+    if (mission_control_is_active()) {
+        debug("%s: %s %d received focus during mission control, ignoring..\n", __FUNCTION__, window->application->name, window->id);
+        return;
+    }
+
+    uint64_t now = read_os_timer();
+    uint64_t last_mc_exit = __atomic_load_n(&g_mission_control_exit_time, __ATOMIC_RELAXED);
+    uint64_t dt_mc_exit_ms = (now > last_mc_exit) ? (now - last_mc_exit) / 1000000ULL : 0;
+    bool mouse_clicked = __atomic_load_n(&g_mission_control_mouse_clicked, __ATOMIC_RELAXED);
+    uint32_t prev_wid = __atomic_load_n(&g_mission_control_prev_wid, __ATOMIC_RELAXED);
+
+    if (dt_mc_exit_ms < 600 && !mouse_clicked) {
+        if (prev_wid && window->id != prev_wid) {
+            debug("%s: %s %d received focus after mission control cancellation (prev_wid=%d), ignoring..\n",
+                  __FUNCTION__, window->application->name, window->id, prev_wid);
+            return;
+        }
+    }
+
     debug("%s: %s %d\n", __FUNCTION__, window->application->name, window->id);
+
+    bool is_sticky = window_check_flag(window, WINDOW_STICKY) || window_is_sticky(window->id);
+    uint64_t sid = window_space(window->id);
+
+    if (!is_sticky && sid && !space_is_visible(sid)) {
+        debug("%s: %s %d is on invisible space %lld, skipping focus assignment\n", __FUNCTION__, window->application->name, window->id, sid);
+        return;
+    }
 
     window_did_receive_focus(&g_window_manager, &g_mouse_state, window);
     event_signal_push(SIGNAL_WINDOW_FOCUSED, window);
@@ -1117,7 +1215,28 @@ static EVENT_HANDLER(SLS_SPACE_DESTROYED)
 
 static EVENT_HANDLER(SPACE_CHANGED)
 {
-    __atomic_store_n(&__last_space_change_time, read_os_timer(), __ATOMIC_RELEASE);
+    if (mission_control_is_active()) {
+        debug("%s: space changed during mission control, ignoring..\n", __FUNCTION__);
+        return;
+    }
+
+    uint64_t now = read_os_timer();
+    uint64_t last_mc_exit = __atomic_load_n(&g_mission_control_exit_time, __ATOMIC_RELAXED);
+    uint64_t dt_mc_exit_ms = (now > last_mc_exit) ? (now - last_mc_exit) / 1000000ULL : 0;
+    bool mouse_clicked = __atomic_load_n(&g_mission_control_mouse_clicked, __ATOMIC_RELAXED);
+    uint64_t prev_sid = __atomic_load_n(&g_mission_control_prev_sid, __ATOMIC_RELAXED);
+
+    if (dt_mc_exit_ms < 400 && !mouse_clicked) {
+        uint64_t active_sid = space_manager_active_space();
+        if (prev_sid && active_sid != prev_sid) {
+            debug("%s: space changed to %lld after mission control cancellation, restoring prev_sid %lld..\n",
+                  __FUNCTION__, active_sid, prev_sid);
+            space_manager_focus_space(prev_sid);
+            return;
+        }
+    }
+
+    __atomic_store_n(&__last_space_change_time, now, __ATOMIC_RELEASE);
     g_space_manager.last_space_id = g_space_manager.current_space_id;
     g_space_manager.current_space_id = space_manager_active_space();
 
@@ -1610,6 +1729,7 @@ out:
 static EVENT_HANDLER(MISSION_CONTROL_SHOW_ALL_WINDOWS)
 {
     debug("%s:\n", __FUNCTION__);
+    mission_control_record_state();
     g_mission_control_mode = MISSION_CONTROL_MODE_SHOW_ALL_WINDOWS;
     event_signal_push(SIGNAL_MISSION_CONTROL_ENTER, (void*)(uintptr_t)g_mission_control_mode);
 }
@@ -1617,6 +1737,7 @@ static EVENT_HANDLER(MISSION_CONTROL_SHOW_ALL_WINDOWS)
 static EVENT_HANDLER(MISSION_CONTROL_SHOW_FRONT_WINDOWS)
 {
     debug("%s:\n", __FUNCTION__);
+    mission_control_record_state();
     g_mission_control_mode = MISSION_CONTROL_MODE_SHOW_FRONT_WINDOWS;
     event_signal_push(SIGNAL_MISSION_CONTROL_ENTER, (void*)(uintptr_t)g_mission_control_mode);
 }
@@ -1624,6 +1745,7 @@ static EVENT_HANDLER(MISSION_CONTROL_SHOW_FRONT_WINDOWS)
 static EVENT_HANDLER(MISSION_CONTROL_SHOW_DESKTOP)
 {
     debug("%s:\n", __FUNCTION__);
+    mission_control_record_state();
     g_mission_control_mode = MISSION_CONTROL_MODE_SHOW_DESKTOP;
     event_signal_push(SIGNAL_MISSION_CONTROL_ENTER, (void*)(uintptr_t)g_mission_control_mode);
 }
@@ -1631,6 +1753,7 @@ static EVENT_HANDLER(MISSION_CONTROL_SHOW_DESKTOP)
 static EVENT_HANDLER(MISSION_CONTROL_ENTER)
 {
     debug("%s:\n", __FUNCTION__);
+    mission_control_record_state();
     g_mission_control_mode = MISSION_CONTROL_MODE_SHOW;
 
     if (!workspace_is_macos_monterey() &&
@@ -1702,6 +1825,9 @@ static EVENT_HANDLER(MISSION_CONTROL_EXIT)
 {
     debug("%s:\n", __FUNCTION__);
 
+    uint64_t exit_now = read_os_timer();
+    __atomic_store_n(&g_mission_control_exit_time, exit_now, __ATOMIC_RELEASE);
+
     if (g_window_manager.menubar_opacity != 1.0f) {
         float alpha = space_is_fullscreen(g_space_manager.current_space_id) ? 1.0f : g_window_manager.menubar_opacity;
         SLSSetMenuBarInsetAndAlpha(g_connection, 0, 1, alpha);
@@ -1713,6 +1839,78 @@ static EVENT_HANDLER(MISSION_CONTROL_EXIT)
 
     event_signal_push(SIGNAL_MISSION_CONTROL_EXIT, (void*)(uintptr_t)g_mission_control_mode);
     g_mission_control_mode = MISSION_CONTROL_MODE_INACTIVE;
+    extern volatile bool g_mission_control_posted_exit;
+    __atomic_store_n(&g_mission_control_posted_exit, false, __ATOMIC_RELEASE);
+
+    uint32_t prev_wid = __atomic_load_n(&g_mission_control_prev_wid, __ATOMIC_RELAXED);
+    uint64_t prev_sid = __atomic_load_n(&g_mission_control_prev_sid, __ATOMIC_RELAXED);
+    bool mouse_clicked = __atomic_load_n(&g_mission_control_mouse_clicked, __ATOMIC_RELAXED);
+
+    void (^restore_focus)(void) = ^{
+        uint64_t current_sid = space_manager_active_space();
+        uint64_t now = read_os_timer();
+        uint64_t last_gesture_time = __atomic_load_n(&__last_gesture_time, __ATOMIC_RELAXED);
+        uint64_t dt_gesture_ms = (now > last_gesture_time) ? (now - last_gesture_time) / 1000000ULL : 0;
+        bool exited_via_gesture = dt_gesture_ms < 800 || __atomic_load_n(&__pending_gesture, __ATOMIC_RELAXED);
+        bool is_cancellation = exited_via_gesture || !mouse_clicked;
+
+        if (prev_sid && (current_sid == prev_sid || is_cancellation)) {
+            if (current_sid != prev_sid) {
+                debug("%s: returning from previewed space %lld to original space %lld (gesture=%d, clicked=%d)\n",
+                      __FUNCTION__, current_sid, prev_sid, exited_via_gesture, mouse_clicked);
+                space_manager_focus_space(prev_sid);
+                current_sid = prev_sid;
+            }
+
+            struct view *view = space_manager_find_view(&g_space_manager, current_sid);
+            if (view_is_invalid(view)) {
+                view_update(view);
+            }
+
+            struct window *restore_window = NULL;
+            if (prev_wid) {
+                struct window *prev_window = window_manager_find_window(&g_window_manager, prev_wid);
+                if (prev_window && !window_check_flag(prev_window, WINDOW_MINIMIZE)) {
+                    uint64_t win_sid = window_space(prev_window->id);
+                    if (win_sid == current_sid || window_is_sticky(prev_window->id)) {
+                        restore_window = prev_window;
+                    }
+                }
+            }
+
+            if (!restore_window) {
+                restore_window = window_manager_find_window_on_space_by_rank_filtering_window(&g_window_manager, current_sid, 1, 0);
+            }
+
+            if (restore_window) {
+                debug("%s: restoring focus to previous window %s %d on space %lld\n", __FUNCTION__, restore_window->application->name, restore_window->id, current_sid);
+                SLSSpaceSetFrontPSN(g_connection, current_sid, restore_window->application->psn);
+                window_manager_focus_window_with_raise(&restore_window->application->psn, restore_window->id, restore_window->ref);
+
+                g_process_manager.last_front_pid = g_process_manager.front_pid;
+                g_process_manager.front_pid = restore_window->application->pid;
+                g_window_manager.last_window_id = g_window_manager.focused_window_id;
+                g_window_manager.focused_window_id = restore_window->id;
+                g_window_manager.focused_window_psn = restore_window->application->psn;
+                event_signal_push(SIGNAL_WINDOW_FOCUSED, restore_window);
+            } else {
+                _SLPSSetFrontProcessWithOptions(&g_process_manager.finder_psn, 0, kCPSNoWindows);
+            }
+        }
+    };
+
+    restore_focus();
+
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 0.15f * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
+        restore_focus();
+    });
+
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 0.6f * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
+        __atomic_store_n(&g_mission_control_prev_wid, 0, __ATOMIC_RELEASE);
+        __atomic_store_n(&g_mission_control_prev_sid, 0, __ATOMIC_RELEASE);
+        __atomic_store_n(&g_mission_control_prev_pid, 0, __ATOMIC_RELEASE);
+        __atomic_store_n(&g_mission_control_mouse_clicked, false, __ATOMIC_RELEASE);
+    });
 }
 
 static EVENT_HANDLER(DOCK_DID_RESTART)

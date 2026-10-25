@@ -219,3 +219,60 @@ TEST_FUNC(osax_expected_attributes_validation, {
     bool ok = run_osax_expected_attributes_validation();
     TEST_CHECK(ok, true);
 })
+
+TEST_FUNC(skip_window_focus_animation_default, {
+    TEST_CHECK(g_space_manager.skip_window_focus_animation, false);
+})
+
+TEST_FUNC(gesture_vertical_and_mc_guards, {
+    extern volatile bool __pending_gesture;
+    extern volatile uint64_t __last_gesture_time;
+
+    __atomic_store_n(&__pending_gesture, false, __ATOMIC_RELEASE);
+    __atomic_store_n(&__last_gesture_time, 0, __ATOMIC_RELEASE);
+
+    // Simulate vertical gesture (motion == 2) began (phase == 1)
+    __atomic_store_n(&__pending_gesture, true, __ATOMIC_RELEASE);
+    TEST_CHECK(__atomic_load_n(&__pending_gesture, __ATOMIC_RELAXED), true);
+
+    // Simulate vertical gesture ended (phase == 4)
+    uint64_t now = read_os_timer();
+    __atomic_store_n(&__pending_gesture, false, __ATOMIC_RELEASE);
+    __atomic_store_n(&__last_gesture_time, now, __ATOMIC_RELEASE);
+    TEST_CHECK(__atomic_load_n(&__pending_gesture, __ATOMIC_RELAXED), false);
+    TEST_CHECK(__atomic_load_n(&__last_gesture_time, __ATOMIC_RELAXED) > 0, true);
+})
+
+TEST_FUNC(mission_control_focus_state_record, {
+    extern volatile uint32_t g_mission_control_prev_wid;
+    extern volatile uint64_t g_mission_control_prev_sid;
+    extern volatile pid_t g_mission_control_prev_pid;
+    void mission_control_record_state(void);
+
+    g_mission_control_prev_wid = 0;
+    g_mission_control_prev_sid = 0;
+    g_mission_control_prev_pid = 0;
+
+    g_space_manager.current_space_id = 42;
+    g_window_manager.focused_window_id = 1234;
+    g_process_manager.front_pid = 789;
+
+    mission_control_record_state();
+    TEST_CHECK((int)g_mission_control_prev_sid, 42);
+    TEST_CHECK((int)g_mission_control_prev_wid, 1234);
+    TEST_CHECK((int)g_mission_control_prev_pid, 789);
+
+    // Idempotent: should not be overwritten while prev_sid != 0
+    g_space_manager.current_space_id = 99;
+    g_window_manager.focused_window_id = 5678;
+    g_process_manager.front_pid = 999;
+    mission_control_record_state();
+    TEST_CHECK((int)g_mission_control_prev_sid, 42);
+    TEST_CHECK((int)g_mission_control_prev_wid, 1234);
+    TEST_CHECK((int)g_mission_control_prev_pid, 789);
+
+    // Cleanup
+    g_mission_control_prev_wid = 0;
+    g_mission_control_prev_sid = 0;
+    g_mission_control_prev_pid = 0;
+})

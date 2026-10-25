@@ -23,7 +23,10 @@ typedef TEST_SIG(function);
     TEST_ENTRY(hashtable_stress_and_rehashing)                 \
     TEST_ENTRY(app_active_space_resolution)                    \
     TEST_ENTRY(space_gesture_guards)                            \
-    TEST_ENTRY(osax_expected_attributes_validation)
+    TEST_ENTRY(osax_expected_attributes_validation)            \
+    TEST_ENTRY(skip_window_focus_animation_default)            \
+    TEST_ENTRY(gesture_vertical_and_mc_guards)                 \
+    TEST_ENTRY(mission_control_focus_state_record)
 
 static struct {
     char *name;

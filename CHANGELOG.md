@@ -6,6 +6,17 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [7.1.32] - 2026-10-25
+### Fixed
+- **Mission Control Window Focus & Menu Bar Synchronization**:
+  - Prevent spurious window focus shifts and menu bar desynchronization caused by hovering thumbnails in Mission Control
+  - Intercept and suppress synthetic window activations during and immediately after Mission Control cancellation gestures
+  - Force macOS front application and menu bar owner back to the previously active window upon Mission Control exit
+  - Ensure thread-safe Mission Control detection across event tap and event loop threads
+- **Configuration & Space Switching Defaults**:
+  - Restore default `skip_window_focus_animation` to `off` (`false`) to prevent unwanted space jumps when activating applications with off-space windows ([#4](https://github.com/Christian-SC26/yabai/issues/4))
+  - Preserve original upstream documentation behavior for scripting addition setups and document opening workflows
+
 ## [7.1.31] - 2026-10-25
 ### Fixed
 - **Scripting Addition (SIP OFF) macOS 27 Handshake & Validation Compatibility**:
