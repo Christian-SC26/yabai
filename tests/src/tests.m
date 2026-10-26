@@ -48,6 +48,7 @@ typedef bool (test_function)(void);
 #include "angry_display_manager_tests.c"
 #include "angry_space_manager_tests.c"
 #include "angry_message_tests.c"
+#include "angry_layout_store_tests.m"
 
 CGError CoreDockSendNotification(CFStringRef notification, int unknown)
 {
@@ -448,7 +449,20 @@ CGError CoreDockSendNotification(CFStringRef notification, int unknown)
     ANGRY_ENTRY(formatsDaemonFailureMessageToJsonStream)                        \
     ANGRY_ENTRY(formatsDaemonDeprecatedWarningToJsonStream)                     \
     ANGRY_ENTRY(terminatesMessageLoopImmediatelyWhenNotRunning)                 \
-    ANGRY_ENTRY(initializesAndTerminatesMessageLoopSocket)
+    ANGRY_ENTRY(initializesAndTerminatesMessageLoopSocket)                     \
+    ANGRY_ENTRY(resolvesLayoutStorePathForNullAndCustomPaths)                   \
+    ANGRY_ENTRY(resolvesLayoutStoreSessionPathForNullAndCustomPaths)            \
+    ANGRY_ENTRY(ensuresDirectoryExistsForTargetFilePath)                       \
+    ANGRY_ENTRY(serializesLeafAndBranchWindowNodesToDictionary)                 \
+    ANGRY_ENTRY(collectsAppNamesRecursivelyFromSerializedNodeDictionary)        \
+    ANGRY_ENTRY(reconstructsWindowNodeHierarchyFromSerializedDictionary)        \
+    ANGRY_ENTRY(buildsSessionDictionaryCapturingDisplaysAndSpaces)              \
+    ANGRY_ENTRY(savesSpaceLayoutToFileHandlingErrors)                           \
+    ANGRY_ENTRY(dumpsSpaceLayoutToJsonStreamHandlingErrors)                     \
+    ANGRY_ENTRY(restoresSpaceLayoutFromFileHandlingMissingFile)                 \
+    ANGRY_ENTRY(savesSessionStateToFileHandlingErrors)                          \
+    ANGRY_ENTRY(dumpsSessionStateToJsonStreamHandlingErrors)                    \
+    ANGRY_ENTRY(restoresSessionStateFromFileHandlingMissingFile)
 
 static struct {
     char *name;
