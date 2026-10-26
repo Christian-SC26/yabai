@@ -6,6 +6,21 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [7.1.33] - 2026-10-26
+### Fixed
+- **BSP Split Live Mouse Resizing Performance & Smoothness**:
+  - Respect `animate = false` during live interactive BSP split resizing (`MOUSE_DRAGGED`), avoiding redundant `CVDisplayLink` animation cycles, thread creation, window proxies, and screenshot captures ([#5](https://github.com/Christian-SC26/yabai/issues/5))
+  - Added `view_flush_direct` and `window_node_flush_direct` to immediately position resized windows via Accessibility APIs
+  - Optimize layout updates to skip redundant Accessibility IPC calls for windows whose geometry did not change
+  - Added drag and mouse move event coalescing in `event_loop_run` to prevent event queue buildup from high-polling-rate mice and Apple trackpads
+  - Set 30 FPS (`33 ms`) update rate for multi-window live BSP resizing to reduce IPC overhead on running applications, while preserving 60 FPS (`16 ms`) for floating and lone tiled windows
+
+### Added
+- **Configurable Live vs Classic BSP Resizing (`mouse_bsp_live_resize`)**:
+  - Added `yabai -m config mouse_bsp_live_resize <on|off>` (alias `mouse_live_resize`)
+  - `on` (default): Real-time live split adjustment with neighboring windows updating as you drag
+  - `off`: Classic yabai behavior, resizing only the grabbed window live and snapping neighboring windows to the BSP grid upon mouse release (`MOUSE_UP`)
+
 ## [7.1.32] - 2026-10-25
 ### Fixed
 - **Mission Control Window Focus & Menu Bar Synchronization**:
@@ -880,7 +895,10 @@ The *window_destroyed* signal is now triggered for windows that are implicitly d
 ### Added
 - First official release
 
-[Unreleased]: https://github.com/Christian-SC26/yabai/compare/v7.1.26...HEAD
+[Unreleased]: https://github.com/Christian-SC26/yabai/compare/v7.1.33...HEAD
+[7.1.33]: https://github.com/Christian-SC26/yabai/compare/v7.1.32...v7.1.33
+[7.1.32]: https://github.com/Christian-SC26/yabai/compare/v7.1.31...v7.1.32
+[7.1.31]: https://github.com/Christian-SC26/yabai/compare/v7.1.30...v7.1.31
 [7.1.26]: https://github.com/Christian-SC26/yabai/compare/v7.1.25...v7.1.26
 [7.1.25]: https://github.com/Christian-SC26/yabai/compare/v7.1.24...v7.1.25
 [7.1.24]: https://github.com/Christian-SC26/yabai/compare/v7.1.23...v7.1.24
