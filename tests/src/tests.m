@@ -45,6 +45,7 @@ typedef bool (test_function)(void);
 #include "angry_display_space_tests.c"
 #include "angry_view_tests.c"
 #include "angry_window_tests.c"
+#include "angry_display_manager_tests.c"
 
 #define TEST_LIST                                                               \
     ANGRY_ENTRY(allocatesChunkInEmptyMemoryPool)                                \
@@ -353,7 +354,24 @@ typedef bool (test_function)(void);
     ANGRY_ENTRY(evaluatesWindowIsRootWithValidOrDummyElement)                   \
     ANGRY_ENTRY(manipulatesWindowFlagsAndRuleFlagsBitmasks)                     \
     ANGRY_ENTRY(destroysWindowFreeingAllocatedStringsAndReferences)             \
-    ANGRY_ENTRY(createsAndObservesWindowWhenAccessibilityWindowExists)
+    ANGRY_ENTRY(createsAndObservesWindowWhenAccessibilityWindowExists)          \
+    ANGRY_ENTRY(queriesAllActiveDisplaysToJsonStream)                           \
+    ANGRY_ENTRY(managesDisplayLabelsSettingAndQueryingAndRemoving)              \
+    ANGRY_ENTRY(resolvesMainDisplayUuidMatchingMainDisplayId)                   \
+    ANGRY_ENTRY(resolvesDockDisplayUuidAndDockDisplayId)                        \
+    ANGRY_ENTRY(resolvesPointDisplayUuidAndPointDisplayId)                      \
+    ANGRY_ENTRY(evaluatesDisplayCoordinateComparatorAcrossAxes)                 \
+    ANGRY_ENTRY(calculatesDisplayArrangementWithCustomSortOrders)               \
+    ANGRY_ENTRY(resolvesArrangementDisplayUuidAndDisplayId)                     \
+    ANGRY_ENTRY(resolvesCursorDisplayIdFromCurrentCursorLocation)               \
+    ANGRY_ENTRY(evaluatesPrevAndNextDisplayIdNavigation)                        \
+    ANGRY_ENTRY(resolvesFirstAndLastDisplayIdsAccurately)                       \
+    ANGRY_ENTRY(findsClosestDisplayInCardinalDirections)                        \
+    ANGRY_ENTRY(queriesDockOrientationAndDockBoundingRect)                      \
+    ANGRY_ENTRY(evaluatesDisplayIsAnimatingStatus)                              \
+    ANGRY_ENTRY(locatesElementAtSpecifiedScreenCoordinates)                    \
+    ANGRY_ENTRY(focusesDisplayWithWindowAtSpecifiedCoordinates)                \
+    ANGRY_ENTRY(returnsSameDisplayErrorWhenSpaceDoesNotBelongToDisplay)
 
 static struct {
     char *name;
