@@ -47,6 +47,7 @@ typedef bool (test_function)(void);
 #include "angry_window_tests.c"
 #include "angry_display_manager_tests.c"
 #include "angry_space_manager_tests.c"
+#include "angry_message_tests.c"
 
 CGError CoreDockSendNotification(CFStringRef notification, int unknown)
 {
@@ -417,7 +418,37 @@ CGError CoreDockSendNotification(CFStringRef notification, int unknown)
     ANGRY_ENTRY(marksSpacesInvalidForDisplayAndAllDisplays)                     \
     ANGRY_ENTRY(refreshesApplicationWindowsReturningStatus)                     \
     ANGRY_ENTRY(handlesDisplayAddUpdatingSpaceViews)                            \
-    ANGRY_ENTRY(evaluatesIsSpaceLastUserSpaceAndFindFirstUserSpace)
+    ANGRY_ENTRY(evaluatesIsSpaceLastUserSpaceAndFindFirstUserSpace)            \
+    ANGRY_ENTRY(advancesTokenPointerAndExtractsTokenText)                       \
+    ANGRY_ENTRY(evaluatesTokenPrefixMatchingStartOfString)                      \
+    ANGRY_ENTRY(evaluatesTokenEqualsAgainstExactStrings)                        \
+    ANGRY_ENTRY(evaluatesTokenIsValidCheckingLengthAndPointer)                  \
+    ANGRY_ENTRY(evaluatesTokenIsPositiveIntegerForValidAndInvalidStrings)       \
+    ANGRY_ENTRY(evaluatesTokenIsHexadecimalForPrefixedNumbers)                  \
+    ANGRY_ENTRY(evaluatesTokenIsFloatForValidFloatingPointNumbers)              \
+    ANGRY_ENTRY(convertsTokenToTypedTokenValue)                                 \
+    ANGRY_ENTRY(parsesKeyValuePairExtractingKeyAndValueAndExclusion)            \
+    ANGRY_ENTRY(parsesValueTypeForAbsAndRelModifiers)                          \
+    ANGRY_ENTRY(parsesResizeHandleForCardinalAndCornerDirections)              \
+    ANGRY_ENTRY(parsesLabelValidatingReservedIdentifiers)                      \
+    ANGRY_ENTRY(parsesPropertiesFromCommaSeparatedToken)                        \
+    ANGRY_ENTRY(parsesDisplaySelectorForIndexAndDirections)                    \
+    ANGRY_ENTRY(parsesSpaceSelectorForIndexAndRelativeSelectors)                \
+    ANGRY_ENTRY(parsesWindowSelectorForKeywordsAndWindowIds)                    \
+    ANGRY_ENTRY(parsesInsertSelectorForCardinalDirectionsAndStack)              \
+    ANGRY_ENTRY(parsesRuleSpecifyingAppFilterAndManageEffect)                   \
+    ANGRY_ENTRY(dispatchesConfigDomainModifyingRuntimeSettings)                 \
+    ANGRY_ENTRY(dispatchesDisplayDomainExecutingDisplayCommands)                \
+    ANGRY_ENTRY(dispatchesSpaceDomainExecutingSpaceCommands)                    \
+    ANGRY_ENTRY(dispatchesWindowDomainExecutingWindowCommands)                  \
+    ANGRY_ENTRY(dispatchesQueryDomainEmittingFormattedJson)                     \
+    ANGRY_ENTRY(dispatchesRuleDomainListingActiveRules)                         \
+    ANGRY_ENTRY(dispatchesSignalDomainListingRegisteredSignals)                 \
+    ANGRY_ENTRY(dispatchesMessageHandlingForInvalidDomain)                      \
+    ANGRY_ENTRY(formatsDaemonFailureMessageToJsonStream)                        \
+    ANGRY_ENTRY(formatsDaemonDeprecatedWarningToJsonStream)                     \
+    ANGRY_ENTRY(terminatesMessageLoopImmediatelyWhenNotRunning)                 \
+    ANGRY_ENTRY(initializesAndTerminatesMessageLoopSocket)
 
 static struct {
     char *name;
