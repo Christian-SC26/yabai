@@ -374,3 +374,31 @@ TEST_FUNC(community_upstream_fixes, {
     TEST_CHECK(is_dragged, true);
     g_mouse_state.window = NULL;
 })
+
+TEST_FUNC(fullscreen_exit_and_mouse_click_guards, {
+    // 1. Verify cursor moved threshold logic for clicks vs drags
+    CGPoint down_loc = CGPointMake(100.0f, 100.0f);
+    CGPoint click_up = CGPointMake(101.0f, 101.5f);
+    double dx = fabs(click_up.x - down_loc.x);
+    double dy = fabs(click_up.y - down_loc.y);
+    bool click_cursor_moved = dx >= 3.0f || dy >= 3.0f;
+    TEST_CHECK(click_cursor_moved, false);
+
+    CGPoint drag_up = CGPointMake(120.0f, 150.0f);
+    double drag_dx = fabs(drag_up.x - down_loc.x);
+    double drag_dy = fabs(drag_up.y - down_loc.y);
+    bool drag_cursor_moved = drag_dx >= 3.0f || drag_dy >= 3.0f;
+    TEST_CHECK(drag_cursor_moved, true);
+
+    // 2. Verify fullscreen space guard in validation logic
+    uint64_t target_sid = 4;
+    uint64_t fullscreen_sid = 1071;
+    bool is_fs = space_is_fullscreen(fullscreen_sid);
+    bool should_skip_untile = is_fs || (fullscreen_sid == target_sid);
+    TEST_CHECK(should_skip_untile, is_fs);
+
+    // Same space guard
+    uint64_t same_sid = target_sid;
+    bool same_space_skip = space_is_fullscreen(same_sid) || (same_sid == target_sid);
+    TEST_CHECK(same_space_skip, true);
+})

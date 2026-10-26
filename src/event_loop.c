@@ -1247,6 +1247,10 @@ static EVENT_HANDLER(SLS_SPACE_DESTROYED)
         view_destroy(view);
         free(view);
         event_signal_push(SIGNAL_SPACE_DESTROYED, context);
+
+        if (space_is_user(g_space_manager.current_space_id)) {
+            window_manager_validate_and_check_for_windows_on_space(&g_space_manager, &g_window_manager, g_space_manager.current_space_id);
+        }
     }
 }
 
@@ -1458,7 +1462,11 @@ static EVENT_HANDLER(MOUSE_UP)
     struct mouse_window_info info;
     mouse_window_info_populate(&g_mouse_state, &info);
 
-    if (info.changed_position && !info.changed_size) {
+    double cursor_dx = fabs(point.x - g_mouse_state.down_location.x);
+    double cursor_dy = fabs(point.y - g_mouse_state.down_location.y);
+    bool cursor_moved = cursor_dx >= 3.0f || cursor_dy >= 3.0f;
+
+    if (cursor_moved && info.changed_position && !info.changed_size) {
         uint64_t cursor_sid = display_space_id(display_manager_point_display_id(point));
         struct view *dst_view = space_manager_find_view(&g_space_manager, cursor_sid);
 
@@ -1503,7 +1511,7 @@ static EVENT_HANDLER(MOUSE_UP)
         } else if (a_node) {
             mouse_drop_no_target(&g_space_manager, &g_window_manager, src_view, dst_view, g_mouse_state.window, a_node);
         }
-    } else if (info.changed_position || info.changed_size) {
+    } else if (cursor_moved && (info.changed_position || info.changed_size)) {
         if (!g_mouse_state.live_resized) {
             mouse_drop_try_adjust_bsp_grid(&g_window_manager, src_view, g_mouse_state.window, &info);
         }

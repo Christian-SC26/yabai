@@ -2291,7 +2291,8 @@ void window_manager_wait_for_native_fullscreen_transition(struct window *window)
         workspace_is_macos_sequoia() ||
         (workspace_is_macos_tahoe() || workspace_is_macos_goldengate())) {
         int timeout = 30;
-        while (!space_is_user(space_manager_active_space()) && --timeout > 0) {
+        while ((!space_is_user(space_manager_active_space()) ||
+                !space_is_user(window_space(window->id))) && --timeout > 0) {
 
             //
             // NOTE(asmvik): Window has exited native-fullscreen mode.
@@ -2588,6 +2589,11 @@ static void window_manager_validate_windows_on_space(struct window_manager *wm, 
             struct window *window = window_manager_find_window(wm, view_window_list[i]);
             if (!window) continue;
 
+            uint64_t w_sid = window_space(window->id);
+            if (space_is_fullscreen(w_sid) || w_sid == view->sid) {
+                continue;
+            }
+
             //
             // @cleanup
             //
@@ -2623,6 +2629,10 @@ static void window_manager_check_for_windows_on_space(struct window_manager *wm,
         if (space_is_user(view->sid)) {
             if (window_check_flag(window, WINDOW_FULLSCREEN) && !window_is_fullscreen(window)) {
                 window_clear_flag(window, WINDOW_FULLSCREEN);
+                int attempts = 0;
+                while (!window_ax_can_move(window) && attempts++ < 15) {
+                    usleep(20000);
+                }
             }
             if (!window_can_move(window) && window_ax_can_move(window)) {
                 window_set_flag(window, WINDOW_MOVABLE);
