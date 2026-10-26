@@ -6,6 +6,22 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [7.1.34] - 2026-10-26
+### Fixed
+- **Multi-Monitor Window Drag & Drop Retiling and Gaps**:
+  - Skip retiling windows under the cursor mid-drag when crossing display boundaries (`g_mouse_state.window`), preserving drop feedback and waiting for mouse release (`MOUSE_UP`) ([asmvik#2843](https://github.com/asmvik/yabai/issues/2843))
+  - Immediately flush the vacated visible view on the source display (`window_node_flush`) to prevent lingering empty gaps
+- **Focus-Follows-Mouse Menu Lockup Prevention**:
+  - Track open menus per application process (`open_menus` on `struct application`) instead of a single global counter, preventing permanent autofocus lockouts when apps crash or close menus without posting notifications ([asmvik#2834](https://github.com/asmvik/yabai/issues/2834))
+  - Clear application menu counts on `APPLICATION_TERMINATED`
+  - Added `event_loop_reset_open_menus()` to allow immediate recovery whenever `yabai -m config focus_follows_mouse` is set
+- **Tracking Windows Restored on Inactive Spaces at Launch**:
+  - Call `window_manager_add_existing_application_windows` on application launch to discover windows restored on inactive spaces via remote token fallback, resolving untracked windows after background updates ([asmvik#2833](https://github.com/asmvik/yabai/issues/2833))
+- **Accurate Drop Feedback for Stack Layouts**:
+  - Map insert feedback direction to `STACK` when dragging onto a space with stack layout, accurately highlighting the entire stack instead of showing a misleading split preview ([asmvik#2840](https://github.com/asmvik/yabai/issues/2840))
+- **Scripting Addition Build Dependency in Makefile**:
+  - Add `arm64_payload.m`, `x64_payload.m`, and `common.h` to `OSAX_SRC` make prerequisites to prevent stale payload caching and version-mismatch Dock restart loops ([asmvik#2846](https://github.com/asmvik/yabai/issues/2846))
+
 ## [7.1.33] - 2026-10-26
 ### Fixed
 - **BSP Split Live Mouse Resizing Performance & Smoothness**:
@@ -895,7 +911,8 @@ The *window_destroyed* signal is now triggered for windows that are implicitly d
 ### Added
 - First official release
 
-[Unreleased]: https://github.com/Christian-SC26/yabai/compare/v7.1.33...HEAD
+[Unreleased]: https://github.com/Christian-SC26/yabai/compare/v7.1.34...HEAD
+[7.1.34]: https://github.com/Christian-SC26/yabai/compare/v7.1.33...v7.1.34
 [7.1.33]: https://github.com/Christian-SC26/yabai/compare/v7.1.32...v7.1.33
 [7.1.32]: https://github.com/Christian-SC26/yabai/compare/v7.1.31...v7.1.32
 [7.1.31]: https://github.com/Christian-SC26/yabai/compare/v7.1.30...v7.1.31
