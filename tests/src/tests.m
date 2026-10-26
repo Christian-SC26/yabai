@@ -38,6 +38,7 @@ typedef bool (test_function)(void);
 #include "angry_rule_tests.c"
 #include "angry_event_serialize_tests.c"
 #include "angry_signal_tests.c"
+#include "angry_application_tests.c"
 
 #define TEST_LIST                                                               \
     ANGRY_ENTRY(allocatesChunkInEmptyMemoryPool)                                \
@@ -223,6 +224,17 @@ typedef bool (test_function)(void);
     ANGRY_ENTRY(pushesDisplayRemovedAndChangedSignalsIntoStorage)               \
     ANGRY_ENTRY(pushesMissionControlExitSignalIntoStorage)                      \
     ANGRY_ENTRY(flushesSignalStorageImmediatelyWhenEmpty)                       \
+    ANGRY_ENTRY(createsApplicationInstanceFromCurrentProcess)                   \
+    ANGRY_ENTRY(evaluatesApplicationFrontmostState)                             \
+    ANGRY_ENTRY(evaluatesApplicationVisibilityState)                            \
+    ANGRY_ENTRY(queriesApplicationWindowList)                                   \
+    ANGRY_ENTRY(queriesApplicationMainWindow)                                  \
+    ANGRY_ENTRY(queriesApplicationFocusedWindow)                               \
+    ANGRY_ENTRY(observesAndUnobservesApplicationNotifications)                  \
+    ANGRY_ENTRY(dispatchesNotificationHandlerForCreatedAndFocusedNotifications) \
+    ANGRY_ENTRY(dispatchesNotificationHandlerForWindowGeometryChanges)          \
+    ANGRY_ENTRY(dispatchesNotificationHandlerForMenuAndStateChanges)           \
+    ANGRY_ENTRY(dispatchesNotificationHandlerForWindowDestroyedNotification)    \
     ANGRY_ENTRY(traversesEmptyWindowTableWithoutErrorDuringRuleReapplyAll)
 
 static struct {
@@ -241,6 +253,12 @@ int main(int argc, char **argv)
     display_manager_begin(&g_display_manager);
     space_manager_begin(&g_space_manager);
     memory_pool_init(&g_signal_storage, KILOBYTES(256));
+    memory_pool_init(&g_event_loop.pool, KILOBYTES(512));
+    g_event_loop.semaphore = sem_open("yabai_event_loop_test_sem", O_CREAT, 0600, 0);
+    sem_unlink("yabai_event_loop_test_sem");
+    g_event_loop.head = memory_pool_push(&g_event_loop.pool, sizeof(struct event));
+    g_event_loop.head->next = NULL;
+    g_event_loop.tail = g_event_loop.head;
 
     int succeeded = 0;
     int failed = 0;
