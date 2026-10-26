@@ -70,6 +70,32 @@ int system(const char *command)
     return real_fn ? real_fn(command) : 0;
 }
 
+static const char *g_mock_home = NULL;
+NSString *NSHomeDirectoryForUser(NSString *userName)
+{
+    if (g_mock_home) return [NSString stringWithUTF8String:g_mock_home];
+    typedef NSString *(*real_home_fn)(NSString *);
+    static real_home_fn real_fn = NULL;
+    if (!real_fn) real_fn = (real_home_fn)dlsym(RTLD_NEXT, "NSHomeDirectoryForUser");
+    return real_fn ? real_fn(userName) : @"/tmp";
+}
+
+static bool g_mock_posix_spawn = false;
+int posix_spawn(pid_t *restrict pid, const char *restrict path,
+                const posix_spawn_file_actions_t *file_actions,
+                const posix_spawnattr_t *restrict attrp,
+                char *const argv[restrict], char *const envp[restrict])
+{
+    if (g_mock_posix_spawn) {
+        if (pid) *pid = 0;
+        return 0;
+    }
+    typedef int (*real_spawn_fn)(pid_t *, const char *, const posix_spawn_file_actions_t *, const posix_spawnattr_t *, char *const [], char *const []);
+    static real_spawn_fn real_fn = NULL;
+    if (!real_fn) real_fn = (real_spawn_fn)dlsym(RTLD_NEXT, "posix_spawn");
+    return real_fn ? real_fn(pid, path, file_actions, attrp, argv, envp) : 1;
+}
+
 #include "area.c"
 #include "structures.c"
 #include "angry_tests.c"
@@ -206,6 +232,29 @@ int system(const char *command)
     ANGRY_ENTRY(verifiesDirectoryExistenceAccurately)                           \
     ANGRY_ENTRY(verifiesFileExistenceAccurately)                                \
     ANGRY_ENTRY(verifiesExecutablePermissionsAccurately)                       \
+    ANGRY_ENTRY(readsOperatingSystemFrequency)                                  \
+    ANGRY_ENTRY(sendsMachMessageSafely)                                         \
+    ANGRY_ENTRY(convertsInt32ToCfString)                                        \
+    ANGRY_ENTRY(resolvesConfigurationFilePath)                                  \
+    ANGRY_ENTRY(executesConfigurationFileSafelyWhenMissing)                      \
+    ANGRY_ENTRY(queriesAccessibilityPrivileges)                                 \
+    ANGRY_ENTRY(resolvesWindowPidFromAccessibilityElement)                      \
+    ANGRY_ENTRY(checksEnhancedUserInterfaceAccessibilityAttribute)             \
+    ANGRY_ENTRY(restoresAlphaChannelInQuartzImage)                              \
+    ANGRY_ENTRY(formatsDebugMessageIteratingTokens)                             \
+    ANGRY_ENTRY(terminatesWithExitFailureOnError)                               \
+    ANGRY_ENTRY(terminatesWithExitSuccessOnRequire)                             \
+    ANGRY_ENTRY(allowsUserNotificationPresentation)                             \
+    ANGRY_ENTRY(profilesExecutionTimerAndPrintsResults)                         \
+    ANGRY_ENTRY(populatesLaunchdServicePlist)                                   \
+    ANGRY_ENTRY(ensuresDirectoryPathExistsBeforeWriting)                        \
+    ANGRY_ENTRY(installsServiceInternalToFile)                                  \
+    ANGRY_ENTRY(cleansUpLegacyServiceRegistrationSafely)                        \
+    ANGRY_ENTRY(installsLaunchdServiceToMockHomeDirectory)                      \
+    ANGRY_ENTRY(uninstallsLaunchdServiceFromMockHomeDirectory)                    \
+    ANGRY_ENTRY(startsLaunchdServiceInMockEnvironment)                          \
+    ANGRY_ENTRY(restartsLaunchdServiceInMockEnvironment)                         \
+    ANGRY_ENTRY(stopsLaunchdServiceInMockEnvironment)                           \
     ANGRY_ENTRY(serializesRuleConfigurationWithLabelAndEscapedStringsToJsonStream) \
     ANGRY_ENTRY(serializesRuleConfigurationWithoutOptionalStringsUsingEmptyDefaults) \
     ANGRY_ENTRY(copiesDisplayIdentifierAndFollowSpaceWhenFollowSpaceFlagSet)   \

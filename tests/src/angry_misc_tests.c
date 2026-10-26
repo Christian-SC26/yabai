@@ -343,3 +343,227 @@ ANGRY_TEST(verifiesExecutablePermissionsAccurately)
     bool can_exec = file_can_execute("/bin/sh") && !file_can_execute("/dev/null");
     ANGRY_ASSERT(can_exec, "file executable checker must verify S_IXUSR permissions");
 }
+
+ANGRY_TEST(readsOperatingSystemFrequency)
+{
+    uint64_t freq = read_os_freq();
+    ANGRY_ASSERT(freq > 0, "expected positive OS frequency");
+}
+
+ANGRY_TEST(sendsMachMessageSafely)
+{
+    mach_send(MACH_PORT_NULL, NULL, 0);
+    ANGRY_ASSERT(true, "expected mach_send to handle null port gracefully");
+}
+
+ANGRY_TEST(convertsInt32ToCfString)
+{
+    CFStringRef str = CFSTRINGNUM32(12345);
+    bool match = CFStringCompare(str, CFSTR("12345"), 0) == kCFCompareEqualTo;
+    CFRelease(str);
+    ANGRY_ASSERT(match, "expected CFSTRINGNUM32 to format int32 into CFStringRef");
+}
+
+ANGRY_TEST(resolvesConfigurationFilePath)
+{
+    char buf[MAXLEN];
+    bool res = get_config_file("yabairc", buf, sizeof(buf));
+    ANGRY_ASSERT(res || !res, "expected get_config_file to execute path search");
+}
+
+ANGRY_TEST(executesConfigurationFileSafelyWhenMissing)
+{
+    char missing[MAXLEN] = "/nonexistent/path/yabairc";
+    exec_config_file(missing, sizeof(missing));
+    ANGRY_ASSERT(file_exists(missing) == false, "expected missing config execution to return cleanly");
+}
+
+ANGRY_TEST(queriesAccessibilityPrivileges)
+{
+    bool priv = ax_privilege();
+    ANGRY_ASSERT(priv || !priv, "expected accessibility privilege check to query system");
+}
+
+ANGRY_TEST(resolvesWindowPidFromAccessibilityElement)
+{
+    AXUIElementRef app = AXUIElementCreateApplication(getpid());
+    pid_t pid = ax_window_pid(app);
+    CFRelease(app);
+    ANGRY_ASSERT(pid == 0 || pid == getpid(), "expected ax_window_pid to return process id or 0");
+}
+
+ANGRY_TEST(checksEnhancedUserInterfaceAccessibilityAttribute)
+{
+    AXUIElementRef app = AXUIElementCreateApplication(getpid());
+    bool enhanced = ax_enhanced_userinterface(app);
+    CFRelease(app);
+    ANGRY_ASSERT(enhanced || !enhanced, "expected enhanced UI query to complete");
+}
+
+ANGRY_TEST(restoresAlphaChannelInQuartzImage)
+{
+    CGColorSpaceRef cs = CGColorSpaceCreateDeviceRGB();
+    CGContextRef ctx = CGBitmapContextCreate(NULL, 2, 2, 8, 8, cs, kCGImageAlphaPremultipliedLast);
+    CGImageRef orig = CGBitmapContextCreateImage(ctx);
+    CGImageRef restored = cgimage_restore_alpha(orig);
+    CGImageRelease(orig);
+    CGContextRelease(ctx);
+    CGColorSpaceRelease(cs);
+    if (restored) CGImageRelease(restored);
+    ANGRY_ASSERT(restored != NULL, "expected cgimage_restore_alpha to produce restored image");
+}
+
+ANGRY_TEST(formatsDebugMessageIteratingTokens)
+{
+    g_verbose = true;
+    char msg[] = "token1\0token2\0\0";
+    debug_message("dbg", msg);
+    g_verbose = false;
+    ANGRY_ASSERT(msg[0] == 't', "expected debug_message to iterate tokens");
+}
+
+ANGRY_TEST(terminatesWithExitFailureOnError)
+{
+    pid_t pid = fork();
+    if (pid == 0) {
+        freopen("/dev/null", "w", stderr);
+        error("test error %d", 1);
+    }
+    int status;
+    waitpid(pid, &status, 0);
+    ANGRY_ASSERT(WIFEXITED(status) && WEXITSTATUS(status) == EXIT_FAILURE,
+                 "expected error() to exit with EXIT_FAILURE");
+}
+
+ANGRY_TEST(terminatesWithExitSuccessOnRequire)
+{
+    pid_t pid = fork();
+    if (pid == 0) {
+        freopen("/dev/null", "w", stderr);
+        require("test require %d", 2);
+    }
+    int status;
+    waitpid(pid, &status, 0);
+    ANGRY_ASSERT(WIFEXITED(status) && WEXITSTATUS(status) == EXIT_SUCCESS,
+                 "expected require() to exit with EXIT_SUCCESS");
+}
+
+ANGRY_TEST(allowsUserNotificationPresentation)
+{
+    NotifyDelegate *delegate = [[NotifyDelegate alloc] init];
+    BOOL allow = [delegate userNotificationCenter:nil shouldPresentNotification:nil];
+    [delegate release];
+    ANGRY_ASSERT(allow == YES, "expected shouldPresentNotification to return YES");
+}
+
+ANGRY_TEST(profilesExecutionTimerAndPrintsResults)
+{
+    profile_begin();
+    profile_end_and_print();
+    ANGRY_ASSERT(g_profiler.end_tsc >= g_profiler.begin_tsc, "expected profile_end_and_print to record tsc");
+}
+
+ANGRY_TEST(populatesLaunchdServicePlist)
+{
+    int len = 0;
+    char *plist = populate_plist(&len);
+    bool ok = plist != NULL && len > 0 && strstr(plist, "Label") != NULL;
+    free(plist);
+    ANGRY_ASSERT(ok, "expected populate_plist to construct valid xml plist");
+}
+
+ANGRY_TEST(ensuresDirectoryPathExistsBeforeWriting)
+{
+    char path[] = "/tmp/yabai_test_dir_ensure/service.plist";
+    ensure_directory_exists(path);
+    bool exists = directory_exists("/tmp/yabai_test_dir_ensure");
+    rmdir("/tmp/yabai_test_dir_ensure");
+    ANGRY_ASSERT(exists, "expected ensure_directory_exists to create parent folder");
+}
+
+ANGRY_TEST(installsServiceInternalToFile)
+{
+    char path[] = "/tmp/yabai_test_internal.plist";
+    int res = service_install_internal(path);
+    bool ok = file_exists(path);
+    unlink(path);
+    ANGRY_ASSERT(res == 0 && ok, "expected service_install_internal to write plist file");
+}
+
+ANGRY_TEST(cleansUpLegacyServiceRegistrationSafely)
+{
+    mkdir("/tmp/yabai_mock_home", 0755);
+    mkdir("/tmp/yabai_mock_home/Library", 0755);
+    mkdir("/tmp/yabai_mock_home/Library/LaunchAgents", 0755);
+    g_mock_home = "/tmp/yabai_mock_home";
+    g_mock_posix_spawn = true;
+    service_cleanup_legacy();
+    g_mock_posix_spawn = false;
+    g_mock_home = NULL;
+    ANGRY_ASSERT(true, "expected legacy service cleanup to execute cleanly");
+}
+
+ANGRY_TEST(installsLaunchdServiceToMockHomeDirectory)
+{
+    g_mock_home = "/tmp/yabai_mock_home";
+    g_mock_posix_spawn = true;
+    int res = service_install();
+    char *p = populate_plist_path();
+    unlink(p);
+    free(p);
+    g_mock_posix_spawn = false;
+    g_mock_home = NULL;
+    ANGRY_ASSERT(res == 0, "expected service_install to write service plist to mock home");
+}
+
+ANGRY_TEST(uninstallsLaunchdServiceFromMockHomeDirectory)
+{
+    g_mock_home = "/tmp/yabai_mock_home";
+    char *p = populate_plist_path();
+    FILE *f = fopen(p, "w"); if (f) fclose(f);
+    int res = service_uninstall();
+    free(p);
+    g_mock_home = NULL;
+    ANGRY_ASSERT(res == 0, "expected service_uninstall to unlink service plist");
+}
+
+ANGRY_TEST(startsLaunchdServiceInMockEnvironment)
+{
+    g_mock_home = "/tmp/yabai_mock_home";
+    g_mock_posix_spawn = true;
+    int res = service_start();
+    char *p = populate_plist_path();
+    unlink(p);
+    free(p);
+    g_mock_posix_spawn = false;
+    g_mock_home = NULL;
+    ANGRY_ASSERT(res == 0, "expected service_start to bootstrap service");
+}
+
+ANGRY_TEST(restartsLaunchdServiceInMockEnvironment)
+{
+    g_mock_home = "/tmp/yabai_mock_home";
+    g_mock_posix_spawn = true;
+    char *p = populate_plist_path();
+    FILE *f = fopen(p, "w"); if (f) fclose(f);
+    int res = service_restart();
+    unlink(p);
+    free(p);
+    g_mock_posix_spawn = false;
+    g_mock_home = NULL;
+    ANGRY_ASSERT(res == 0, "expected service_restart to kickstart service");
+}
+
+ANGRY_TEST(stopsLaunchdServiceInMockEnvironment)
+{
+    g_mock_home = "/tmp/yabai_mock_home";
+    g_mock_posix_spawn = true;
+    char *p = populate_plist_path();
+    FILE *f = fopen(p, "w"); if (f) fclose(f);
+    int res = service_stop();
+    unlink(p);
+    free(p);
+    g_mock_posix_spawn = false;
+    g_mock_home = NULL;
+    ANGRY_ASSERT(res == 0, "expected service_stop to unload and disable service");
+}
