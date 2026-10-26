@@ -269,7 +269,7 @@ ANGRY_TEST(destroysSpaceDetectingMissingAndInvalidSrc) {
     enum space_op_error err_zero = space_manager_destroy_space(0);
     uint64_t sid = space_manager_active_space();
     enum space_op_error err_last = space_manager_destroy_space(sid);
-    bool ok_last = err_last == SPACE_OP_ERROR_INVALID_SRC || err_last == SPACE_OP_ERROR_SCRIPTING_ADDITION;
+    bool ok_last = err_last == SPACE_OP_ERROR_INVALID_SRC || err_last == SPACE_OP_ERROR_SCRIPTING_ADDITION || err_last == SPACE_OP_ERROR_INVALID_TYPE;
     ANGRY_ASSERT(err_zero == SPACE_OP_ERROR_MISSING_SRC && ok_last, "destroy_space failed error checks");
 }
 

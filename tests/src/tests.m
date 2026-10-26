@@ -63,11 +63,84 @@ int csr_get_active_config(uint32_t *config)
 static bool g_mock_system = false;
 int system(const char *command)
 {
-    if (g_mock_system) return 0;
-    typedef int (*real_system_fn)(const char *);
-    static real_system_fn real_fn = NULL;
-    if (!real_fn) real_fn = (real_system_fn)dlsym(RTLD_NEXT, "system");
-    return real_fn ? real_fn(command) : 0;
+    return 0;
+}
+
+sem_t *sem_open(const char *name, int oflag, ...)
+{
+    char isolated_name[256];
+    const char *target_name = name;
+    if (name && strstr(name, "yabai_event_loop_semaphore")) {
+        snprintf(isolated_name, sizeof(isolated_name), "yabai_test_sem_%d", getpid());
+        target_name = isolated_name;
+    }
+    typedef sem_t *(*real_sem_open_fn)(const char *, int, ...);
+    static real_sem_open_fn real_fn = NULL;
+    if (!real_fn) real_fn = (real_sem_open_fn)dlsym(RTLD_NEXT, "sem_open");
+
+    va_list ap;
+    va_start(ap, oflag);
+    mode_t mode = (mode_t)va_arg(ap, int);
+    unsigned int value = va_arg(ap, unsigned int);
+    va_end(ap);
+
+    return real_fn ? real_fn(target_name, oflag, mode, value) : SEM_FAILED;
+}
+
+int sem_unlink(const char *name)
+{
+    char isolated_name[256];
+    const char *target_name = name;
+    if (name && strstr(name, "yabai_event_loop_semaphore")) {
+        snprintf(isolated_name, sizeof(isolated_name), "yabai_test_sem_%d", getpid());
+        target_name = isolated_name;
+    }
+    typedef int (*real_sem_unlink_fn)(const char *);
+    static real_sem_unlink_fn real_fn = NULL;
+    if (!real_fn) real_fn = (real_sem_unlink_fn)dlsym(RTLD_NEXT, "sem_unlink");
+    return real_fn ? real_fn(target_name) : -1;
+}
+
+static void dummy_event_tap_mach_port_cb(CFMachPortRef port, void *msg, CFIndex size, void *info) {}
+
+CFMachPortRef CGEventTapCreate(CGEventTapLocation tap,
+                               CGEventTapPlacement place,
+                               CGEventTapOptions options,
+                               CGEventMask eventsOfInterest,
+                               CGEventTapCallBack callback,
+                               void *refcon)
+{
+    CFMachPortContext ctx = { 0, refcon, NULL, NULL, NULL };
+    return CFMachPortCreate(kCFAllocatorDefault, dummy_event_tap_mach_port_cb, &ctx, NULL);
+}
+
+bool CGEventTapIsEnabled(CFMachPortRef tap)
+{
+    return tap != NULL;
+}
+
+void CGEventTapEnable(CFMachPortRef tap, bool enable)
+{
+}
+
+int execvp(const char *file, char *const argv[])
+{
+    _exit(0);
+}
+
+CGError CGSetLocalEventsSuppressionInterval(CFTimeInterval seconds)
+{
+    return kCGErrorSuccess;
+}
+
+CGError CGEnableEventStateCombining(boolean_t doCombineState)
+{
+    return kCGErrorSuccess;
+}
+
+CGError SLPSPostEventRecordTo(ProcessSerialNumber *psn, uint8_t *bytes)
+{
+    return kCGErrorSuccess;
 }
 
 static const char *g_mock_home = NULL;
