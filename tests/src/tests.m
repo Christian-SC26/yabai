@@ -34,6 +34,7 @@ typedef bool (test_function)(void);
 #include "area.c"
 #include "structures.c"
 #include "angry_tests.c"
+#include "angry_misc_tests.c"
 
 #define TEST_LIST                                                               \
     ANGRY_ENTRY(allocatesChunkInEmptyMemoryPool)                                \
@@ -100,7 +101,56 @@ typedef bool (test_function)(void);
     ANGRY_ENTRY(escapesSpecialCharactersForJsonSerialization)                   \
     ANGRY_ENTRY(returnsNullWhenStringRequiresNoEscaping)                        \
     ANGRY_ENTRY(matchesValidRegularExpression)                                  \
-    ANGRY_ENTRY(rejectsMismatchedRegularExpression)
+    ANGRY_ENTRY(rejectsMismatchedRegularExpression)                             \
+    ANGRY_ENTRY(allocatesAndPushesElementsIntoStretchBuffer)                    \
+    ANGRY_ENTRY(deletesElementFromStretchBufferDecreasingLength)                 \
+    ANGRY_ENTRY(allocatesAndPushesElementsIntoTemporaryStretchBuffer)           \
+    ANGRY_ENTRY(deletesElementFromTemporaryStretchBufferDecreasingLength)        \
+    ANGRY_ENTRY(allocatesAlignedMemoryAcrossSpecificByteBoundaries)              \
+    ANGRY_ENTRY(expandsTemporaryStorageBufferInPlace)                           \
+    ANGRY_ENTRY(shrinksTemporaryStorageBufferAdjustingUsedCounter)              \
+    ANGRY_ENTRY(resetsTemporaryStorageUsedCounterToZero)                        \
+    ANGRY_ENTRY(readsNonZeroMonotonicCpuTimerTicks)                             \
+    ANGRY_ENTRY(readsPositiveCpuFrequencyValue)                                 \
+    ANGRY_ENTRY(recordsProfilerAnchorsDuringExecution)                          \
+    ANGRY_ENTRY(suppressesDebugOutputWhenVerboseIsDisabled)                     \
+    ANGRY_ENTRY(locatesExportedSymbolFromDynamicLibrary)                        \
+    ANGRY_ENTRY(returnsNullWhenSearchingForNonexistentSymbol)                   \
+    ANGRY_ENTRY(returnsNullWhenSearchingInNonexistentLibrary)                   \
+    ANGRY_ENTRY(populatesCurrentUserLaunchdPlistPath)                           \
+    ANGRY_ENTRY(populatesLegacyCurrentUserLaunchdPlistPath)                     \
+    ANGRY_ENTRY(executesSimpleBinaryViaSafeExecReturningZero)                   \
+    ANGRY_ENTRY(initializesNotificationCenterDelegateAndIcon)                   \
+    ANGRY_ENTRY(computesEaseInSineBoundaryValues)                               \
+    ANGRY_ENTRY(computesEaseOutSineBoundaryValues)                              \
+    ANGRY_ENTRY(computesEaseInOutSineBoundaryValues)                           \
+    ANGRY_ENTRY(computesEaseInQuadBoundaryValues)                               \
+    ANGRY_ENTRY(computesEaseOutQuadBoundaryValues)                              \
+    ANGRY_ENTRY(computesEaseInOutQuadBoundaryValues)                            \
+    ANGRY_ENTRY(computesEaseInCubicBoundaryValues)                              \
+    ANGRY_ENTRY(computesEaseOutCubicBoundaryValues)                             \
+    ANGRY_ENTRY(computesEaseInOutCubicBoundaryValues)                           \
+    ANGRY_ENTRY(computesEaseInQuartBoundaryValues)                              \
+    ANGRY_ENTRY(computesEaseOutQuartBoundaryValues)                             \
+    ANGRY_ENTRY(computesEaseInOutQuartBoundaryValues)                           \
+    ANGRY_ENTRY(computesEaseInQuintBoundaryValues)                              \
+    ANGRY_ENTRY(computesEaseOutQuintBoundaryValues)                             \
+    ANGRY_ENTRY(computesEaseInOutQuintBoundaryValues)                           \
+    ANGRY_ENTRY(computesEaseInExpoBoundaryValues)                               \
+    ANGRY_ENTRY(computesEaseOutExpoBoundaryValues)                              \
+    ANGRY_ENTRY(computesEaseInOutExpoBoundaryValues)                           \
+    ANGRY_ENTRY(computesEaseInCircBoundaryValues)                               \
+    ANGRY_ENTRY(computesEaseOutCircBoundaryValues)                              \
+    ANGRY_ENTRY(computesEaseInOutCircBoundaryValues)                            \
+    ANGRY_ENTRY(formatsOptionalBoolJsonValues)                                  \
+    ANGRY_ENTRY(formatsBooleanJsonValues)                                       \
+    ANGRY_ENTRY(determinesRootPrivilegesAccurately)                             \
+    ANGRY_ENTRY(copiesCfStringToHeapAllocatedCString)                           \
+    ANGRY_ENTRY(copiesHeapStringAccurately)                                     \
+    ANGRY_ENTRY(clampsCornerRadiiToHalfDimensionBoundary)                       \
+    ANGRY_ENTRY(verifiesDirectoryExistenceAccurately)                           \
+    ANGRY_ENTRY(verifiesFileExistenceAccurately)                                \
+    ANGRY_ENTRY(verifiesExecutablePermissionsAccurately)
 
 static struct {
     char *name;
