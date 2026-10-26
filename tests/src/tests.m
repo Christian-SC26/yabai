@@ -4,6 +4,7 @@ unsigned char __src_osax_loader[1];
 unsigned int __src_osax_loader_len;
 
 #include "../../src/manifest.m"
+#include <dlfcn.h>
 
 typedef bool (test_function)(void);
 
@@ -31,6 +32,44 @@ typedef bool (test_function)(void);
 
 #define ANGRY_ENTRY(func_name) { #func_name, func_name },
 
+CGError CoreDockSendNotification(CFStringRef notification, int unknown)
+{
+    return kCGErrorSuccess;
+}
+
+static uid_t g_mock_uid = (uid_t)-1;
+uid_t getuid(void)
+{
+    if (g_mock_uid != (uid_t)-1) return g_mock_uid;
+    typedef uid_t (*real_getuid_fn)(void);
+    static real_getuid_fn real_fn = NULL;
+    if (!real_fn) real_fn = (real_getuid_fn)dlsym(RTLD_NEXT, "getuid");
+    return real_fn ? real_fn() : 501;
+}
+
+static int g_mock_csr_config = -1;
+int csr_get_active_config(uint32_t *config)
+{
+    if (g_mock_csr_config != -1) {
+        *config = (uint32_t)g_mock_csr_config;
+        return 0;
+    }
+    typedef int (*csr_fn)(uint32_t *);
+    static csr_fn real_csr = NULL;
+    if (!real_csr) real_csr = (csr_fn)dlsym(RTLD_NEXT, "csr_get_active_config");
+    return real_csr ? real_csr(config) : 0;
+}
+
+static bool g_mock_system = false;
+int system(const char *command)
+{
+    if (g_mock_system) return 0;
+    typedef int (*real_system_fn)(const char *);
+    static real_system_fn real_fn = NULL;
+    if (!real_fn) real_fn = (real_system_fn)dlsym(RTLD_NEXT, "system");
+    return real_fn ? real_fn(command) : 0;
+}
+
 #include "area.c"
 #include "structures.c"
 #include "angry_tests.c"
@@ -50,11 +89,7 @@ typedef bool (test_function)(void);
 #include "angry_message_tests.c"
 #include "angry_layout_store_tests.m"
 #include "angry_workspace_tests.m"
-
-CGError CoreDockSendNotification(CFStringRef notification, int unknown)
-{
-    return kCGErrorSuccess;
-}
+#include "angry_sa_tests.m"
 
 #define TEST_LIST                                                               \
     ANGRY_ENTRY(allocatesChunkInEmptyMemoryPool)                                \
@@ -478,7 +513,32 @@ CGError CoreDockSendNotification(CFStringRef notification, int unknown)
     ANGRY_ENTRY(handlesDockPreferenceChangeNotificationSafely)                  \
     ANGRY_ENTRY(handlesActiveDisplayChangeNotificationSafely)                   \
     ANGRY_ENTRY(handlesActiveSpaceChangeNotificationSafely)                     \
-    ANGRY_ENTRY(handlesApplicationHideAndUnhideNotificationsSafely)
+    ANGRY_ENTRY(handlesApplicationHideAndUnhideNotificationsSafely)             \
+    ANGRY_ENTRY(configuresOsaxFilesystemPathsProperly)                          \
+    ANGRY_ENTRY(failsToCreateOsaxDirectoryWithoutRootPrivileges)                \
+    ANGRY_ENTRY(writesAndRemovesTemporaryOsaxFile)                              \
+    ANGRY_ENTRY(preparesOsaxBinariesPermissionsAndSignatures)                   \
+    ANGRY_ENTRY(restartsDockApplicationSafelyWithSwizzledTerminate)             \
+    ANGRY_ENTRY(configuresSocketPathWhenRunningUnderSudo)                       \
+    ANGRY_ENTRY(evaluatesOsaxInstallationAndVersionStatus)                      \
+    ANGRY_ENTRY(removesOsaxInstallationReturningStatusCode)                     \
+    ANGRY_ENTRY(handlesOsaxInstallationFailureGracefully)                       \
+    ANGRY_ENTRY(failsHandshakeRequestWhenSocketServerIsAbsent)                  \
+    ANGRY_ENTRY(returnsExpectedAttributesForOperatingSystemVersion)             \
+    ANGRY_ENTRY(performsValidationFailingWhenSocketIsAbsent)                    \
+    ANGRY_ENTRY(evaluatesSystemIntegrityProtectionCompatibility)                \
+    ANGRY_ENTRY(evaluatesArm64ePreviewAbiStatus)                                \
+    ANGRY_ENTRY(attemptsMachLoaderPayloadInjection)                             \
+    ANGRY_ENTRY(uninstallsScriptingAdditionWithPermissionChecks)                \
+    ANGRY_ENTRY(loadsScriptingAdditionVerifyingRootAndSipEnforcement)             \
+    ANGRY_ENTRY(failsSendingRawBytesWhenSocketUnavailable)                      \
+    ANGRY_ENTRY(dispatchesSpaceFocusAndCreationCommandsSafely)                  \
+    ANGRY_ENTRY(dispatchesSpaceMoveToDisplayCommandSafely)                      \
+    ANGRY_ENTRY(dispatchesWindowMoveCommandSafely)                              \
+    ANGRY_ENTRY(dispatchesWindowOpacityCommandsForInstantAndFade)               \
+    ANGRY_ENTRY(dispatchesWindowStickyAndFocusAndScaleCommandsSafely)           \
+    ANGRY_ENTRY(dispatchesWindowSwapProxyInAndOutCommandsSafely)                \
+    ANGRY_ENTRY(dispatchesWindowOrderInCommandSafely)
 
 static struct {
     char *name;
