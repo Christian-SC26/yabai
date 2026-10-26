@@ -83,7 +83,38 @@ Additional features of yabai include focus-follows-mouse, disabling animations f
 
 ## Installation and Configuration
 
-### Pre-built Signed & Notarized Binaries (Recommended)
+### Homebrew Installation (Recommended)
+
+You can install and automatically receive updates via our official Homebrew tap:
+
+```sh
+# Tap the repository
+brew tap Christian-SC26/formulae
+
+# Install yabai
+brew install yabai
+```
+
+Or install directly in a single step:
+
+```sh
+brew install Christian-SC26/formulae/yabai
+```
+
+To update whenever new releases are published:
+
+```sh
+brew update && brew upgrade yabai
+```
+
+If you previously installed yabai from the upstream tap (`asmvik/formulae` or `koekeishiya/formulae`), switch seamlessly:
+
+```sh
+brew uninstall yabai
+brew install Christian-SC26/formulae/yabai
+```
+
+### Pre-built Signed & Notarized Binaries (Direct Download)
 
 Universal release binaries (`arm64` Apple Silicon + `x86_64` Intel) are available on the [GitHub Releases](https://github.com/Christian-SC26/yabai/releases) page.
 - **Apple Notarized**: Every official release archive is signed with Apple Developer ID and fully notarized by Apple. Gatekeeper allows running them immediately.
