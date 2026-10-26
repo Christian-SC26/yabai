@@ -73,6 +73,7 @@ struct event_loop
 bool event_loop_begin(struct event_loop *event_loop);
 void event_loop_post(struct event_loop *event_loop, enum event_type type, void *context, int param1);
 void update_window_notifications(void);
+void event_loop_reset_open_menus(void);
 
 #endif
 

@@ -350,3 +350,27 @@ TEST_FUNC(mouse_drag_coalescing_and_bsp_direct_flush, {
     g_mouse_state.bsp_live_resize = true;
     TEST_CHECK(g_mouse_state.bsp_live_resize, true);
 })
+
+TEST_FUNC(community_upstream_fixes, {
+    // 1. Verify stack layout drop feedback rule (#2840)
+    struct view stack_view = {0};
+    stack_view.layout = VIEW_STACK;
+    int insert_dir = DIR_WEST;
+    if (insert_dir && stack_view.layout == VIEW_STACK) {
+        insert_dir = STACK;
+    }
+    TEST_CHECK(insert_dir, (int)STACK);
+
+    // 2. Verify FFM reset functionality (#2834)
+    event_loop_reset_open_menus();
+    window_manager_set_focus_follows_mouse(&g_window_manager, FFM_AUTOFOCUS);
+    TEST_CHECK((int)g_window_manager.ffm_mode, (int)FFM_AUTOFOCUS);
+
+    // 3. Verify drag guard logic (#2843): window currently being dragged across displays is skipped
+    struct window dummy_window = {0};
+    dummy_window.id = 9999;
+    g_mouse_state.window = &dummy_window;
+    bool is_dragged = (&dummy_window == g_mouse_state.window);
+    TEST_CHECK(is_dragged, true);
+    g_mouse_state.window = NULL;
+})

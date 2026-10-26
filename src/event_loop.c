@@ -41,6 +41,35 @@ void update_window_notifications(void)
     free(window_list);
 }
 
+static enum ffm_mode ffm_value;
+static int open_menus;
+
+//
+// NOTE: Menus are counted per application, because an application that terminates
+// while one of its menus is open never sends kAXMenuClosedNotification. Its menus
+// are released on termination, so focus_follows_mouse does not stay disabled.
+//
+
+static void set_open_menus(struct application *application, int count)
+{
+    int previous = open_menus;
+    open_menus += count - application->open_menus;
+    application->open_menus = count;
+    if (open_menus < 0) open_menus = 0;
+
+    if (previous == 0 && open_menus > 0) {
+        ffm_value = g_window_manager.ffm_mode;
+        g_window_manager.ffm_mode = FFM_DISABLED;
+    } else if (previous > 0 && open_menus == 0) {
+        g_window_manager.ffm_mode = ffm_value;
+    }
+}
+
+void event_loop_reset_open_menus(void)
+{
+    open_menus = 0;
+}
+
 static void window_did_receive_focus(struct window_manager *wm, struct mouse_state *ms, struct window *window)
 {
     struct window *focused_window = window_manager_find_window(wm, wm->focused_window_id);
@@ -182,6 +211,13 @@ static EVENT_HANDLER(APPLICATION_LAUNCHED)
 
     int window_count;
     struct window **window_list = window_manager_add_application_windows(&g_space_manager, &g_window_manager, application, &window_count);
+
+    //
+    // NOTE: The AX API only returns windows on visible spaces. An application that restores its windows on
+    // an inactive space while launching (e.g. relaunch after an update) would otherwise never have them tracked.
+    //
+
+    window_manager_add_existing_application_windows(&g_space_manager, &g_window_manager, application, -1);
     uint32_t prev_window_id = g_window_manager.focused_window_id;
 
     uint64_t sid;
@@ -267,6 +303,7 @@ static EVENT_HANDLER(APPLICATION_TERMINATED)
 
     debug("%s: %s (%d)\n", __FUNCTION__, process->name, process->pid);
     event_signal_push(SIGNAL_APPLICATION_TERMINATED, application);
+    set_open_menus(application, 0);
     window_manager_remove_application(&g_window_manager, application->pid);
 
     for (int i = 0; i < buf_len(g_window_manager.applications_to_refresh); ++i) {
@@ -1600,6 +1637,16 @@ static EVENT_HANDLER(MOUSE_DRAGGED)
             } break;
             }
 
+            //
+            // NOTE: a space with the stack layout always stacks the dropped window
+            // onto its root node, regardless of which edge was targeted, so the
+            // feedback should cover the entire node instead of suggesting a split.
+            //
+
+            if (insert_dir && dst_view->layout == VIEW_STACK) {
+                insert_dir = STACK;
+            }
+
             if (b_node->insert_dir != insert_dir) {
                 b_node->insert_dir = insert_dir;
                 insert_feedback_show(b_node);
@@ -1933,30 +1980,22 @@ static EVENT_HANDLER(DOCK_DID_RESTART)
     event_signal_push(SIGNAL_DOCK_DID_RESTART, NULL);
 }
 
-static enum ffm_mode ffm_value;
-static int is_menu_open = 0;
-
 static EVENT_HANDLER(MENU_OPENED)
 {
-    debug("%s\n", __FUNCTION__);
-    ++is_menu_open;
+    struct application *application = window_manager_find_application(&g_window_manager, (pid_t)(intptr_t) context);
+    if (!application) return;
 
-    if (is_menu_open == 1) {
-        ffm_value = g_window_manager.ffm_mode;
-        g_window_manager.ffm_mode = FFM_DISABLED;
-    }
+    debug("%s: %s (%d)\n", __FUNCTION__, application->name, application->pid);
+    set_open_menus(application, application->open_menus + 1);
 }
 
 static EVENT_HANDLER(MENU_CLOSED)
 {
-    debug("%s\n", __FUNCTION__);
-    --is_menu_open;
+    struct application *application = window_manager_find_application(&g_window_manager, (pid_t)(intptr_t) context);
+    if (!application || !application->open_menus) return;
 
-    if (is_menu_open == 0) {
-        g_window_manager.ffm_mode = ffm_value;
-    } else if (is_menu_open < 0) {
-        is_menu_open = 0;
-    }
+    debug("%s: %s (%d)\n", __FUNCTION__, application->name, application->pid);
+    set_open_menus(application, application->open_menus - 1);
 }
 
 static EVENT_HANDLER(MENU_BAR_HIDDEN_CHANGED)

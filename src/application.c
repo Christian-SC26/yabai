@@ -17,9 +17,9 @@ static OBSERVER_CALLBACK(application_notification_handler)
     } else if (CFEqual(notification, kAXTitleChangedNotification)) {
         event_loop_post(&g_event_loop, WINDOW_TITLE_CHANGED, (void *)(intptr_t) ax_window_id(element), 0);
     } else if (CFEqual(notification, kAXMenuOpenedNotification)) {
-        event_loop_post(&g_event_loop, MENU_OPENED, (void *)(intptr_t) ax_window_id(element), 0);
+        event_loop_post(&g_event_loop, MENU_OPENED, (void *)(intptr_t)((struct application *) context)->pid, 0);
     } else if (CFEqual(notification, kAXMenuClosedNotification)) {
-        event_loop_post(&g_event_loop, MENU_CLOSED, NULL, 0);
+        event_loop_post(&g_event_loop, MENU_CLOSED, (void *)(intptr_t)((struct application *) context)->pid, 0);
     } else if (CFEqual(notification, kAXWindowMiniaturizedNotification)) {
         event_loop_post(&g_event_loop, WINDOW_MINIMIZED, context, 0);
     } else if (CFEqual(notification, kAXWindowDeminiaturizedNotification)) {
