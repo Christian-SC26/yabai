@@ -40,6 +40,7 @@ typedef bool (test_function)(void);
 #include "angry_signal_tests.c"
 #include "angry_application_tests.c"
 #include "angry_mouse_tests.c"
+#include "angry_process_tests.c"
 
 #define TEST_LIST                                                               \
     ANGRY_ENTRY(allocatesChunkInEmptyMemoryPool)                                \
@@ -262,7 +263,25 @@ typedef bool (test_function)(void);
     ANGRY_ENTRY(swapsWindowsAcrossDifferentSpacesUpdatingManagedTable)          \
     ANGRY_ENTRY(warpsWindowBetweenSiblingsWithDifferentSplitModifyingParent)    \
     ANGRY_ENTRY(handlesMouseMovedEventPostingEventWhenModifierDiffers)          \
-    ANGRY_ENTRY(handlesZoomedNodeOnMouseDropActionStack)
+    ANGRY_ENTRY(handlesZoomedNodeOnMouseDropActionStack)                        \
+    ANGRY_ENTRY(hashesProcessSerialNumberUsingLowLong)                          \
+    ANGRY_ENTRY(comparesIdenticalProcessSerialNumbersReturningTrue)             \
+    ANGRY_ENTRY(comparesDifferentProcessSerialNumbersReturningFalse)            \
+    ANGRY_ENTRY(retrievesPidForCurrentProcessSerialNumber)                      \
+    ANGRY_ENTRY(createsProcessInstanceForCurrentProcess)                       \
+    ANGRY_ENTRY(rejectsInvalidProcessInProcessCreateReturningNull)              \
+    ANGRY_ENTRY(evaluatesProcessIsBeingDebuggedViaSysctl)                       \
+    ANGRY_ENTRY(findsProcessInProcessManagerTable)                              \
+    ANGRY_ENTRY(returnsNullWhenProcessNotFoundInProcessManager)                 \
+    ANGRY_ENTRY(destroysProcessReleasingResources)                             \
+    ANGRY_ENTRY(handlesProcessLaunchEventInProcessHandler)                      \
+    ANGRY_ENTRY(handlesDuplicateProcessLaunchEventDiscardingDupe)               \
+    ANGRY_ENTRY(handlesProcessFrontSwitchedEventInProcessHandler)               \
+    ANGRY_ENTRY(handlesProcessTerminatedEventMarkingProcessTerminated)         \
+    ANGRY_ENTRY(returnsErrorWhenProcessEventLacksProcessIdParameter)            \
+    ANGRY_ENTRY(returnsZeroActiveSpaceForInvalidConnectionId)                   \
+    ANGRY_ENTRY(addsRunningProcessesAndCachesFinderPsn)                         \
+    ANGRY_ENTRY(initializesProcessManagerInstallingCarbonEventHandler)
 
 static struct {
     char *name;
@@ -275,6 +294,7 @@ int main(int argc, char **argv)
 {
     ts_init(MEGABYTES(8));
     g_connection = SLSMainConnectionID();
+    workspace_event_handler_begin(&g_workspace_context);
     mouse_state_init(&g_mouse_state);
     window_manager_init(&g_window_manager);
     display_manager_begin(&g_display_manager);
