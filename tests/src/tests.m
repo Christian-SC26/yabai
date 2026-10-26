@@ -78,7 +78,29 @@ typedef bool (test_function)(void);
     ANGRY_ENTRY(updatesFocusFollowsMouseMode)                                   \
     ANGRY_ENTRY(suppressesRapidGestureToSameSpace)                              \
     ANGRY_ENTRY(rateLimitsRapidGesturesUnderThreshold)                         \
-    ANGRY_ENTRY(resolvesActiveSpaceForRunningApplications)
+    ANGRY_ENTRY(resolvesActiveSpaceForRunningApplications)                      \
+    ANGRY_ENTRY(balancesBspTreeLeafRatiosEquallyForTwoLeaves)                   \
+    ANGRY_ENTRY(balancesBspTreeLeafRatiosProportionallyForAsymmetricSubtrees)   \
+    ANGRY_ENTRY(rotatesBspNodeNinetyDegreesTogglingSplitAxis)                   \
+    ANGRY_ENTRY(rotatesBspNodeOneEightyDegreesInvertingRatioAndChildren)        \
+    ANGRY_ENTRY(rotatesBspNodeTwoSeventyDegreesTogglingSplitAxis)               \
+    ANGRY_ENTRY(findsNorthFenceAncestorWhenBoundedVertically)                   \
+    ANGRY_ENTRY(returnsNullFenceWhenNodeLiesOnDisplayEdge)                      \
+    ANGRY_ENTRY(stacksWindowOnLeafNodePlacingItAtFrontOfOrder)                  \
+    ANGRY_ENTRY(combinesRuleEffectsOverridingManageProperty)                    \
+    ANGRY_ENTRY(combinesRuleEffectsClampingOpacityToUnitInterval)               \
+    ANGRY_ENTRY(combinesRuleEffectsPreservingScratchpadIdentifier)              \
+    ANGRY_ENTRY(parsesRgbaColorFromHexWithAlphaChannel)                         \
+    ANGRY_ENTRY(clampsFloatValueWithinSpecifiedBoundary)                        \
+    ANGRY_ENTRY(clampsNegativeFloatValueToMinimumBoundary)                      \
+    ANGRY_ENTRY(identifiesPointInsideBoundingBox)                               \
+    ANGRY_ENTRY(rejectsPointOutsideBoundingBox)                                 \
+    ANGRY_ENTRY(identifiesPointInsideTriangle)                                  \
+    ANGRY_ENTRY(rejectsPointOutsideTriangle)                                    \
+    ANGRY_ENTRY(escapesSpecialCharactersForJsonSerialization)                   \
+    ANGRY_ENTRY(returnsNullWhenStringRequiresNoEscaping)                        \
+    ANGRY_ENTRY(matchesValidRegularExpression)                                  \
+    ANGRY_ENTRY(rejectsMismatchedRegularExpression)
 
 static struct {
     char *name;

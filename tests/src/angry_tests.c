@@ -425,3 +425,185 @@ ANGRY_TEST(resolvesActiveSpaceForRunningApplications)
     bool ok = run_app_active_space_resolution();
     ANGRY_ASSERT(ok, "running application PID must resolve to valid non-zero active space ID");
 }
+
+ANGRY_TEST(balancesBspTreeLeafRatiosEquallyForTwoLeaves)
+{
+    struct window_node left = { .window_count = 1 };
+    struct window_node right = { .window_count = 1 };
+    struct window_node root = { .split = SPLIT_Y, .left = &left, .right = &right };
+    left.parent = &root;
+    right.parent = &root;
+    window_node_balance(&root, SPLIT_Y);
+    ANGRY_ASSERT(fabs(root.ratio - 0.5f) < 0.001f, "balanced tree with two leaves must assign ratio 0.5");
+}
+
+ANGRY_TEST(balancesBspTreeLeafRatiosProportionallyForAsymmetricSubtrees)
+{
+    struct window_node l1 = { .window_count = 1 }, l2 = { .window_count = 1 }, r = { .window_count = 1 };
+    struct window_node left_branch = { .split = SPLIT_Y, .left = &l1, .right = &l2 };
+    struct window_node root = { .split = SPLIT_Y, .left = &left_branch, .right = &r };
+    l1.parent = &left_branch; l2.parent = &left_branch;
+    left_branch.parent = &root; r.parent = &root;
+    window_node_balance(&root, SPLIT_Y);
+    ANGRY_ASSERT(fabs(root.ratio - (2.0f / 3.0f)) < 0.001f, "asymmetric tree with 2-to-1 leaves must assign ratio 2/3");
+}
+
+ANGRY_TEST(rotatesBspNodeNinetyDegreesTogglingSplitAxis)
+{
+    struct window_node left = { .window_count = 1 }, right = { .window_count = 1 };
+    struct window_node root = { .split = SPLIT_Y, .ratio = 0.6f, .left = &left, .right = &right };
+    window_node_rotate(&root, 90);
+    bool valid = (root.split == SPLIT_X) && (fabs(root.ratio - 0.4f) < 0.001f);
+    ANGRY_ASSERT(valid, "rotating 90 degrees must toggle split axis and invert ratio");
+}
+
+ANGRY_TEST(rotatesBspNodeOneEightyDegreesInvertingRatioAndChildren)
+{
+    struct window_node left = { .window_count = 1 }, right = { .window_count = 1 };
+    struct window_node root = { .split = SPLIT_Y, .ratio = 0.7f, .left = &left, .right = &right };
+    window_node_rotate(&root, 180);
+    bool valid = (root.left == &right) && (root.right == &left) && (fabs(root.ratio - 0.3f) < 0.001f);
+    ANGRY_ASSERT(valid, "rotating 180 degrees must swap left/right children and invert ratio");
+}
+
+ANGRY_TEST(rotatesBspNodeTwoSeventyDegreesTogglingSplitAxis)
+{
+    struct window_node top = { .window_count = 1 }, bottom = { .window_count = 1 };
+    struct window_node root = { .split = SPLIT_X, .ratio = 0.25f, .left = &top, .right = &bottom };
+    window_node_rotate(&root, 270);
+    bool valid = (root.split == SPLIT_Y) && (fabs(root.ratio - 0.75f) < 0.001f);
+    ANGRY_ASSERT(valid, "rotating 270 degrees must switch split from X to Y and invert ratio");
+}
+
+ANGRY_TEST(findsNorthFenceAncestorWhenBoundedVertically)
+{
+    struct window_node parent = { .split = SPLIT_X, .area = { 0, 0, 1920, 1080 } };
+    struct window_node child = { .parent = &parent, .area = { 0, 540, 1920, 540 } };
+    struct window_node *fence = window_node_fence(&child, DIR_NORTH);
+    ANGRY_ASSERT(fence == &parent, "node bounded from above must find parent as northern fence");
+}
+
+ANGRY_TEST(returnsNullFenceWhenNodeLiesOnDisplayEdge)
+{
+    struct window_node parent = { .split = SPLIT_Y, .area = { 0, 0, 1920, 1080 } };
+    struct window_node child = { .parent = &parent, .area = { 0, 0, 960, 1080 } };
+    struct window_node *fence = window_node_fence(&child, DIR_WEST);
+    ANGRY_ASSERT(fence == NULL, "node abutting display boundary must return NULL fence in that direction");
+}
+
+ANGRY_TEST(stacksWindowOnLeafNodePlacingItAtFrontOfOrder)
+{
+    struct window_node leaf = { .window_count = 1, .window_list = { 101 }, .window_order = { 101 } };
+    struct window w2 = { .id = 202 };
+    view_stack_window_node(&leaf, &w2);
+    bool valid = (leaf.window_count == 2) && (leaf.window_order[0] == 202);
+    ANGRY_ASSERT(valid, "stacking window must increment count and place new window at front of order");
+}
+
+ANGRY_TEST(combinesRuleEffectsOverridingManageProperty)
+{
+    struct rule_effects base = { .manage = RULE_PROP_OFF };
+    struct rule_effects incoming = { .manage = RULE_PROP_ON };
+    rule_combine_effects(&incoming, &base);
+    ANGRY_ASSERT(base.manage == RULE_PROP_ON, "incoming rule manage property must override base rule effects");
+}
+
+ANGRY_TEST(combinesRuleEffectsClampingOpacityToUnitInterval)
+{
+    struct rule_effects base = {0};
+    struct rule_effects incoming = { .flags = RULE_OPACITY, .opacity = 0.85f };
+    rule_combine_effects(&incoming, &base);
+    bool valid = rule_effects_check_flag(&base, RULE_OPACITY) && (fabs(base.opacity - 0.85f) < 0.001f);
+    ANGRY_ASSERT(valid, "valid opacity within unit interval must be copied and flagged in combined result");
+}
+
+ANGRY_TEST(combinesRuleEffectsPreservingScratchpadIdentifier)
+{
+    struct rule_effects base = {0};
+    struct rule_effects incoming = { .scratchpad = "debug_term" };
+    rule_combine_effects(&incoming, &base);
+    bool valid = base.scratchpad && string_equals(base.scratchpad, "debug_term");
+    free(base.scratchpad);
+    ANGRY_ASSERT(valid, "combining effects must duplicate incoming scratchpad string without leak");
+}
+
+ANGRY_TEST(parsesRgbaColorFromHexWithAlphaChannel)
+{
+    uint32_t hex = 0xFF804020;
+    struct rgba_color c = rgba_color_from_hex(hex);
+    bool valid = (fabs(c.a - 1.0f) < 0.001f) && (fabs(c.r - (128.0f / 255.0f)) < 0.005f);
+    ANGRY_ASSERT(valid, "hex color 0xFF804020 must parse alpha as 1.0 and red channel accurately");
+}
+
+ANGRY_TEST(clampsFloatValueWithinSpecifiedBoundary)
+{
+    float clamped = clampf_range(15.7f, 0.0f, 10.0f);
+    ANGRY_ASSERT(clamped == 10.0f, "float exceeding upper boundary must clamp to maximum");
+}
+
+ANGRY_TEST(clampsNegativeFloatValueToMinimumBoundary)
+{
+    float clamped = clampf_range(-4.2f, -1.0f, 5.0f);
+    ANGRY_ASSERT(clamped == -1.0f, "float below lower boundary must clamp to minimum");
+}
+
+ANGRY_TEST(identifiesPointInsideBoundingBox)
+{
+    CGRect r = CGRectMake(100.0f, 100.0f, 200.0f, 200.0f);
+    CGPoint p = CGPointMake(150.0f, 250.0f);
+    ANGRY_ASSERT(cgrect_contains_point(r, p), "point strictly within rectangle boundaries must evaluate true");
+}
+
+ANGRY_TEST(rejectsPointOutsideBoundingBox)
+{
+    CGRect r = CGRectMake(100.0f, 100.0f, 200.0f, 200.0f);
+    CGPoint p = CGPointMake(350.0f, 150.0f);
+    ANGRY_ASSERT(!cgrect_contains_point(r, p), "point beyond rectangle width must evaluate false");
+}
+
+ANGRY_TEST(identifiesPointInsideTriangle)
+{
+    CGPoint t[3] = { CGPointMake(0.0f, 0.0f), CGPointMake(100.0f, 0.0f), CGPointMake(50.0f, 100.0f) };
+    CGPoint p = CGPointMake(50.0f, 30.0f);
+    ANGRY_ASSERT(triangle_contains_point(t, p), "interior centroid point must evaluate true inside triangle");
+}
+
+ANGRY_TEST(rejectsPointOutsideTriangle)
+{
+    CGPoint t[3] = { CGPointMake(0.0f, 0.0f), CGPointMake(100.0f, 0.0f), CGPointMake(50.0f, 100.0f) };
+    CGPoint p = CGPointMake(50.0f, 150.0f);
+    ANGRY_ASSERT(!triangle_contains_point(t, p), "exterior point beyond vertex must evaluate false");
+}
+
+ANGRY_TEST(escapesSpecialCharactersForJsonSerialization)
+{
+    char raw[] = "name=\"yabai\"\nstatus=ok";
+    char *escaped = ts_string_escape(raw);
+    bool valid = escaped && string_equals(escaped, "name=\\\"yabai\\\"\\nstatus=ok");
+    ANGRY_ASSERT(valid, "quotes and newlines must be escaped with preceding backslashes");
+}
+
+ANGRY_TEST(returnsNullWhenStringRequiresNoEscaping)
+{
+    char plain[] = "clean_unquoted_string_123";
+    char *escaped = ts_string_escape(plain);
+    ANGRY_ASSERT(escaped == NULL, "plain alphanumeric strings must return NULL bypassing re-allocation");
+}
+
+ANGRY_TEST(matchesValidRegularExpression)
+{
+    regex_t re;
+    regcomp(&re, "^Google Chrome.*$", REG_EXTENDED | REG_NOSUB);
+    int res = regex_match(true, &re, "Google Chrome - New Tab");
+    regfree(&re);
+    ANGRY_ASSERT(res == REGEX_MATCH_YES, "matching window title against pattern must return REGEX_MATCH_YES");
+}
+
+ANGRY_TEST(rejectsMismatchedRegularExpression)
+{
+    regex_t re;
+    regcomp(&re, "^Safari.*$", REG_EXTENDED | REG_NOSUB);
+    int res = regex_match(true, &re, "Google Chrome - New Tab");
+    regfree(&re);
+    ANGRY_ASSERT(res == REGEX_MATCH_NO, "mismatched window title against pattern must return REGEX_MATCH_NO");
+}
