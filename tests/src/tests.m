@@ -35,33 +35,50 @@ typedef bool (test_function)(void);
 #include "structures.c"
 #include "angry_tests.c"
 
-#define TEST_LIST                                              \
-    TEST_ENTRY(display_area_is_in_direction)                   \
-    TEST_ENTRY(closest_display_in_direction)                   \
-    TEST_ENTRY(memory_pool_basic)                              \
-    TEST_ENTRY(memory_pool_wraparound_detection)               \
-    TEST_ENTRY(hashtable_stress_and_rehashing)                 \
-    TEST_ENTRY(app_active_space_resolution)                    \
-    TEST_ENTRY(space_gesture_guards)                            \
-    TEST_ENTRY(osax_expected_attributes_validation)            \
-    TEST_ENTRY(skip_window_focus_animation_default)            \
-    TEST_ENTRY(gesture_vertical_and_mc_guards)                 \
-    TEST_ENTRY(mission_control_focus_state_record)             \
-    TEST_ENTRY(mouse_drag_coalescing_and_bsp_direct_flush)     \
-    TEST_ENTRY(community_upstream_fixes)                      \
-    TEST_ENTRY(fullscreen_exit_and_mouse_click_guards)        \
-    ANGRY_ENTRY(allocatesChunkInEmptyMemoryPool)               \
-    ANGRY_ENTRY(preservesStoredPointerAcrossThousandAllocations)\
-    ANGRY_ENTRY(wrapsMemoryPoolPointerToOriginOnOverflow)      \
-    ANGRY_ENTRY(rehashesTableWithoutDataLossUnderHighLoad)     \
-    ANGRY_ENTRY(identifiesWestDisplayAcrossNegativeCoordinates)\
-    ANGRY_ENTRY(rejectsEastDisplayWhenTargetIsPositionedWest)  \
-    ANGRY_ENTRY(splitsParentAreaEquallyWithSpecifiedGapOnVerticalAxis)\
-    ANGRY_ENTRY(splitsParentAreaAsymmetricallyOnHorizontalAxis)\
-    ANGRY_ENTRY(ignoresDropWhenCursorDeltaIsBelowThreshold)    \
-    ANGRY_ENTRY(permitsDropWhenCursorDeltaCrossesThreshold)    \
-    ANGRY_ENTRY(preservesWindowWhenExitingToMatchingSpace)     \
-    ANGRY_ENTRY(guardsAgainstPrematureUntileDuringFullscreenSpaceDestruction)
+#define TEST_LIST                                                               \
+    ANGRY_ENTRY(allocatesChunkInEmptyMemoryPool)                                \
+    ANGRY_ENTRY(preservesStoredPointerAcrossThousandAllocations)                 \
+    ANGRY_ENTRY(wrapsMemoryPoolPointerToOriginOnOverflow)                       \
+    ANGRY_ENTRY(rehashesTableWithoutDataLossUnderHighLoad)                      \
+    ANGRY_ENTRY(removesKeyAndCleansEntryFromTable)                              \
+    ANGRY_ENTRY(preservesUnremovedKeysAfterPartialDeletion)                     \
+    ANGRY_ENTRY(ignoresDuplicateAddWhenKeyAlreadyExists)                       \
+    ANGRY_ENTRY(identifiesWestDisplayAcrossNegativeCoordinates)                 \
+    ANGRY_ENTRY(rejectsEastDisplayWhenTargetIsPositionedWest)                   \
+    ANGRY_ENTRY(identifiesEastDisplayAcrossPositiveCoordinates)                 \
+    ANGRY_ENTRY(rejectsWestDisplayWhenTargetIsPositionedEast)                   \
+    ANGRY_ENTRY(findsNearestWestDisplayAmongMultipleMonitors)                   \
+    ANGRY_ENTRY(findsNearestEastDisplayAcrossIrregularGaps)                     \
+    ANGRY_ENTRY(returnsNegativeIndexWhenNoDisplayInDirection)                   \
+    ANGRY_ENTRY(splitsParentAreaEquallyWithSpecifiedGapOnVerticalAxis)          \
+    ANGRY_ENTRY(splitsParentAreaAsymmetricallyOnHorizontalAxis)                  \
+    ANGRY_ENTRY(preservesTotalDimensionWithinPixelRoundingTolerance)            \
+    ANGRY_ENTRY(allocatesMinimumDimensionWhenSplitRatioIsExtremelySmall)         \
+    ANGRY_ENTRY(allocatesMinimumDimensionWhenSplitRatioIsExtremelyLarge)         \
+    ANGRY_ENTRY(ignoresDropWhenCursorDeltaIsBelowThreshold)                     \
+    ANGRY_ENTRY(permitsDropWhenCursorDeltaCrossesThreshold)                     \
+    ANGRY_ENTRY(preservesWindowWhenExitingToMatchingSpace)                      \
+    ANGRY_ENTRY(guardsAgainstPrematureUntileDuringFullscreenSpaceDestruction)   \
+    ANGRY_ENTRY(swapsWindowIdsBetweenTwoBspNodesPreservingTreeStructure)        \
+    ANGRY_ENTRY(mirrorsBspTreeHorizontallyInvertingChildOrder)                  \
+    ANGRY_ENTRY(mirrorsBspTreeVerticallyInvertingChildOrder)                    \
+    ANGRY_ENTRY(promotesSiblingToRootWhenRemovingLeafFromTwoNodeTree)           \
+    ANGRY_ENTRY(requiresAllAttributesForLegacyMacOsVersions)                    \
+    ANGRY_ENTRY(requiresReducedAttributesForTahoeAndGoldengate)                 \
+    ANGRY_ENTRY(verifiesReducedAttributeMaskMatchesSubset)                      \
+    ANGRY_ENTRY(defaultsWindowFocusAnimationToDisabled)                         \
+    ANGRY_ENTRY(recordsPendingStateOnVerticalGestureBegin)                      \
+    ANGRY_ENTRY(updatesLastGestureTimeOnVerticalGestureEnd)                     \
+    ANGRY_ENTRY(capturesFrontmostWindowAndSpaceStateOnMissionControlEnter)      \
+    ANGRY_ENTRY(maintainsIdempotencyWhenMissionControlStateAlreadyRecorded)     \
+    ANGRY_ENTRY(coalescesConsecutiveMouseDraggedEventsInQueue)                  \
+    ANGRY_ENTRY(clearsDirtyFlagOnDirectViewFlush)                               \
+    ANGRY_ENTRY(defaultsBspLiveResizeToEnabled)                                 \
+    ANGRY_ENTRY(coercesInsertDirectionToStackWhenTargetViewIsStacked)           \
+    ANGRY_ENTRY(updatesFocusFollowsMouseMode)                                   \
+    ANGRY_ENTRY(suppressesRapidGestureToSameSpace)                              \
+    ANGRY_ENTRY(rateLimitsRapidGesturesUnderThreshold)                         \
+    ANGRY_ENTRY(resolvesActiveSpaceForRunningApplications)
 
 static struct {
     char *name;
@@ -83,7 +100,7 @@ int main(int argc, char **argv)
     int failed = 0;
     int slow = 0;
     int total = array_count(tests);
-    printf("\e[1;34m -- Running %d tests (Angry Tests standard: <50ms/test)\e[m\n\n", total);
+    printf("\e[1;34m -- Running %d Angry Tests (<50ms/test standard)\e[m\n\n", total);
 
     uint64_t cpu_freq  = read_cpu_freq();
     uint64_t begin_tsc = read_cpu_timer();
