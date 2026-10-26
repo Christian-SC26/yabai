@@ -46,6 +46,12 @@ typedef bool (test_function)(void);
 #include "angry_view_tests.c"
 #include "angry_window_tests.c"
 #include "angry_display_manager_tests.c"
+#include "angry_space_manager_tests.c"
+
+CGError CoreDockSendNotification(CFStringRef notification, int unknown)
+{
+    return kCGErrorSuccess;
+}
 
 #define TEST_LIST                                                               \
     ANGRY_ENTRY(allocatesChunkInEmptyMemoryPool)                                \
@@ -371,7 +377,47 @@ typedef bool (test_function)(void);
     ANGRY_ENTRY(evaluatesDisplayIsAnimatingStatus)                              \
     ANGRY_ENTRY(locatesElementAtSpecifiedScreenCoordinates)                    \
     ANGRY_ENTRY(focusesDisplayWithWindowAtSpecifiedCoordinates)                \
-    ANGRY_ENTRY(returnsSameDisplayErrorWhenSpaceDoesNotBelongToDisplay)
+    ANGRY_ENTRY(returnsSameDisplayErrorWhenSpaceDoesNotBelongToDisplay)         \
+    ANGRY_ENTRY(comparesViewsUsingKeyEquality)                                  \
+    ANGRY_ENTRY(queriesSpaceToJsonStream)                                       \
+    ANGRY_ENTRY(queriesSpacesForWindowToJsonStream)                             \
+    ANGRY_ENTRY(queriesSpacesForDisplayToJsonStream)                            \
+    ANGRY_ENTRY(queriesSpacesForDisplaysToJsonStream)                           \
+    ANGRY_ENTRY(findsAndRefreshesViewForSpace)                                  \
+    ANGRY_ENTRY(marksViewInvalidForSpace)                                       \
+    ANGRY_ENTRY(untilesWindowFromSpaceView)                                     \
+    ANGRY_ENTRY(managesSpaceLabelsSettingAndQueryingAndRemoving)                \
+    ANGRY_ENTRY(configuresSpaceLayoutAndValidates)                              \
+    ANGRY_ENTRY(configuresGapForSpaceWithAbsAndRelTypes)                        \
+    ANGRY_ENTRY(togglesGapForSpaceUpdatingState)                                \
+    ANGRY_ENTRY(togglesMissionControlAndShowDesktopSafely)                      \
+    ANGRY_ENTRY(configuresLayoutForAllSpaces)                                   \
+    ANGRY_ENTRY(configuresWindowGapForAllSpaces)                                 \
+    ANGRY_ENTRY(configuresAllPaddingDimensionsForAllSpaces)                     \
+    ANGRY_ENTRY(configuresSplitTypeAndAutoBalanceForAllSpaces)                  \
+    ANGRY_ENTRY(configuresPaddingForSpaceWithAbsAndRelTypes)                     \
+    ANGRY_ENTRY(togglesPaddingForSpaceUpdatingState)                            \
+    ANGRY_ENTRY(rotatesAndMirrorsSpaceSubtree)                                  \
+    ANGRY_ENTRY(equalizesAndBalancesSpaceSubtree)                               \
+    ANGRY_ENTRY(tilesWindowOnSpaceWithInsertionPoint)                           \
+    ANGRY_ENTRY(togglesWindowSplitDirectionInBspSubtree)                        \
+    ANGRY_ENTRY(resolvesMissionControlSpaceByDesktopIndex)                      \
+    ANGRY_ENTRY(resolvesCursorSpaceMatchingCurrentCursor)                      \
+    ANGRY_ENTRY(resolvesPreviousAndNextSpaceFromCurrent)                        \
+    ANGRY_ENTRY(resolvesFirstAndLastSpaceAcrossDisplays)                       \
+    ANGRY_ENTRY(movesWindowListAndSingleWindowToSpace)                          \
+    ANGRY_ENTRY(assignsProcessToSpaceAndAllSpaces)                              \
+    ANGRY_ENTRY(evaluatesWindowIsOnActiveSpaceAndSpecifiedSpace)                 \
+    ANGRY_ENTRY(swapsSpaceWithSpaceOnSameAndCrossDisplay)                       \
+    ANGRY_ENTRY(movesSpaceToSpaceDetectingErrors)                               \
+    ANGRY_ENTRY(movesSpaceToDisplayDetectingErrors)                             \
+    ANGRY_ENTRY(switchesSpaceDetectingSameSpace)                                \
+    ANGRY_ENTRY(destroysSpaceDetectingMissingAndInvalidSrc)                      \
+    ANGRY_ENTRY(addsSpaceDetectingMissingSrc)                                   \
+    ANGRY_ENTRY(marksSpacesInvalidForDisplayAndAllDisplays)                     \
+    ANGRY_ENTRY(refreshesApplicationWindowsReturningStatus)                     \
+    ANGRY_ENTRY(handlesDisplayAddUpdatingSpaceViews)                            \
+    ANGRY_ENTRY(evaluatesIsSpaceLastUserSpaceAndFindFirstUserSpace)
 
 static struct {
     char *name;
