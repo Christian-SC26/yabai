@@ -167,6 +167,7 @@ CFArrayRef CGWindowListCopyWindowInfo(CGWindowListOption option, CGWindowID rela
 #include "angry_workspace_tests.m"
 #include "angry_sa_tests.m"
 #include "angry_event_loop_tests.c"
+#include "angry_yabai_tests.c"
 
 #define TEST_LIST                                                               \
     ANGRY_ENTRY(allocatesChunkInEmptyMemoryPool)                                \
@@ -664,7 +665,10 @@ CFArrayRef CGWindowListCopyWindowInfo(CGWindowListOption option, CGWindowID rela
     ANGRY_ENTRY(handlesMissionControlExitWithFocusRestorationDispatchBlocks)    \
     ANGRY_ENTRY(handlesDockDidRestartEventSafely)                               \
     ANGRY_ENTRY(handlesMenuAndSystemStateNotificationEventsSafely)             \
-    ANGRY_ENTRY(handlesDaemonSocketMessageProcessingPayload)
+    ANGRY_ENTRY(handlesDaemonSocketMessageProcessingPayload)                    \
+    ANGRY_ENTRY(abortsWhenClientSendMessageReceivesNoArguments)                 \
+    ANGRY_ENTRY(printsVersionAndExitsInParseArguments)                          \
+    ANGRY_ENTRY(initializesSettingsAndAttemptsLockAcquisition)
 
 static struct {
     char *name;
