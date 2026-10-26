@@ -405,18 +405,19 @@ ANGRY_TEST(updatesFocusFollowsMouseMode)
 
 ANGRY_TEST(suppressesRapidGestureToSameSpace)
 {
-    uint64_t dummy_sid = 999901;
-    space_manager_focus_space_using_gesture(0, dummy_sid);
-    bool dup_res = space_manager_focus_space_using_gesture(0, dummy_sid);
+    uint64_t sid = space_manager_active_space();
+    uint32_t did = space_display_id(sid);
+    space_manager_focus_space_using_gesture(did, sid);
+    bool dup_res = space_manager_focus_space_using_gesture(did, sid);
     ANGRY_ASSERT(dup_res, "duplicate gesture to same space must be suppressed as success no-op");
 }
 
 ANGRY_TEST(rateLimitsRapidGesturesUnderThreshold)
 {
-    uint64_t dummy_sid = 999901;
-    uint64_t other_sid = 999902;
-    space_manager_focus_space_using_gesture(0, dummy_sid);
-    bool rate_res = space_manager_focus_space_using_gesture(0, other_sid);
+    uint64_t sid = space_manager_active_space();
+    uint32_t did = space_display_id(sid);
+    space_manager_focus_space_using_gesture(did, sid);
+    bool rate_res = space_manager_focus_space_using_gesture(did, sid + 9999);
     ANGRY_ASSERT(!rate_res, "rapid consecutive gesture to another space must be rate-limited");
 }
 

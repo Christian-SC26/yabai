@@ -143,6 +143,7 @@ static bool run_app_active_space_resolution(void)
         GetProcessForPID(target_app.processIdentifier, &psn);
         int cid = 0;
         SLSGetConnectionIDForPSN(g_connection, &psn, &cid);
+        if (cid <= 0) continue;
 
         uint64_t psn_sid = process_manager_active_space_for_psn(cid);
         int space_idx = space_manager_mission_control_index(psn_sid);

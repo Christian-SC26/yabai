@@ -35,6 +35,7 @@ typedef bool (test_function)(void);
 #include "structures.c"
 #include "angry_tests.c"
 #include "angry_misc_tests.c"
+#include "angry_rule_tests.c"
 
 #define TEST_LIST                                                               \
     ANGRY_ENTRY(allocatesChunkInEmptyMemoryPool)                                \
@@ -150,7 +151,37 @@ typedef bool (test_function)(void);
     ANGRY_ENTRY(clampsCornerRadiiToHalfDimensionBoundary)                       \
     ANGRY_ENTRY(verifiesDirectoryExistenceAccurately)                           \
     ANGRY_ENTRY(verifiesFileExistenceAccurately)                                \
-    ANGRY_ENTRY(verifiesExecutablePermissionsAccurately)
+    ANGRY_ENTRY(verifiesExecutablePermissionsAccurately)                       \
+    ANGRY_ENTRY(serializesRuleConfigurationWithLabelAndEscapedStringsToJsonStream) \
+    ANGRY_ENTRY(serializesRuleConfigurationWithoutOptionalStringsUsingEmptyDefaults) \
+    ANGRY_ENTRY(copiesDisplayIdentifierAndFollowSpaceWhenFollowSpaceFlagSet)   \
+    ANGRY_ENTRY(clearsFollowSpaceFlagWhenSourceDisplaySpecifiedWithoutFollowSpaceFlag) \
+    ANGRY_ENTRY(copiesSpaceIdentifierAndFollowSpaceWhenFollowSpaceFlagSet)     \
+    ANGRY_ENTRY(clearsFollowSpaceFlagWhenSourceSpaceSpecifiedWithoutFollowSpaceFlag) \
+    ANGRY_ENTRY(ignoresOpacityOutsideUnitIntervalDuringCombination)             \
+    ANGRY_ENTRY(copiesSublayerWhenRuleLayerFlagSet)                             \
+    ANGRY_ENTRY(replacesScratchpadStringFreeingPreexistingValue)                \
+    ANGRY_ENTRY(preservesDestinationPropertyWhenSourcePropertyIsUndecided)     \
+    ANGRY_ENTRY(appliesGridDimensionsWhenBothRowAndColumnAreNonZero)            \
+    ANGRY_ENTRY(ignoresGridDimensionsWhenRowOrColumnIsZero)                     \
+    ANGRY_ENTRY(addsRuleToWindowManagerRulesBuffer)                             \
+    ANGRY_ENTRY(replacesExistingRuleWhenAddingRuleWithIdenticalLabel)           \
+    ANGRY_ENTRY(removesRuleByIndexFromWindowManagerBuffer)                      \
+    ANGRY_ENTRY(returnsFalseWhenRemovingRuleByInvalidIndex)                     \
+    ANGRY_ENTRY(removesRuleByLabelFromWindowManagerBuffer)                      \
+    ANGRY_ENTRY(returnsFalseWhenRemovingRuleByNonexistentLabel)                 \
+    ANGRY_ENTRY(freesRuleResourcesAndCompiledRegularExpressions)                \
+    ANGRY_ENTRY(skipsOneShotRuleWhenReapplyingByIndex)                          \
+    ANGRY_ENTRY(returnsFalseWhenReapplyingByNonexistentIndex)                    \
+    ANGRY_ENTRY(skipsOneShotRuleWhenReapplyingByLabel)                          \
+    ANGRY_ENTRY(returnsFalseWhenReapplyingByNonexistentLabel)                    \
+    ANGRY_ENTRY(combinesStickyMffAndFullscreenProperties)                       \
+    ANGRY_ENTRY(reappliesRuleByIndexIteratingActiveWindows)                     \
+    ANGRY_ENTRY(reappliesRuleByLabelIteratingActiveWindows)                     \
+    ANGRY_ENTRY(clearsRuleFlagFromRuleBitmask)                                  \
+    ANGRY_ENTRY(setsRuleFlagInRuleBitmask)                                      \
+    ANGRY_ENTRY(clearsRuleEffectsFlagFromEffectsBitmask)                         \
+    ANGRY_ENTRY(traversesEmptyWindowTableWithoutErrorDuringRuleReapplyAll)
 
 static struct {
     char *name;

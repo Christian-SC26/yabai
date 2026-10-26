@@ -118,7 +118,13 @@ uint64_t process_manager_active_space_for_psn(int connection)
     if (!count) goto out;
 
     CFTypeRef query = SLSWindowQueryWindows(g_connection, window_list_ref, count);
+    if (!query) goto out;
+
     CFTypeRef iterator = SLSWindowQueryResultCopyWindows(query);
+    if (!iterator) {
+        CFRelease(query);
+        goto out;
+    }
 
     while (SLSWindowIteratorAdvance(iterator)) {
         uint64_t tags = SLSWindowIteratorGetTags(iterator);
