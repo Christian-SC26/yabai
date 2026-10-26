@@ -281,10 +281,11 @@ end:
 
 void mouse_state_init(struct mouse_state *state)
 {
-    state->modifier    = MOUSE_MOD_FN;
-    state->action1     = MOUSE_MODE_MOVE;
-    state->action2     = MOUSE_MODE_RESIZE;
-    state->drop_action = MOUSE_MODE_SWAP;
+    state->modifier        = MOUSE_MOD_FN;
+    state->action1         = MOUSE_MODE_MOVE;
+    state->action2         = MOUSE_MODE_RESIZE;
+    state->drop_action     = MOUSE_MODE_SWAP;
+    state->bsp_live_resize = true;
 }
 
 static void *mouse_handler_thread(void *context)

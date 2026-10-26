@@ -81,6 +81,7 @@ struct mouse_state
     uint32_t ffm_window_id;
     uint8_t direction;
     bool live_resized;
+    bool bsp_live_resize;
     struct window_node *feedback_node;
 };
 

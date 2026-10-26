@@ -1511,16 +1511,19 @@ static EVENT_HANDLER(MOUSE_DRAGGED)
             window_manager_move_window(g_mouse_state.window, new_point.x, new_point.y);
         }
     } else if (g_mouse_state.current_action == MOUSE_MODE_RESIZE) {
+        struct view *view = window_manager_find_managed_window(&g_window_manager, g_mouse_state.window);
+        bool is_bsp_live = g_mouse_state.bsp_live_resize && view && view->layout == VIEW_BSP;
+
         uint64_t event_time = read_os_timer();
         float dt = ((float) event_time - g_mouse_state.last_moved_time) * (1000.0f / (float)read_os_freq());
-        if (dt < 16.0f) goto out;
+        float min_dt = is_bsp_live ? 33.0f : 16.0f;
+        if (dt < min_dt) goto out;
 
         int dx = point.x - g_mouse_state.down_location.x;
         int dy = point.y - g_mouse_state.down_location.y;
         if (abs(dx) < 2 && abs(dy) < 2) goto out;
 
-        struct view *view = window_manager_find_managed_window(&g_window_manager, g_mouse_state.window);
-        if (view && view->layout == VIEW_BSP) {
+        if (is_bsp_live) {
             uint8_t direction = 0;
             if (dx != 0) {
                 if (g_mouse_state.direction & HANDLE_LEFT)  direction |= HANDLE_LEFT;

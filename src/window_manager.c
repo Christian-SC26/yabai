@@ -370,6 +370,7 @@ void window_manager_resize_window_relative_internal(struct window *window, CGRec
             window_manager_move_window(window, fx, fy);
             window_manager_resize_window(window, fw, fh);
         });
+        window->frame = (CGRect){{fx, fy}, {fw, fh}};
     }
 }
 

@@ -40,6 +40,7 @@ int main(int argc, char **argv)
 {
     ts_init(MEGABYTES(8));
     g_connection = SLSMainConnectionID();
+    mouse_state_init(&g_mouse_state);
     window_manager_init(&g_window_manager);
     display_manager_begin(&g_display_manager);
     space_manager_begin(&g_space_manager);

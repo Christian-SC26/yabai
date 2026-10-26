@@ -229,6 +229,10 @@ Global Settings
 *mouse_drop_action* ['swap|stack']::
     Action performed when a bsp-managed window is dropped in the center of some other bsp-managed window.
 
+*mouse_bsp_live_resize* ['on|off']::
+    Specify whether resizing a tiled BSP window with the mouse adjusts sibling window borders in real time ('on') or only upon mouse release ('off', classic yabai behavior). +
+    Default: 'on'.
+
 Space Settings
 ^^^^^^^^^^^^^^
 

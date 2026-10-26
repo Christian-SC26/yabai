@@ -342,4 +342,11 @@ TEST_FUNC(mouse_drag_coalescing_and_bsp_direct_flush, {
         TEST_CHECK(view_is_dirty(test_view), false);
         view_destroy(test_view);
     }
+
+    // Verify bsp_live_resize config defaults to true and can be toggled
+    TEST_CHECK(g_mouse_state.bsp_live_resize, true);
+    g_mouse_state.bsp_live_resize = false;
+    TEST_CHECK(g_mouse_state.bsp_live_resize, false);
+    g_mouse_state.bsp_live_resize = true;
+    TEST_CHECK(g_mouse_state.bsp_live_resize, true);
 })

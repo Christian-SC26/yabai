@@ -385,7 +385,14 @@ void window_node_flush_direct(struct window_node *node)
     if (window_list) {
         int window_count = ts_buf_len(window_list);
         for (int i = 0; i < window_count; ++i) {
-            window_manager_set_window_frame(window_list[i].window, window_list[i].x, window_list[i].y, window_list[i].w, window_list[i].h);
+            struct window *window = window_list[i].window;
+            if (window->frame.origin.x != window_list[i].x ||
+                window->frame.origin.y != window_list[i].y ||
+                window->frame.size.width != window_list[i].w ||
+                window->frame.size.height != window_list[i].h) {
+                window_manager_set_window_frame(window, window_list[i].x, window_list[i].y, window_list[i].w, window_list[i].h);
+                window->frame = (CGRect){{window_list[i].x, window_list[i].y}, {window_list[i].w, window_list[i].h}};
+            }
         }
     }
 }
