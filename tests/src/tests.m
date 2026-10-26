@@ -41,6 +41,7 @@ typedef bool (test_function)(void);
 #include "angry_application_tests.c"
 #include "angry_mouse_tests.c"
 #include "angry_process_tests.c"
+#include "angry_mission_control_tests.c"
 
 #define TEST_LIST                                                               \
     ANGRY_ENTRY(allocatesChunkInEmptyMemoryPool)                                \
@@ -281,7 +282,23 @@ typedef bool (test_function)(void);
     ANGRY_ENTRY(returnsErrorWhenProcessEventLacksProcessIdParameter)            \
     ANGRY_ENTRY(returnsZeroActiveSpaceForInvalidConnectionId)                   \
     ANGRY_ENTRY(addsRunningProcessesAndCachesFinderPsn)                         \
-    ANGRY_ENTRY(initializesProcessManagerInstallingCarbonEventHandler)
+    ANGRY_ENTRY(initializesProcessManagerInstallingCarbonEventHandler)          \
+    ANGRY_ENTRY(recordsMissionControlStateCapturingFrontApplicationAndSpace)    \
+    ANGRY_ENTRY(preservesMissionControlStateIdempotencyWhenAlreadyRecorded)     \
+    ANGRY_ENTRY(dispatchesConnectionHandlerForMissionControlEnter)              \
+    ANGRY_ENTRY(dispatchesConnectionHandlerForSpaceCreatedNotification)         \
+    ANGRY_ENTRY(dispatchesConnectionHandlerForSpaceDestroyedNotification)       \
+    ANGRY_ENTRY(dispatchesConnectionHandlerForWindowOrderedNotification)        \
+    ANGRY_ENTRY(dispatchesConnectionHandlerForWindowDestroyedNotification)      \
+    ANGRY_ENTRY(updatesLastCmdTabTimeOnConnectionHandlerType1202)               \
+    ANGRY_ENTRY(dispatchesMissionControlNotificationHandlerForShowAllWindows)   \
+    ANGRY_ENTRY(dispatchesMissionControlNotificationHandlerForShowFrontWindows) \
+    ANGRY_ENTRY(dispatchesMissionControlNotificationHandlerForShowDesktop)      \
+    ANGRY_ENTRY(dispatchesMissionControlNotificationHandlerForExposeExit)       \
+    ANGRY_ENTRY(observesAndUnobservesMissionControlDockEvents)                  \
+    ANGRY_ENTRY(evaluatesMissionControlIsActiveReturningBooleanState)           \
+    ANGRY_ENTRY(returnsCachedMissionControlStateWhenCalledWithinFiftyMilliseconds) \
+    ANGRY_ENTRY(mapsMissionControlModesToExpectedStringRepresentations)
 
 static struct {
     char *name;
