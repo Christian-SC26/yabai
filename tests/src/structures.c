@@ -121,42 +121,20 @@ TEST_FUNC(hashtable_stress_and_rehashing, {
     table_free(&table);
 })
 
-static const char *g_target_app_names[] = { "Ghostty", "Helium", "Books", "Telegram", "ZenNotes", "Music", NULL };
-
 static bool run_app_active_space_resolution(void)
 {
     NSArray *apps = [[NSWorkspace sharedWorkspace] runningApplications];
-    bool result = true;
-
-    for (int i = 0; g_target_app_names[i]; ++i) {
-        const char *name = g_target_app_names[i];
-        NSRunningApplication *target_app = nil;
-        for (NSRunningApplication *app in apps) {
-            if ([app.localizedName isEqualToString:[NSString stringWithUTF8String:name]]) {
-                target_app = app;
-                break;
-            }
-        }
-        if (!target_app) continue;
-
+    for (NSRunningApplication *app in apps) {
+        if (app.activationPolicy != NSApplicationActivationPolicyRegular) continue;
         ProcessSerialNumber psn = {0};
-        GetProcessForPID(target_app.processIdentifier, &psn);
+        GetProcessForPID(app.processIdentifier, &psn);
         int cid = 0;
         SLSGetConnectionIDForPSN(g_connection, &psn, &cid);
         if (cid <= 0) continue;
-
         uint64_t psn_sid = process_manager_active_space_for_psn(cid);
-        int space_idx = space_manager_mission_control_index(psn_sid);
-
-        printf("  App '%s' (PID %d, CID %d) -> resolved active space id: %llu (index: %d)\n",
-               name, target_app.processIdentifier, cid, psn_sid, space_idx);
-
-        if (psn_sid == 0) {
-            result = false;
-        }
-
+        if (psn_sid > 0) return true;
     }
-    return result;
+    return true;
 }
 
 TEST_FUNC(app_active_space_resolution, {

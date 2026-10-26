@@ -36,6 +36,7 @@ typedef bool (test_function)(void);
 #include "angry_tests.c"
 #include "angry_misc_tests.c"
 #include "angry_rule_tests.c"
+#include "angry_event_serialize_tests.c"
 
 #define TEST_LIST                                                               \
     ANGRY_ENTRY(allocatesChunkInEmptyMemoryPool)                                \
@@ -181,6 +182,17 @@ typedef bool (test_function)(void);
     ANGRY_ENTRY(clearsRuleFlagFromRuleBitmask)                                  \
     ANGRY_ENTRY(setsRuleFlagInRuleBitmask)                                      \
     ANGRY_ENTRY(clearsRuleEffectsFlagFromEffectsBitmask)                         \
+    ANGRY_ENTRY(augmentsDockSwipeEventWithRawIoHidPayload)                      \
+    ANGRY_ENTRY(augmentsDockSwipeEndedEventWithVelocityPayload)                 \
+    ANGRY_ENTRY(replacesPreexistingPayloadWhenAugmentingAlreadyAugmentedEvent)  \
+    ANGRY_ENTRY(returnsNullWhenAugmentingNullEvent)                             \
+    ANGRY_ENTRY(augmentsBareEventDefaultingMissingFieldsToZero)                 \
+    ANGRY_ENTRY(evaluatesRequiresEventAugmentationWithoutCrashing)              \
+    ANGRY_ENTRY(rejectsTruncatedEventDataUnderFourBytes)                        \
+    ANGRY_ENTRY(rejectsUnsupportedEventDataVersionNumber)                       \
+    ANGRY_ENTRY(rejectsTruncatedFieldHeaderInEventData)                         \
+    ANGRY_ENTRY(clampsExtremePositiveAndNegativeFixedPointValues)               \
+    ANGRY_ENTRY(handlesNullParsedEventDataFreeSafely)                           \
     ANGRY_ENTRY(traversesEmptyWindowTableWithoutErrorDuringRuleReapplyAll)
 
 static struct {
