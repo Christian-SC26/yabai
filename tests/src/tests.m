@@ -96,6 +96,40 @@ int posix_spawn(pid_t *restrict pid, const char *restrict path,
     return real_fn ? real_fn(pid, path, file_actions, attrp, argv, envp) : 1;
 }
 
+static bool g_mock_fast_usleep = false;
+int usleep(useconds_t usec)
+{
+    if (g_mock_fast_usleep) return 0;
+    typedef int (*real_fn)(useconds_t);
+    static real_fn r = NULL;
+    if (!r) r = (real_fn)dlsym(RTLD_NEXT, "usleep");
+    return r ? r(usec) : 0;
+}
+
+static uint64_t g_mock_active_space = 0;
+uint64_t SLSGetActiveSpace(int cid)
+{
+    if (g_mock_active_space) return g_mock_active_space;
+    typedef uint64_t (*real_fn)(int);
+    static real_fn r = NULL;
+    if (!r) r = (real_fn)dlsym(RTLD_NEXT, "SLSGetActiveSpace");
+    return r ? r(cid) : 1;
+}
+
+CFArrayRef SLSCopySpacesForWindows(int cid, int selector, CFArrayRef window_list)
+{
+    if (g_mock_active_space) {
+        CFNumberRef num = CFNumberCreate(NULL, kCFNumberSInt64Type, &g_mock_active_space);
+        CFArrayRef arr = CFArrayCreate(NULL, (const void **)&num, 1, &kCFTypeArrayCallBacks);
+        CFRelease(num);
+        return arr;
+    }
+    typedef CFArrayRef (*real_fn)(int, int, CFArrayRef);
+    static real_fn r = NULL;
+    if (!r) r = (real_fn)dlsym(RTLD_NEXT, "SLSCopySpacesForWindows");
+    return r ? r(cid, selector, window_list) : NULL;
+}
+
 static bool g_mock_dispatch_after = false;
 void dispatch_after(dispatch_time_t when, dispatch_queue_t queue, dispatch_block_t block)
 {
@@ -168,6 +202,7 @@ CFArrayRef CGWindowListCopyWindowInfo(CGWindowListOption option, CGWindowID rela
 #include "angry_sa_tests.m"
 #include "angry_event_loop_tests.c"
 #include "angry_yabai_tests.c"
+#include "angry_window_manager_tests.c"
 
 #define TEST_LIST                                                               \
     ANGRY_ENTRY(allocatesChunkInEmptyMemoryPool)                                \
@@ -668,7 +703,96 @@ CFArrayRef CGWindowListCopyWindowInfo(CGWindowListOption option, CGWindowID rela
     ANGRY_ENTRY(handlesDaemonSocketMessageProcessingPayload)                    \
     ANGRY_ENTRY(abortsWhenClientSendMessageReceivesNoArguments)                 \
     ANGRY_ENTRY(printsVersionAndExitsInParseArguments)                          \
-    ANGRY_ENTRY(initializesSettingsAndAttemptsLockAcquisition)
+    ANGRY_ENTRY(initializesSettingsAndAttemptsLockAcquisition)                  \
+    ANGRY_ENTRY(validatesWindowEligibilityForManagedRules)                      \
+    ANGRY_ENTRY(queriesWindowsForSpaceListAsJsonStream)                         \
+    ANGRY_ENTRY(queriesWindowsForSingleDisplayAsJsonStream)                     \
+    ANGRY_ENTRY(queriesWindowsForDisplaysAsJsonStream)                         \
+    ANGRY_ENTRY(matchesWindowAgainstRegexRule)                                  \
+    ANGRY_ENTRY(appliesManageRuleEffectsToWindow)                               \
+    ANGRY_ENTRY(appliesGeneralRuleEffectsToWindow)                              \
+    ANGRY_ENTRY(evaluatesManageRulesAcrossWindowManagers)                       \
+    ANGRY_ENTRY(evaluatesGeneralRulesAcrossWindowManagers)                      \
+    ANGRY_ENTRY(togglesGlobalWindowOpacityState)                                \
+    ANGRY_ENTRY(evaluatesWhetherWindowShouldBeManaged)                          \
+    ANGRY_ENTRY(adjustsWindowRatioReturningErrorOnUnmanagedWindow)              \
+    ANGRY_ENTRY(movesWindowRelativelyForUnmanagedWindow)                        \
+    ANGRY_ENTRY(resizesWindowRelativeInternalWithAnimation)                     \
+    ANGRY_ENTRY(resizesWindowRelativeHandlingUnmanagedWindow)                   \
+    ANGRY_ENTRY(movesWindowDirectlyWithNullReference)                           \
+    ANGRY_ENTRY(resizesWindowDirectlyWithNullReference)                          \
+    ANGRY_ENTRY(animatesWindowListAsynchronouslyWithEmptyList)                  \
+    ANGRY_ENTRY(setsWindowPurifyModeAndIteratesWindows)                         \
+    ANGRY_ENTRY(setsWindowOpacityDirectly)                                      \
+    ANGRY_ENTRY(setsMenubarOpacityDirectly)                                     \
+    ANGRY_ENTRY(setsActiveWindowOpacityDirectly)                                \
+    ANGRY_ENTRY(setsNormalWindowOpacityDirectly)                                \
+    ANGRY_ENTRY(setsWindowLayerAndAssociatedSublayers)                         \
+    ANGRY_ENTRY(findsRankOfWindowInWindowList)                                  \
+    ANGRY_ENTRY(findsWindowAtPointFilteringSpecifiedWindow)                     \
+    ANGRY_ENTRY(notifiesJankyBordersSafely)                                     \
+    ANGRY_ENTRY(createsWindowProxySkippingNullImage)                            \
+    ANGRY_ENTRY(destroysWindowProxyCleaningUpResources)                         \
+    ANGRY_ENTRY(buildsWindowProxyInThreadProcSafely)                            \
+    ANGRY_ENTRY(processesWindowAnimationListStepInThreadProc)                  \
+    ANGRY_ENTRY(findsClosestManagedWindowInDirection)                          \
+    ANGRY_ENTRY(findsPrevManagedWindowOnActiveSpace)                            \
+    ANGRY_ENTRY(findsNextManagedWindowOnActiveSpace)                            \
+    ANGRY_ENTRY(findsFirstManagedWindowOnActiveSpace)                           \
+    ANGRY_ENTRY(findsLastManagedWindowOnActiveSpace)                            \
+    ANGRY_ENTRY(findsRecentManagedWindowUsingLastWindowId)                      \
+    ANGRY_ENTRY(findsPrevWindowInStackReturningNull)                            \
+    ANGRY_ENTRY(findsNextWindowInStackReturningNull)                            \
+    ANGRY_ENTRY(findsFirstWindowInStackReturningNull)                           \
+    ANGRY_ENTRY(findsLastWindowInStackReturningNull)                            \
+    ANGRY_ENTRY(findsRecentWindowInStackReturningNull)                          \
+    ANGRY_ENTRY(findsWindowInStackByIndexReturningNull)                         \
+    ANGRY_ENTRY(findsLargestManagedWindowOnActiveSpace)                          \
+    ANGRY_ENTRY(findsSmallestManagedWindowOnActiveSpace)                         \
+    ANGRY_ENTRY(findsSiblingForManagedWindowReturningNull)                      \
+    ANGRY_ENTRY(findsFirstNephewForManagedWindowReturningNull)                  \
+    ANGRY_ENTRY(findsSecondNephewForManagedWindowReturningNull)                 \
+    ANGRY_ENTRY(findsUncleForManagedWindowReturningNull)                        \
+    ANGRY_ENTRY(findsFirstCousinForManagedWindowReturningNull)                  \
+    ANGRY_ENTRY(findsSecondCousinForManagedWindowReturningNull)                 \
+    ANGRY_ENTRY(focusesWindowWithoutRaiseSynthesizingEvents)                    \
+    ANGRY_ENTRY(focusesWindowWithRaiseActivatingProcess)                        \
+    ANGRY_ENTRY(tracksLostFrontSwitchedEventInTable)                            \
+    ANGRY_ENTRY(tracksLostFocusedEventInTable)                                  \
+    ANGRY_ENTRY(addsAndRemovesWindowFromTable)                                  \
+    ANGRY_ENTRY(addsAndRemovesApplicationFromTable)                             \
+    ANGRY_ENTRY(findsWindowsBelongingToApplication)                             \
+    ANGRY_ENTRY(makesKeyWindowPostingEventRecords)                              \
+    ANGRY_ENTRY(retrievesExistingApplicationWindowList)                         \
+    ANGRY_ENTRY(createsAndAddsWindowHandlingUnknownWindow)                      \
+    ANGRY_ENTRY(addsApplicationWindowsSafely)                                   \
+    ANGRY_ENTRY(addsExistingApplicationWindowsSafely)                           \
+    ANGRY_ENTRY(setsWindowInsertionPointDirection)                             \
+    ANGRY_ENTRY(stacksWindowReturningErrorOnSelfStack)                          \
+    ANGRY_ENTRY(warpsWindowReturningErrorOnSelfWarp)                            \
+    ANGRY_ENTRY(swapsWindowReturningErrorOnSelfSwap)                            \
+    ANGRY_ENTRY(minimizesWindowCheckingCapabilities)                            \
+    ANGRY_ENTRY(deminimizesWindowCheckingMinimizedState)                        \
+    ANGRY_ENTRY(closesWindowReturningFailureOnNullButton)                       \
+    ANGRY_ENTRY(sendsWindowToSpaceHandlingSameSpace)                            \
+    ANGRY_ENTRY(appliesGridToWindowHandlingInvalidView)                         \
+    ANGRY_ENTRY(makesWindowFloatingHandlingIneligibleWindow)                    \
+    ANGRY_ENTRY(makesWindowStickyHandlingIneligibleWindow)                      \
+    ANGRY_ENTRY(togglesWindowShadowDirectly)                                    \
+    ANGRY_ENTRY(waitsForNativeFullscreenTransitionOnWindow)                    \
+    ANGRY_ENTRY(togglesWindowNativeFullscreenSafely)                            \
+    ANGRY_ENTRY(togglesWindowZoomParentOnWindow)                                \
+    ANGRY_ENTRY(togglesWindowZoomFullscreenOnWindow)                            \
+    ANGRY_ENTRY(togglesWindowWindowedFullscreenOnWindow)                        \
+    ANGRY_ENTRY(togglesWindowExposeDirectly)                                    \
+    ANGRY_ENTRY(togglesWindowPictureInPictureDirectly)                          \
+    ANGRY_ENTRY(togglesScratchpadWindowByLabelReturningFalse)                   \
+    ANGRY_ENTRY(togglesScratchpadWindowDirectly)                                \
+    ANGRY_ENTRY(setsAndRemovesScratchpadForWindow)                              \
+    ANGRY_ENTRY(findsScratchpadWindowByLabel)                                   \
+    ANGRY_ENTRY(recoversScratchpadWindowsSafely)                                \
+    ANGRY_ENTRY(correctsForMissionControlChangesSafely)                         \
+    ANGRY_ENTRY(beginsWindowManagerLifecyleObservingWindows)
 
 static struct {
     char *name;
