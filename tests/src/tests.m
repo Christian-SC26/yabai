@@ -49,6 +49,7 @@ typedef bool (test_function)(void);
 #include "angry_space_manager_tests.c"
 #include "angry_message_tests.c"
 #include "angry_layout_store_tests.m"
+#include "angry_workspace_tests.m"
 
 CGError CoreDockSendNotification(CFStringRef notification, int unknown)
 {
@@ -462,7 +463,22 @@ CGError CoreDockSendNotification(CFStringRef notification, int unknown)
     ANGRY_ENTRY(restoresSpaceLayoutFromFileHandlingMissingFile)                 \
     ANGRY_ENTRY(savesSessionStateToFileHandlingErrors)                          \
     ANGRY_ENTRY(dumpsSessionStateToJsonStreamHandlingErrors)                    \
-    ANGRY_ENTRY(restoresSessionStateFromFileHandlingMissingFile)
+    ANGRY_ENTRY(restoresSessionStateFromFileHandlingMissingFile)                \
+    ANGRY_ENTRY(observesFinishedLaunchingForValidAndNullApplications)           \
+    ANGRY_ENTRY(observesActivationPolicyForValidAndNullApplications)            \
+    ANGRY_ENTRY(determinesApplicationObservableForRegularAndNullPolicies)       \
+    ANGRY_ENTRY(evaluatesApplicationFinishedLaunchingState)                     \
+    ANGRY_ENTRY(measuresDisplayNotchHeightForBuiltinAndExternalDisplays)        \
+    ANGRY_ENTRY(deallocatesWorkspaceContextProperly)                            \
+    ANGRY_ENTRY(processesActivationPolicyChangeObservation)                     \
+    ANGRY_ENTRY(processesFinishedLaunchingChangeObservation)                    \
+    ANGRY_ENTRY(handlesWorkspaceWakeNotificationSafely)                         \
+    ANGRY_ENTRY(handlesMenuBarHidingChangeNotificationSafely)                   \
+    ANGRY_ENTRY(handlesDockRestartNotificationSafely)                           \
+    ANGRY_ENTRY(handlesDockPreferenceChangeNotificationSafely)                  \
+    ANGRY_ENTRY(handlesActiveDisplayChangeNotificationSafely)                   \
+    ANGRY_ENTRY(handlesActiveSpaceChangeNotificationSafely)                     \
+    ANGRY_ENTRY(handlesApplicationHideAndUnhideNotificationsSafely)
 
 static struct {
     char *name;
