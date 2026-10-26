@@ -42,6 +42,7 @@ typedef bool (test_function)(void);
 #include "angry_mouse_tests.c"
 #include "angry_process_tests.c"
 #include "angry_mission_control_tests.c"
+#include "angry_display_space_tests.c"
 
 #define TEST_LIST                                                               \
     ANGRY_ENTRY(allocatesChunkInEmptyMemoryPool)                                \
@@ -298,7 +299,22 @@ typedef bool (test_function)(void);
     ANGRY_ENTRY(observesAndUnobservesMissionControlDockEvents)                  \
     ANGRY_ENTRY(evaluatesMissionControlIsActiveReturningBooleanState)           \
     ANGRY_ENTRY(returnsCachedMissionControlStateWhenCalledWithinFiftyMilliseconds) \
-    ANGRY_ENTRY(mapsMissionControlModesToExpectedStringRepresentations)
+    ANGRY_ENTRY(mapsMissionControlModesToExpectedStringRepresentations)         \
+    ANGRY_ENTRY(dispatchesDisplayHandlerForDisplayAddedEvent)                    \
+    ANGRY_ENTRY(dispatchesDisplayHandlerForDisplayRemovedEvent)                  \
+    ANGRY_ENTRY(dispatchesDisplayHandlerForDisplayMovedEvent)                    \
+    ANGRY_ENTRY(dispatchesDisplayHandlerForDisplayResizedEvent)                  \
+    ANGRY_ENTRY(serializesDisplayPropertiesToJsonStream)                        \
+    ANGRY_ENTRY(serializesIndividualDisplayPropertyFields)                      \
+    ANGRY_ENTRY(countsSpacesForActiveDisplay)                                   \
+    ANGRY_ENTRY(returnsZeroSpacesForInvalidDisplayId)                           \
+    ANGRY_ENTRY(resolvesDisplayBoundsConstrainedWithExternalBarPadding)          \
+    ANGRY_ENTRY(convertsDisplayIdToUuidAndBack)                                 \
+    ANGRY_ENTRY(identifiesSystemSpaceAccurately)                                 \
+    ANGRY_ENTRY(queriesSpaceWindowListIncludingMinimizedWindows)                \
+    ANGRY_ENTRY(evaluatesSpaceVisibilityForActiveSpace)                          \
+    ANGRY_ENTRY(evaluatesSpaceFullscreenStateForActiveSpace)                      \
+    ANGRY_ENTRY(evaluatesSpaceUserTypeForActiveSpace)
 
 static struct {
     char *name;
