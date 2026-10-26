@@ -39,6 +39,7 @@ typedef bool (test_function)(void);
 #include "angry_event_serialize_tests.c"
 #include "angry_signal_tests.c"
 #include "angry_application_tests.c"
+#include "angry_mouse_tests.c"
 
 #define TEST_LIST                                                               \
     ANGRY_ENTRY(allocatesChunkInEmptyMemoryPool)                                \
@@ -235,7 +236,33 @@ typedef bool (test_function)(void);
     ANGRY_ENTRY(dispatchesNotificationHandlerForWindowGeometryChanges)          \
     ANGRY_ENTRY(dispatchesNotificationHandlerForMenuAndStateChanges)           \
     ANGRY_ENTRY(dispatchesNotificationHandlerForWindowDestroyedNotification)    \
-    ANGRY_ENTRY(traversesEmptyWindowTableWithoutErrorDuringRuleReapplyAll)
+    ANGRY_ENTRY(traversesEmptyWindowTableWithoutErrorDuringRuleReapplyAll)      \
+    ANGRY_ENTRY(initializesMouseStateWithDefaultParameters)                     \
+    ANGRY_ENTRY(parsesMouseModifierFromCommandAndAltFlags)                      \
+    ANGRY_ENTRY(parsesMouseModifierFromShiftAndControlFlags)                    \
+    ANGRY_ENTRY(populatesMouseWindowInfoCalculatingDeltasAndFlags)              \
+    ANGRY_ENTRY(determinesStackDropActionWhenCursorInCenterAndModeIsStack)       \
+    ANGRY_ENTRY(determinesSwapDropActionWhenCursorInCenterAndModeIsSwap)        \
+    ANGRY_ENTRY(determinesWarpTopDropActionWhenCursorInTopTriangle)             \
+    ANGRY_ENTRY(determinesWarpRightDropActionWhenCursorInRightTriangle)         \
+    ANGRY_ENTRY(determinesWarpBottomDropActionWhenCursorInBottomTriangle)       \
+    ANGRY_ENTRY(determinesWarpLeftDropActionWhenCursorInLeftTriangle)           \
+    ANGRY_ENTRY(returnsDropActionNoneWhenCursorIsOutsideWindowBounds)           \
+    ANGRY_ENTRY(handlesMouseDropNoTargetOnSameSpaceByFlushingNode)              \
+    ANGRY_ENTRY(bypassesBspGridAdjustmentWhenViewLayoutIsNotBsp)                \
+    ANGRY_ENTRY(swapsWindowsBetweenNodesUpdatingInsertionPoints)                \
+    ANGRY_ENTRY(consumesMouseClickWhenModifiersMatchAndFreesOnRelease)          \
+    ANGRY_ENTRY(stacksWindowIntoDestinationNodeOnMouseDropActionStack)          \
+    ANGRY_ENTRY(warpsWindowBetweenSiblingsWithMatchingSplitSwappingNodes)       \
+    ANGRY_ENTRY(handlesMouseRightMouseDownConsumingWhenModifierMatches)         \
+    ANGRY_ENTRY(handlesMouseDraggedEventSettingDragDetectedFlag)                \
+    ANGRY_ENTRY(handlesMouseMovedEventPassingThroughWhenModifierMatches)        \
+    ANGRY_ENTRY(handlesDockSwipeGestureBeganAndEndedEvents)                     \
+    ANGRY_ENTRY(handlesEventTapDisabledTimeoutReenablingHandleSafely)           \
+    ANGRY_ENTRY(swapsWindowsAcrossDifferentSpacesUpdatingManagedTable)          \
+    ANGRY_ENTRY(warpsWindowBetweenSiblingsWithDifferentSplitModifyingParent)    \
+    ANGRY_ENTRY(handlesMouseMovedEventPostingEventWhenModifierDiffers)          \
+    ANGRY_ENTRY(handlesZoomedNodeOnMouseDropActionStack)
 
 static struct {
     char *name;

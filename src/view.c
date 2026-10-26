@@ -207,7 +207,7 @@ static inline bool window_node_is_intermediate(struct window_node *node)
 
 static inline bool window_node_is_leaf(struct window_node *node)
 {
-    return node->left == NULL && node->right == NULL;
+    return node && node->left == NULL && node->right == NULL;
 }
 
 static inline bool window_node_is_left_child(struct window_node *node)
@@ -440,7 +440,7 @@ void window_node_swap_window_list(struct window_node *a_node, struct window_node
 struct window_node *window_node_find_first_leaf(struct window_node *root)
 {
     struct window_node *node = root;
-    while (!window_node_is_leaf(node)) {
+    while (node && !window_node_is_leaf(node)) {
         node = node->left;
     }
     return node;
@@ -449,7 +449,7 @@ struct window_node *window_node_find_first_leaf(struct window_node *root)
 struct window_node *window_node_find_last_leaf(struct window_node *root)
 {
     struct window_node *node = root;
-    while (!window_node_is_leaf(node)) {
+    while (node && !window_node_is_leaf(node)) {
         node = node->right;
     }
     return node;
