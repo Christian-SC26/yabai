@@ -44,6 +44,7 @@ typedef bool (test_function)(void);
 #include "angry_mission_control_tests.c"
 #include "angry_display_space_tests.c"
 #include "angry_view_tests.c"
+#include "angry_window_tests.c"
 
 #define TEST_LIST                                                               \
     ANGRY_ENTRY(allocatesChunkInEmptyMemoryPool)                                \
@@ -328,7 +329,31 @@ typedef bool (test_function)(void);
     ANGRY_ENTRY(marksViewDirtyWhenFlushingInvisibleSpace)                       \
     ANGRY_ENTRY(serializesBspViewPropertiesToJsonStream)                        \
     ANGRY_ENTRY(clearsViewRootTreeAndResetsNodeDimensions)                     \
-    ANGRY_ENTRY(displaysAndDestroysInsertFeedbackWindow)
+    ANGRY_ENTRY(displaysAndDestroysInsertFeedbackWindow)                        \
+    ANGRY_ENTRY(resolvesWindowDisplayUuidAndDisplayId)                           \
+    ANGRY_ENTRY(resolvesWindowSpaceAndSpaceList)                                \
+    ANGRY_ENTRY(queriesWindowShadowAndOpacity)                                  \
+    ANGRY_ENTRY(queriesWindowLevelAndSubLevel)                                  \
+    ANGRY_ENTRY(queriesWindowParentAndTags)                                     \
+    ANGRY_ENTRY(evaluatesWindowIsStickyAccurately)                              \
+    ANGRY_ENTRY(queriesWindowPropertyTitleViaTextStorage)                       \
+    ANGRY_ENTRY(serializesNonAxWindowPropertiesToJsonStream)                    \
+    ANGRY_ENTRY(serializesWindowStructurePropertiesToJsonStream)                \
+    ANGRY_ENTRY(serializesWindowSelectedPropertiesWithoutOptionalAttributes)    \
+    ANGRY_ENTRY(formatsWindowTitleUsingTemporaryStorage)                       \
+    ANGRY_ENTRY(formatsWindowRoleUsingTemporaryStorage)                         \
+    ANGRY_ENTRY(formatsWindowSubroleUsingTemporaryStorage)                      \
+    ANGRY_ENTRY(identifiesRealWindowWithStandardRoleAndSubrole)                  \
+    ANGRY_ENTRY(identifiesStandardWindowWithStandardSubrole)                    \
+    ANGRY_ENTRY(identifiesUnknownSubroleWindow)                                 \
+    ANGRY_ENTRY(evaluatesWindowCanMoveAndCanResizeFromFlags)                     \
+    ANGRY_ENTRY(evaluatesWindowIsUndersizedBasedOnFrameDimensions)              \
+    ANGRY_ENTRY(mapsWindowLevelsToLayerStrings)                                 \
+    ANGRY_ENTRY(evaluatesWindowLevelIsStandardMatchingNormalLayer)              \
+    ANGRY_ENTRY(evaluatesWindowIsRootWithValidOrDummyElement)                   \
+    ANGRY_ENTRY(manipulatesWindowFlagsAndRuleFlagsBitmasks)                     \
+    ANGRY_ENTRY(destroysWindowFreeingAllocatedStringsAndReferences)             \
+    ANGRY_ENTRY(createsAndObservesWindowWhenAccessibilityWindowExists)
 
 static struct {
     char *name;
@@ -341,6 +366,10 @@ int main(int argc, char **argv)
 {
     ts_init(MEGABYTES(8));
     g_connection = SLSMainConnectionID();
+    CGSGetConnectionPortById = macho_find_symbol("/System/Library/PrivateFrameworks/SkyLight.framework/Versions/A/SkyLight", "_CGSGetConnectionPortById");
+    g_layer_below_window_level  = CGWindowLevelForKey(LAYER_BELOW);
+    g_layer_normal_window_level = CGWindowLevelForKey(LAYER_NORMAL);
+    g_layer_above_window_level  = CGWindowLevelForKey(LAYER_ABOVE);
     workspace_event_handler_begin(&g_workspace_context);
     mouse_state_init(&g_mouse_state);
     window_manager_init(&g_window_manager);
