@@ -378,6 +378,18 @@ void window_node_flush(struct window_node *node)
     if (window_list) window_manager_animate_window_list(window_list, ts_buf_len(window_list));
 }
 
+void window_node_flush_direct(struct window_node *node)
+{
+    struct window_capture *window_list = NULL;
+    window_node_capture_windows(node, &window_list);
+    if (window_list) {
+        int window_count = ts_buf_len(window_list);
+        for (int i = 0; i < window_count; ++i) {
+            window_manager_set_window_frame(window_list[i].window, window_list[i].x, window_list[i].y, window_list[i].w, window_list[i].h);
+        }
+    }
+}
+
 bool window_node_contains_window(struct window_node *node, uint32_t window_id)
 {
     for (int i = 0; i < node->window_count; ++i) {
@@ -851,6 +863,16 @@ void view_flush(struct view *view)
 {
     if (space_is_visible(view->sid)) {
         window_node_flush(view->root);
+        view_clear_flag(view, VIEW_IS_DIRTY);
+    } else {
+        view_set_flag(view, VIEW_IS_DIRTY);
+    }
+}
+
+void view_flush_direct(struct view *view)
+{
+    if (space_is_visible(view->sid)) {
+        window_node_flush_direct(view->root);
         view_clear_flag(view, VIEW_IS_DIRTY);
     } else {
         view_set_flag(view, VIEW_IS_DIRTY);

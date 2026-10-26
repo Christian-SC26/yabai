@@ -404,7 +404,11 @@ enum window_op_error window_manager_resize_window_relative(struct window_manager
         }
 
         view_update(view);
-        view_flush(view);
+        if (animate) {
+            view_flush(view);
+        } else {
+            view_flush_direct(view);
+        }
     } else {
         if (direction == HANDLE_ABS) {
             if (animate) {

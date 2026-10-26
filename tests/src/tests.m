@@ -26,7 +26,8 @@ typedef TEST_SIG(function);
     TEST_ENTRY(osax_expected_attributes_validation)            \
     TEST_ENTRY(skip_window_focus_animation_default)            \
     TEST_ENTRY(gesture_vertical_and_mc_guards)                 \
-    TEST_ENTRY(mission_control_focus_state_record)
+    TEST_ENTRY(mission_control_focus_state_record)             \
+    TEST_ENTRY(mouse_drag_coalescing_and_bsp_direct_flush)
 
 static struct {
     char *name;

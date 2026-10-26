@@ -276,3 +276,70 @@ TEST_FUNC(mission_control_focus_state_record, {
     g_mission_control_prev_sid = 0;
     g_mission_control_prev_pid = 0;
 })
+
+TEST_FUNC(mouse_drag_coalescing_and_bsp_direct_flush, {
+    struct event_loop loop = {0};
+    bool init = memory_pool_init(&loop.pool, KILOBYTES(64));
+    TEST_CHECK(init, true);
+    loop.head = memory_pool_push(&loop.pool, sizeof(struct event));
+    loop.head->next = NULL;
+    loop.tail = loop.head;
+    loop.semaphore = sem_open("yabai_test_semaphore", O_CREAT, 0600, 0);
+    sem_unlink("yabai_test_semaphore");
+
+    // Post 5 MOUSE_DRAGGED events
+    for (int i = 0; i < 5; ++i) {
+        int val = i + 1;
+        CFNumberRef num = CFNumberCreate(kCFAllocatorDefault, kCFNumberIntType, &val);
+        event_loop_post(&loop, MOUSE_DRAGGED, (void *) num, 0);
+    }
+    // And 1 MOUSE_UP at the end
+    event_loop_post(&loop, MOUSE_UP, NULL, 0);
+
+    // Dequeue first (advancing loop.head to next, exactly as in event_loop_run)
+    struct event *head = loop.head;
+    struct event *next = head->next;
+    TEST_CHECK(next != NULL, true);
+    loop.head = next;
+
+    enum event_type type = __atomic_load_n(&next->type, __ATOMIC_RELAXED);
+    TEST_CHECK((int)type, (int)MOUSE_DRAGGED);
+
+    // Run coalesce logic
+    if (type == MOUSE_DRAGGED || type == MOUSE_MOVED) {
+        struct event *peek;
+        while ((peek = __atomic_load_n(&next->next, __ATOMIC_RELAXED)) != NULL) {
+            if (__atomic_load_n(&peek->type, __ATOMIC_RELAXED) != type) break;
+            if (!__sync_bool_compare_and_swap(&loop.head, next, peek)) break;
+            void *old_context = __atomic_load_n(&next->context, __ATOMIC_RELAXED);
+            if (old_context) CFRelease(old_context);
+            next = peek;
+        }
+    }
+
+    // next should now be the 5th MOUSE_DRAGGED event!
+    int final_val = 0;
+    CFNumberGetValue((CFNumberRef)next->context, kCFNumberIntType, &final_val);
+    TEST_CHECK(final_val, 5);
+
+    // The event following next should be MOUSE_UP!
+    struct event *up_event = next->next;
+    TEST_CHECK(up_event != NULL, true);
+    TEST_CHECK((int)up_event->type, (int)MOUSE_UP);
+
+    // Cleanup 5th context
+    CFRelease(next->context);
+    sem_close(loop.semaphore);
+
+    // Verify view_flush_direct clears dirty flag on active space
+    uint32_t did = display_manager_active_display_id();
+    uint64_t active_sid = display_space_id(did);
+    if (active_sid) {
+        struct view *test_view = view_create(active_sid);
+        test_view->layout = VIEW_BSP;
+        view_update(test_view);
+        view_flush_direct(test_view);
+        TEST_CHECK(view_is_dirty(test_view), false);
+        view_destroy(test_view);
+    }
+})

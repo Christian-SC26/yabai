@@ -1545,6 +1545,7 @@ static EVENT_HANDLER(MOUSE_DRAGGED)
 
         g_mouse_state.last_moved_time = event_time;
         g_mouse_state.down_location = point;
+        goto out;
     }
 
     struct view *src_view = window_manager_find_managed_window(&g_window_manager, g_mouse_state.window);
@@ -2032,7 +2033,19 @@ static void *event_loop_run(void *context)
                 if (!next) goto empty;
             } while (!__sync_bool_compare_and_swap(&event_loop->head, head, next));
 
-            switch (__atomic_load_n(&next->type, __ATOMIC_RELAXED)) {
+            enum event_type type = __atomic_load_n(&next->type, __ATOMIC_RELAXED);
+            if (type == MOUSE_DRAGGED || type == MOUSE_MOVED) {
+                struct event *peek;
+                while ((peek = __atomic_load_n(&next->next, __ATOMIC_RELAXED)) != NULL) {
+                    if (__atomic_load_n(&peek->type, __ATOMIC_RELAXED) != type) break;
+                    if (!__sync_bool_compare_and_swap(&event_loop->head, next, peek)) break;
+                    void *old_context = __atomic_load_n(&next->context, __ATOMIC_RELAXED);
+                    if (old_context) CFRelease(old_context);
+                    next = peek;
+                }
+            }
+
+            switch (type) {
 #define EVENT_TYPE_ENTRY(value) case value: EVENT_HANDLER_##value(__atomic_load_n(&next->context, __ATOMIC_RELAXED), __atomic_load_n(&next->param1, __ATOMIC_RELAXED)); break;
                 EVENT_TYPE_LIST
 #undef EVENT_TYPE_ENTRY
