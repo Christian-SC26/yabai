@@ -96,6 +96,56 @@ int posix_spawn(pid_t *restrict pid, const char *restrict path,
     return real_fn ? real_fn(pid, path, file_actions, attrp, argv, envp) : 1;
 }
 
+static bool g_mock_dispatch_after = false;
+void dispatch_after(dispatch_time_t when, dispatch_queue_t queue, dispatch_block_t block)
+{
+    if (g_mock_dispatch_after) {
+        block();
+        return;
+    }
+    typedef void (*real_dispatch_after_fn)(dispatch_time_t, dispatch_queue_t, dispatch_block_t);
+    static real_dispatch_after_fn real_fn = NULL;
+    if (!real_fn) real_fn = (real_dispatch_after_fn)dlsym(RTLD_NEXT, "dispatch_after");
+    if (real_fn) real_fn(when, queue, block);
+}
+
+static bool g_mock_ax_cannot_complete = false;
+AXError AXObserverAddNotification(AXObserverRef observer, AXUIElementRef element, CFStringRef notification, void *refcon)
+{
+    if (g_mock_ax_cannot_complete) {
+        return kAXErrorCannotComplete;
+    }
+    typedef AXError (*real_ax_fn)(AXObserverRef, AXUIElementRef, CFStringRef, void *);
+    static real_ax_fn real_fn = NULL;
+    if (!real_fn) real_fn = (real_ax_fn)dlsym(RTLD_NEXT, "AXObserverAddNotification");
+    return real_fn ? real_fn(observer, element, notification, refcon) : kAXErrorFailure;
+}
+
+static bool g_mock_dock_window_layer18 = false;
+CFArrayRef CGWindowListCopyWindowInfo(CGWindowListOption option, CGWindowID relativeToWindow)
+{
+    if (g_mock_dock_window_layer18) {
+        int layer18 = 18;
+        CFNumberRef layer_num = CFNumberCreate(NULL, kCFNumberIntType, &layer18);
+        CFTypeRef keys[] = { (const void *)kCGWindowOwnerName, (const void *)kCGWindowLayer };
+        CFTypeRef values[] = { (const void *)CFSTR("Dock"), (const void *)layer_num };
+        CFDictionaryRef dict = CFDictionaryCreate(NULL, keys, values, 2, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+        CFArrayRef arr = CFArrayCreate(NULL, (const void **)&dict, 1, &kCFTypeArrayCallBacks);
+        CFRelease(layer_num);
+        CFRelease(dict);
+        return arr;
+    }
+    typedef CFArrayRef (*real_cg_fn)(CGWindowListOption, CGWindowID);
+    static real_cg_fn real_fn = NULL;
+    if (!real_fn) real_fn = (real_cg_fn)dlsym(RTLD_NEXT, "CGWindowListCopyWindowInfo");
+    return real_fn ? real_fn(option, relativeToWindow) : NULL;
+}
+
+@implementation NSRunningApplication (AngryEventLoopMock)
+- (BOOL)mock_isFinishedLaunching { return YES; }
+- (NSApplicationActivationPolicy)mock_activationPolicy { return NSApplicationActivationPolicyRegular; }
+@end
+
 #include "area.c"
 #include "structures.c"
 #include "angry_tests.c"
@@ -116,6 +166,7 @@ int posix_spawn(pid_t *restrict pid, const char *restrict path,
 #include "angry_layout_store_tests.m"
 #include "angry_workspace_tests.m"
 #include "angry_sa_tests.m"
+#include "angry_event_loop_tests.c"
 
 #define TEST_LIST                                                               \
     ANGRY_ENTRY(allocatesChunkInEmptyMemoryPool)                                \
@@ -587,7 +638,33 @@ int posix_spawn(pid_t *restrict pid, const char *restrict path,
     ANGRY_ENTRY(dispatchesWindowOpacityCommandsForInstantAndFade)               \
     ANGRY_ENTRY(dispatchesWindowStickyAndFocusAndScaleCommandsSafely)           \
     ANGRY_ENTRY(dispatchesWindowSwapProxyInAndOutCommandsSafely)                \
-    ANGRY_ENTRY(dispatchesWindowOrderInCommandSafely)
+    ANGRY_ENTRY(dispatchesWindowOrderInCommandSafely)                           \
+    ANGRY_ENTRY(updatesWindowNotificationsAcrossWindowManagerWindows)           \
+    ANGRY_ENTRY(updatesApplicationOpenMenusCounterAndAdjustsFfm)                \
+    ANGRY_ENTRY(processesWindowDidReceiveFocusUpdatingWindowManagerState)       \
+    ANGRY_ENTRY(initializesAndRunsEventLoopThreadProcessingEvents)              \
+    ANGRY_ENTRY(handlesApplicationLaunchedEventForTerminatedAndRunningProcess)  \
+    ANGRY_ENTRY(triggersAxRetryBlockInApplicationLaunchedEvent)                 \
+    ANGRY_ENTRY(handlesApplicationTerminatedEventSafely)                        \
+    ANGRY_ENTRY(handlesApplicationFrontSwitchedEventSafely)                     \
+    ANGRY_ENTRY(handlesApplicationVisibilityEventsSafely)                      \
+    ANGRY_ENTRY(handlesWindowCreatedEventSafely)                                \
+    ANGRY_ENTRY(handlesWindowDestroyedAndFocusedEventsSafely)                   \
+    ANGRY_ENTRY(handlesWindowMovedAndResizedEventsSafely)                       \
+    ANGRY_ENTRY(handlesWindowMinimizedAndDeminimizedEventsSafely)               \
+    ANGRY_ENTRY(handlesWindowTitleChangedEventSafely)                          \
+    ANGRY_ENTRY(handlesSlsWindowOrderedAndDestroyedEventsSafely)                \
+    ANGRY_ENTRY(handlesSlsSpaceCreatedAndDestroyedEventsSafely)                 \
+    ANGRY_ENTRY(handlesSpaceChangedEventSafely)                                 \
+    ANGRY_ENTRY(handlesDisplayLifecycleAndGeometryChangeEventsSafely)          \
+    ANGRY_ENTRY(handlesMouseInteractionEventsSafely)                            \
+    ANGRY_ENTRY(handlesMissionControlPresentationModeEventsSafely)              \
+    ANGRY_ENTRY(handlesMissionControlEnterWithDispatchBlocks)                   \
+    ANGRY_ENTRY(handlesMissionControlCheckForExitWithLegacyDispatchBlocks)      \
+    ANGRY_ENTRY(handlesMissionControlExitWithFocusRestorationDispatchBlocks)    \
+    ANGRY_ENTRY(handlesDockDidRestartEventSafely)                               \
+    ANGRY_ENTRY(handlesMenuAndSystemStateNotificationEventsSafely)             \
+    ANGRY_ENTRY(handlesDaemonSocketMessageProcessingPayload)
 
 static struct {
     char *name;
