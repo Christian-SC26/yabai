@@ -43,6 +43,7 @@ typedef bool (test_function)(void);
 #include "angry_process_tests.c"
 #include "angry_mission_control_tests.c"
 #include "angry_display_space_tests.c"
+#include "angry_view_tests.c"
 
 #define TEST_LIST                                                               \
     ANGRY_ENTRY(allocatesChunkInEmptyMemoryPool)                                \
@@ -314,7 +315,20 @@ typedef bool (test_function)(void);
     ANGRY_ENTRY(queriesSpaceWindowListIncludingMinimizedWindows)                \
     ANGRY_ENTRY(evaluatesSpaceVisibilityForActiveSpace)                          \
     ANGRY_ENTRY(evaluatesSpaceFullscreenStateForActiveSpace)                      \
-    ANGRY_ENTRY(evaluatesSpaceUserTypeForActiveSpace)
+    ANGRY_ENTRY(evaluatesSpaceUserTypeForActiveSpace)                           \
+    ANGRY_ENTRY(identifiesLeftChildInBinaryTreeHierarchy)                       \
+    ANGRY_ENTRY(equalizesBspNodeRatioAcrossSpecifiedSplitAxis)                  \
+    ANGRY_ENTRY(locatesIndexOfWindowInWindowNodeList)                           \
+    ANGRY_ENTRY(clearsZoomNodeRecursivelyFromBspSubtree)                       \
+    ANGRY_ENTRY(locatesLastLeafNodeInDeepBspTree)                               \
+    ANGRY_ENTRY(locatesPreviousLeafNodeInBspTree)                               \
+    ANGRY_ENTRY(returnsNullWhenSearchingDirectionalNodeOnInvalidSpace)          \
+    ANGRY_ENTRY(allocatesAndPopulatesWindowListFromLeafNodes)                   \
+    ANGRY_ENTRY(evaluatesViewIsInvalidWhenValidFlagIsUnset)                      \
+    ANGRY_ENTRY(marksViewDirtyWhenFlushingInvisibleSpace)                       \
+    ANGRY_ENTRY(serializesBspViewPropertiesToJsonStream)                        \
+    ANGRY_ENTRY(clearsViewRootTreeAndResetsNodeDimensions)                     \
+    ANGRY_ENTRY(displaysAndDestroysInsertFeedbackWindow)
 
 static struct {
     char *name;
