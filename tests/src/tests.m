@@ -37,6 +37,7 @@ typedef bool (test_function)(void);
 #include "angry_misc_tests.c"
 #include "angry_rule_tests.c"
 #include "angry_event_serialize_tests.c"
+#include "angry_signal_tests.c"
 
 #define TEST_LIST                                                               \
     ANGRY_ENTRY(allocatesChunkInEmptyMemoryPool)                                \
@@ -193,6 +194,35 @@ typedef bool (test_function)(void);
     ANGRY_ENTRY(rejectsTruncatedFieldHeaderInEventData)                         \
     ANGRY_ENTRY(clampsExtremePositiveAndNegativeFixedPointValues)               \
     ANGRY_ENTRY(handlesNullParsedEventDataFreeSafely)                           \
+    ANGRY_ENTRY(resolvesSignalTypeFromStringAccurately)                         \
+    ANGRY_ENTRY(resolvesSignalTypeForDockDidChangePref)                         \
+    ANGRY_ENTRY(returnsUnknownSignalTypeForInvalidString)                       \
+    ANGRY_ENTRY(addsSignalToSignalEventBuffer)                                 \
+    ANGRY_ENTRY(replacesSignalWhenAddingWithDuplicateLabel)                     \
+    ANGRY_ENTRY(removesSignalByIndexAcrossGlobalSignalTypes)                    \
+    ANGRY_ENTRY(returnsFalseWhenRemovingSignalByInvalidIndex)                   \
+    ANGRY_ENTRY(removesSignalByLabelFromSignalEventBuffer)                      \
+    ANGRY_ENTRY(returnsFalseWhenRemovingSignalByNonexistentLabel)               \
+    ANGRY_ENTRY(destroysSignalFreeingRegexesAndStrings)                         \
+    ANGRY_ENTRY(serializesSignalListToJsonStream)                               \
+    ANGRY_ENTRY(serializesEmptySignalListAsEmptyJsonArray)                      \
+    ANGRY_ENTRY(filtersSignalWhenApplicationRegexDoesNotMatch)                  \
+    ANGRY_ENTRY(permitsSignalWhenApplicationRegexMatches)                       \
+    ANGRY_ENTRY(filtersSignalWhenActivePropertyMismatches)                      \
+    ANGRY_ENTRY(pushesApplicationSignalIntoStorageWhenSubscriberExists)         \
+    ANGRY_ENTRY(skipsSignalPushWhenNoSubscribersExist)                          \
+    ANGRY_ENTRY(pushesDisplaySignalIntoStorageWhenSubscriberExists)              \
+    ANGRY_ENTRY(pushesSpaceSignalIntoStorageWhenSubscriberExists)                \
+    ANGRY_ENTRY(pushesMissionControlSignalIntoStorageWhenSubscriberExists)       \
+    ANGRY_ENTRY(pushesSystemWokeSignalIntoStorageWhenSubscriberExists)          \
+    ANGRY_ENTRY(pushesApplicationTerminatedSignalIntoStorage)                   \
+    ANGRY_ENTRY(pushesApplicationFrontSwitchedSignalIntoStorage)                 \
+    ANGRY_ENTRY(pushesApplicationHiddenSignalIntoStorage)                        \
+    ANGRY_ENTRY(pushesWindowDestroyedSignalIntoStorage)                         \
+    ANGRY_ENTRY(pushesSpaceCreatedAndDestroyedSignalsIntoStorage)               \
+    ANGRY_ENTRY(pushesDisplayRemovedAndChangedSignalsIntoStorage)               \
+    ANGRY_ENTRY(pushesMissionControlExitSignalIntoStorage)                      \
+    ANGRY_ENTRY(flushesSignalStorageImmediatelyWhenEmpty)                       \
     ANGRY_ENTRY(traversesEmptyWindowTableWithoutErrorDuringRuleReapplyAll)
 
 static struct {
@@ -210,6 +240,7 @@ int main(int argc, char **argv)
     window_manager_init(&g_window_manager);
     display_manager_begin(&g_display_manager);
     space_manager_begin(&g_space_manager);
+    memory_pool_init(&g_signal_storage, KILOBYTES(256));
 
     int succeeded = 0;
     int failed = 0;
