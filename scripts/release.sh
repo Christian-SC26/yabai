@@ -4,6 +4,9 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
+echo "==> 0. Checking that OSAX_VERSION changed with the scripting addition..."
+./scripts/check-osax-version.sh
+
 echo "==> 1. Building optimized release binary (make install)..."
 make install
 
