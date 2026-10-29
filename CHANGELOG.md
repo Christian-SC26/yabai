@@ -6,6 +6,13 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [7.1.36] - 2026-10-29
+### Fixed
+- **App Activation Not Switching to the App's Space**:
+  - After `yabai -m space --focus` (scripting addition), the previous front process stayed active although none of its windows were visible, so re-activating it (e.g. via an app hotkey) produced no front-switched event and no space switch. `SPACE_CHANGED` now hands focus to the top window of the new space, or to Finder when the space is empty
+- **Bouncing Away From Empty Spaces**:
+  - Focusing an empty space made the system activate the next application in its activation order, and `skip_window_focus_animation` followed it to that application's space. The automatic space switch is now suppressed for 400ms after focusing an empty space
+
 ## [7.1.35] - 2026-10-29
 ### Added
 - **Non-Natural Scrolling Space Switching (`space_gesture_natural_scrolling`)**:
@@ -917,7 +924,8 @@ The *window_destroyed* signal is now triggered for windows that are implicitly d
 ### Added
 - First official release
 
-[Unreleased]: https://github.com/Christian-SC26/yabai/compare/v7.1.35...HEAD
+[Unreleased]: https://github.com/Christian-SC26/yabai/compare/v7.1.36...HEAD
+[7.1.36]: https://github.com/Christian-SC26/yabai/compare/v7.1.35...v7.1.36
 [7.1.35]: https://github.com/Christian-SC26/yabai/compare/v7.1.34...v7.1.35
 [7.1.34]: https://github.com/Christian-SC26/yabai/compare/v7.1.33...v7.1.34
 [7.1.33]: https://github.com/Christian-SC26/yabai/compare/v7.1.32...v7.1.33
