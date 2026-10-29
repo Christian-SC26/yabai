@@ -6,6 +6,15 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [7.1.38] - 2026-10-29
+### Fixed
+- **Scripting Addition Not Updating (macOS 27.2 payload never installed)**:
+  - Bumped the scripting-addition version to 2.1.36. The payload changed in 7.1.29 and 7.1.31 without a version bump, so `sudo yabai --load-sa` kept the payload from 7.1.27 installed. On macOS 27.2 that payload matched `moveSpace` and the desktop picture manager with macOS 27.0/27.1 patterns, although those Dock functions no longer exist in 27.2
+- **`space --move` Reporting Success on macOS 27.2**:
+  - yabai now checks the capabilities reported by the scripting addition before moving a space, and returns an error when the Dock functions it needs are missing, instead of exiting with status 0 and doing nothing
+- **Possible Hang in `window --toggle native-fullscreen`**:
+  - The wait for the window's space to become active is now limited to 3 seconds instead of looping indefinitely on the event loop thread
+
 ## [7.1.37] - 2026-10-29
 ### Fixed
 - **Multi-Space Jumps Without the Scripting Addition (SIP enabled) on macOS 27**:
@@ -929,7 +938,8 @@ The *window_destroyed* signal is now triggered for windows that are implicitly d
 ### Added
 - First official release
 
-[Unreleased]: https://github.com/Christian-SC26/yabai/compare/v7.1.37...HEAD
+[Unreleased]: https://github.com/Christian-SC26/yabai/compare/v7.1.38...HEAD
+[7.1.38]: https://github.com/Christian-SC26/yabai/compare/v7.1.37...v7.1.38
 [7.1.37]: https://github.com/Christian-SC26/yabai/compare/v7.1.36...v7.1.37
 [7.1.36]: https://github.com/Christian-SC26/yabai/compare/v7.1.35...v7.1.36
 [7.1.35]: https://github.com/Christian-SC26/yabai/compare/v7.1.34...v7.1.35
