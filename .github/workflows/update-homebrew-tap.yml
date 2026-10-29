@@ -56,7 +56,7 @@ jobs:
 
           echo "Updating ${FORMULA}..."
           sed -i -E "s|url \"https://github.com/[^/]+/yabai/releases/download/[^/]+/yabai-.*\.tar\.gz\"|url \"https://github.com/${{ github.repository }}/releases/download/${TAG}/yabai-${TAG}.tar.gz\"|" "${FORMULA}"
-          sed -i -E "s|sha256 \"[a-f0-9]{64}\"|sha256 \"${SHA256}\"|" "${FORMULA}"
+          sed -i -E "0,/^  sha256 \"[a-f0-9]{64}\"/s|^  sha256 \"[a-f0-9]{64}\"|  sha256 \"${SHA256}\"|" "${FORMULA}"
 
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
