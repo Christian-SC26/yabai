@@ -5,6 +5,8 @@ All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [7.1.35] - 2026-10-29
 ### Added
 - **Non-Natural Scrolling Space Switching (`space_gesture_natural_scrolling`)**:
   - Automatically detect macOS natural scrolling system preference (`com.apple.swipescrolldirection`) when synthesizing Dock space gestures, inverting gesture swipe velocity when natural scrolling is disabled ([#6](https://github.com/Christian-SC26/yabai/issues/6))
@@ -915,7 +917,8 @@ The *window_destroyed* signal is now triggered for windows that are implicitly d
 ### Added
 - First official release
 
-[Unreleased]: https://github.com/Christian-SC26/yabai/compare/v7.1.34...HEAD
+[Unreleased]: https://github.com/Christian-SC26/yabai/compare/v7.1.35...HEAD
+[7.1.35]: https://github.com/Christian-SC26/yabai/compare/v7.1.34...v7.1.35
 [7.1.34]: https://github.com/Christian-SC26/yabai/compare/v7.1.33...v7.1.34
 [7.1.33]: https://github.com/Christian-SC26/yabai/compare/v7.1.32...v7.1.33
 [7.1.32]: https://github.com/Christian-SC26/yabai/compare/v7.1.31...v7.1.32

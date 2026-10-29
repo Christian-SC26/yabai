@@ -60,6 +60,7 @@ SIGN_IDENTITY := -
 endif
 
 sign:
+	xattr -c $(BUILD_PATH)/yabai
 	codesign -fs "$(SIGN_IDENTITY)" --options runtime --timestamp $(BUILD_PATH)/yabai
 
 clean-build:
