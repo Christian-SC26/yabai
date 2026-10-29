@@ -98,7 +98,7 @@ if [ "$FILE_HASH" = "$EXPECTED_HASH" ]; then
     echo "Sudoers file configuration row:"
     echo "  $(whoami) ALL=(root) NOPASSWD: sha256:$(shasum -a 256 ${BIN_DIR}/yabai | cut -d " " -f 1) ${BIN_DIR}/yabai --load-sa"
     echo ""
-    echo "README: https://github.com/Christian-SC26/yabai/wiki/Installing-yabai-(latest-release)#configure-scripting-addition"
+    echo "README: https://github.com/asmvik/yabai/wiki/Installing-yabai-(latest-release)#configure-scripting-addition"
 else
     echo "Hash does not match the expected value.. abort."
     echo "Expected hash: $EXPECTED_HASH"

@@ -1,186 +1,110 @@
-<!-- Please be careful editing the below HTML, as GitHub is quite finicky with anything that looks like an HTML tag in GitHub Flavored Markdown. -->
-<p align="center">
-  <img width="75%" src="assets/banner/banner.svg" alt="Banner">
-</p>
-<p align="center">
-  <b>Tiling window management for the Mac.</b>
-</p>
-<p align="center">
-  <a href="https://github.com/Christian-SC26/yabai/blob/master/LICENSE.txt">
-    <img src="https://img.shields.io/github/license/Christian-SC26/yabai.svg?color=green" alt="License Badge">
-  </a>
-  <a href="https://github.com/Christian-SC26/yabai/blob/master/doc/yabai.asciidoc">
-    <img src="https://img.shields.io/badge/view-documentation-green.svg" alt="Documentation Badge">
-  </a>
-  <a href="https://github.com/Christian-SC26/yabai/wiki">
-    <img src="https://img.shields.io/badge/view-wiki-green.svg" alt="Wiki Badge">
-  </a>
-  <a href="https://github.com/Christian-SC26/yabai/blob/master/CHANGELOG.md">
-    <img src="https://img.shields.io/badge/view-changelog-green.svg" alt="Changelog Badge">
-  </a>
-  <a href="https://github.com/Christian-SC26/yabai/releases">
-    <img src="https://img.shields.io/badge/Apple-Notarized-brightgreen.svg" alt="Notarized Badge">
-  </a>
-  <a href="https://github.com/Christian-SC26/yabai/releases">
-    <img src="https://img.shields.io/github/v/release/Christian-SC26/yabai?color=green" alt="Version Badge">
-  </a>
-</p>
+# yabai (macOS 27 fork)
 
-> [!IMPORTANT]
-> ### 🚀 Community Maintenance Fork (macOS 27 Golden Gate & Critical Fixes)
-> This repository is an actively maintained fork created to provide timely fixes, critical stability improvements, and **macOS 27 (Golden Gate)** compatibility in the absence of upstream maintainer activity.
->
-> **Issues resolved in this fork:**
-> * **⚡ Instant Space Switching with SIP Enabled (SIP ON) on macOS 27 (Golden Gate)**:
->   * Instant, glitch-free space switching (`yabai -m space --focus <index|recent|prev|next>`) out-of-the-box with **System Integrity Protection (SIP) fully enabled** — **no SIP disabling or scripting addition injection required**!
->   * Employs reverse-engineered IOHIDSystemQueue fluid touch gesture serialization (field 4205 payload) directly into `Dock.app` with calibrated multi-step phase timing for instant multi-space jumps;
->   * Completely avoids duplicate/ghost window rendering across spaces and eliminates menu bar stacking/artifacts by synchronizing through Dock's native space pipeline;
->   * Seamlessly falls back to scripting addition payload when SIP is disabled.
-> * **macOS 27 (Golden Gate) Full Compatibility** ([#2824](https://github.com/asmvik/yabai/issues/2824)):
->   * Updated Mach-O opcode scanner and payload injection for macOS 27 `Dock.app`;
->   * Corrected `scripting_addition_perform_validation()` verification (`attrib = 0x7f`).
-> * **Dedicated Thread for Mouse Event Tap** ([#2829](https://github.com/asmvik/yabai/issues/2829)):
->   * Runs `CGEventTap` on its own dedicated `pthread` with private `CFRunLoop`, completely eliminating delayed or dropped mouse clicks when heavy applications stall the Accessibility API on the main thread.
-> * **Launchd Restart Loop Guard & Legacy Service Migration** ([#2808](https://github.com/asmvik/yabai/issues/2808)):
->   * Automatically unloads, disables, and deletes legacy `com.koekeishiya.yabai` launchd agent on service commands (`--install-service`, `--start-service`, `--restart-service`, `--stop-service`);
->   * Reports the PID of an already-running yabai process and exits cleanly with code `0` to prevent launchd runaway respawn loops and multi-gigabyte log files.
-> * **Window Close BSP Gap Elimination & Auto-Healing** ([#2828](https://github.com/asmvik/yabai/issues/2828)):
->   * Full tree root flush on window un-tile so remaining windows automatically expand to fill freed space;
->   * Space validation on `WINDOW_FOCUSED` and `APPLICATION_FRONT_SWITCHED` cleans up zombie windows and restores proper tiling immediately upon closing windows (`Cmd+W`).
-> * **Reliable BSP Retiling on Fullscreen Exit** ([#2758](https://github.com/asmvik/yabai/issues/2758), [#2576](https://github.com/asmvik/yabai/issues/2576), [#2653](https://github.com/asmvik/yabai/issues/2653), [#2716](https://github.com/asmvik/yabai/issues/2716)):
->   * Exiting native fullscreen or zoom-fullscreen now reliably re-integrates windows into the BSP layout;
->   * Fixes premature clearing of `WINDOW_MOVABLE` and debouncing false alarms during system transition animations.
-> * **`external_bar` Consideration in Windowed Fullscreen** ([#2776](https://github.com/asmvik/yabai/issues/2776)):
->   * Toggling `windowed-fullscreen` mode now honors configured top and bottom padding for external status bars (e.g., Sketchybar).
-> * **Per-App Focus-Follows-Mouse Exclusion Rule** ([#2750](https://github.com/asmvik/yabai/issues/2750)):
->   * Added `ffm=off` / `focus_follows_mouse=off` rule option to prevent focus from jumping to or from excluded apps (such as virtual machines, games, or graphic editors) when the mouse passes over them.
-> * **Prevent Space Jump on Sticky & PiP Window Focus** ([#2825](https://github.com/asmvik/yabai/issues/2825)):
->   * When `skip_window_focus_animation` is enabled, focusing or clicking sticky windows (such as YouTube Picture-in-Picture players in Safari/Chrome or floating utility overlays) no longer erroneously triggers a space-switching gesture to the application's background space.
-> * **Fix Frame Recalculation When Warping Sole Window Between Spaces** ([#2817](https://github.com/asmvik/yabai/issues/2817)):
->   * When dragging and dropping the only window on a space to warp into a window on another display or space (`mouse_drop_action warp`), the target window and newly moved window now properly capture their geometries and animate smoothly instead of freezing at their old bounds.
-> * **Scratchpad Toggle Space Jumping Fix** ([#2807](https://github.com/asmvik/yabai/issues/2807)):
->   * Synchronized window space movement before focus change, preventing yabai from snapping back to the previous space when toggling a scratchpad window.
-> * **Smooth Live 60 FPS Mouse Resizing & Real-Time Border Dragging** ([#2712](https://github.com/asmvik/yabai/issues/2712), [#2714](https://github.com/asmvik/yabai/issues/2714)):
->   * Upgraded mouse drag rate-limiting from ~15 FPS (67.67 ms) to smooth 60 FPS (16 ms) with delta-distance thresholding;
->   * Resizing tiled BSP windows now adjusts sibling fences in real-time as the cursor moves instead of waiting for mouse release.
-> * **Save & Restore Workspace Sessions & Layouts** ([#902](https://github.com/asmvik/yabai/issues/902)):
->   * Added `yabai -m space --save-session [<name|path>]`, `yabai -m space --load-session [<name|path>]`, and `yabai -m space --dump-session` to snapshot and restore your entire multi-display workspace (all spaces, space types, paddings, window trees, and open applications);
->   * Added `yabai -m space --save-layout [<name|path>]`, `yabai -m space --load-layout [<name|path>]`, and `yabai -m space --dump-layout` for individual space layout templates.
-> * **🍏 Apple Developer ID Signed & Apple Notarized Binaries**:
->   * Official release binaries published on the [GitHub Releases](https://github.com/Christian-SC26/yabai/releases) page are digitally signed with an official Apple Developer ID certificate using Hardened Runtime and ticketed by the Apple Notary Service (`xcrun notarytool`).
->   * macOS Gatekeeper verifies the ticket automatically—no security blocks, quarantine prompts, or manual `xattr -d com.apple.quarantine` workarounds needed.
+A maintained fork of [yabai](https://github.com/asmvik/yabai) that works on macOS 27: instant space switching with SIP on or off, signed and notarized builds.
 
+[![Latest release](https://img.shields.io/github/v/release/Christian-SC26/yabai?color=green)](https://github.com/Christian-SC26/yabai/releases)
+[![License: MIT](https://img.shields.io/github/license/Christian-SC26/yabai.svg?color=green)](LICENSE.txt)
 
-## About
+yabai is a tiling window manager for macOS. It arranges windows with binary space partitioning and lets you control windows, spaces and displays from the command line. Bind those commands to keys with [skhd](https://github.com/asmvik/skhd) or a similar tool.
 
-<img align="right" width="40%" src="assets/screenshot.png" alt="Screenshot">
+<img align="right" width="40%" src="assets/screenshot.png" alt="Two code editor windows tiled side by side by yabai, with a floating terminal window on top">
 
-yabai is a window management utility that is designed to work as an extension to the built-in window manager of macOS.
-yabai allows you to control your windows, spaces and displays freely using an intuitive command line interface and optionally set user-defined keyboard shortcuts using [&nearr;&nbsp;skhd][gh-skhd] and other third-party software.
+**Status:** maintained, with 12 releases between September 22 and October 29, 2026. Commands and config format match upstream. I test fixes on macOS 27.2.
 
-The primary function of yabai is tiling window management; automatically modifying your window layout using a binary space partitioning algorithm to allow you to focus on the content of your windows without distractions.
-Additional features of yabai include focus-follows-mouse, disabling animations for switching spaces, creating spaces past the limit of 16 spaces, and much more.
+## What's different from upstream
 
-## Installation and Configuration
+- **Scripting addition on macOS 27.0–27.2.** `sudo yabai --load-sa` works on macOS 27, including the reduced capability mask on 27.2+.
+- **Space switching with SIP enabled.** `yabai -m space --focus` works without the scripting addition on macOS 27. Jumps across several spaces land on the right space (7.1.37). The swipe direction follows your natural scrolling setting, or set it with `space_gesture_natural_scrolling`.
+- **Focus fixes.** Activating an app switches to its space, even after `space --focus`. Focusing an empty space stays there. Focus and the menu bar stay in sync after Mission Control.
+- **Mouse.** BSP splits resize live while you drag (`mouse_bsp_live_resize`). The mouse event tap runs on its own thread, so clicks are not dropped while an app blocks the Accessibility API.
+- **Sessions and layouts.** `yabai -m space --save-session`, `--load-session`, `--save-layout` and `--load-layout` save and restore spaces and window trees.
+- **Signed and notarized releases.** Each release binary carries a Developer ID signature and Apple notarization.
 
-### Homebrew Installation (Recommended)
+Full list with issue links: [CHANGELOG.md](CHANGELOG.md).
 
-You can install and automatically receive updates via our official Homebrew tap:
+## Install
+
+With Homebrew:
 
 ```sh
-# Tap the repository
-brew tap Christian-SC26/formulae
-
-# Install yabai
-brew install yabai
+brew install christian-sc26/formulae/yabai
+yabai --start-service
 ```
 
-Or install directly in a single step:
+macOS asks for Accessibility access on first launch. Grant it in System Settings → Privacy & Security → Accessibility, then run `yabai --restart-service`.
+
+Use the full name `christian-sc26/formulae/yabai` in every brew command. If the upstream tap `asmvik/formulae` is also installed, `brew upgrade yabai` stops with "Formulae found in multiple taps".
+
+To upgrade:
 
 ```sh
-brew install Christian-SC26/formulae/yabai
+brew upgrade christian-sc26/formulae/yabai
+yabai --restart-service
 ```
 
-To update whenever new releases are published:
+Each upgrade installs the binary under a new versioned path. macOS treats it as a new program, so you have to grant Accessibility access again.
+
+### Switching from upstream yabai
 
 ```sh
-brew update && brew upgrade yabai
-```
-
-If you previously installed yabai from the upstream tap (`asmvik/formulae` or `koekeishiya/formulae`), switch seamlessly:
-
-```sh
+yabai --stop-service
 brew uninstall yabai
-brew install Christian-SC26/formulae/yabai
+brew install christian-sc26/formulae/yabai
+yabai --start-service
 ```
 
-### Pre-built Signed & Notarized Binaries (Direct Download)
+### Without Homebrew
 
-Universal release binaries (`arm64` Apple Silicon + `x86_64` Intel) are available on the [GitHub Releases](https://github.com/Christian-SC26/yabai/releases) page.
-- **Apple Notarized**: Every official release archive is signed with Apple Developer ID and fully notarized by Apple. Gatekeeper allows running them immediately.
-- Quick install via release installer script:
-  ```sh
-  curl -fsSL https://raw.githubusercontent.com/Christian-SC26/yabai/master/scripts/install.sh | sh
-  ```
-- Or download `yabai-v*.tar.gz` directly from [GitHub Releases](https://github.com/Christian-SC26/yabai/releases), extract it, and place `yabai` into your `$PATH` (e.g. `/usr/local/bin` or `~/.local/bin`).
+Universal binaries (Apple Silicon and Intel) are on the [releases page](https://github.com/Christian-SC26/yabai/releases). The install script downloads the current release and checks its SHA-256:
 
-### Documentation and Configuration
-- The [&nearr;&nbsp;yabai&nbsp;wiki][yabai-wiki] has both brief and detailed installation instructions for multiple installation methods, and also explains how to uninstall yabai completely.
-- Sample configuration files can be found in the [&nearr;&nbsp;examples][yabai-examples] directory. Refer to the [&nearr;&nbsp;documentation][yabai-docs] or the wiki for further information.
-- Keyboard shortcuts can be defined with [&nearr;&nbsp;skhd][gh-skhd] or any other suitable software you may prefer.
+```sh
+curl -fsSL https://raw.githubusercontent.com/Christian-SC26/yabai/master/scripts/install.sh | sh
+```
 
-## Requirements and Caveats
+### Scripting addition (optional)
 
-Please read the below requirements carefully.
-Make sure you fulfil all of them before filing an issue.
+Some features, such as moving spaces or changing window layers, need the scripting addition injected into Dock.app. That requires [partially disabling SIP](https://github.com/asmvik/yabai/wiki/Disabling-System-Integrity-Protection). Then:
 
-|Requirement|Note|
-|-:|:-|
-|Operating&nbsp;System&nbsp;Intel x86-64|Big Sur 11.0.0+, Monterey 12.0.0+, Ventura 13.0.0+, Sonoma 14.0.0+, Sequoia 15.0+, Tahoe 26.0+, and Golden Gate 27.0+ is supported.|
-|Operating&nbsp;System&nbsp;Apple Silicon|Monterey 12.0.0+, Ventura 13.0.0+, Sonoma 14.0.0+, Sequoia 15.0+, Tahoe 26.0+, and Golden Gate 27.0+ is supported.|
-|Accessibility&nbsp;API|yabai must be given permission to utilize the Accessibility API and will request access upon launch. The application must be restarted after access has been granted.|
-|Screen Recording|yabai must be given Screen Recording permission if and only if you want to enable window animations, and will request access when necessary. The application must be restarted after access has been granted.|
-|System&nbsp;Preferences&nbsp;(macOS 11.x, 12.x)|In the Mission Control pane, the setting "Displays have separate Spaces" must be enabled.|
-|System&nbsp;Settings&nbsp;(macOS 13.x, 14.x, 15.x, 26.x, 27.x)|In the Desktop & Dock tab, inside the Mission Control pane, the setting "Displays have separate Spaces" must be enabled.|
+```sh
+sudo yabai --load-sa
+```
 
-Please also take note of the following caveats.
+To load it without a password prompt and after every Dock restart, follow [Configure scripting addition](https://github.com/asmvik/yabai/wiki/Installing-yabai-(latest-release)#configure-scripting-addition) in the upstream wiki.
 
-|Caveat|Note|
-|-:|:-|
-|System&nbsp;Integrity&nbsp;Protection (Optional)|System Integrity Protection can be (partially) disabled if you wish to inject the scripting addition into Dock.app for advanced window server manipulation. Note: **Instant space switching (`yabai -m space --focus <index>`) works cleanly out-of-the-box with SIP fully enabled (SIP ON)** on macOS 27 Golden Gate without needing scripting addition injection.|
-|Code&nbsp;Signing|When building from source (or installing from HEAD), it is necessary to codesign the binary so it retains its accessibility and automation privileges when updated or rebuilt.|
-|Finder&nbsp;Desktop|Some people disable the Finder Desktop window using an undocumented defaults write command. This breaks focusing of empty spaces and should be avoided when using yabai. To re-activate the Finder Desktop, run: "defaults write com.apple.finder CreateDesktop -bool true".|
-|NSDocument-based&nbsp;Applications|Windows that utilize native macOS tabs such as Terminal and Finder, [do not behave correctly when creating tabs](https://github.com/asmvik/yabai/issues/68). Avoid creating tabs in these applications, consider alternatives that do not use NSDocument's tab system, or make these windows float using rules.|
-|System&nbsp;Preferences&nbsp;(macOS 11.x, 12.x)|In the Mission Control pane, the setting "Automatically rearrange Spaces based on most recent use" should be disabled for commands that rely on the ordering of spaces to work reliably.|
-|System&nbsp;Settings&nbsp;(macOS 13.x, 14.x, 15.x, 26.x)|In the Desktop & Dock tab, inside the Mission Control pane, the setting "Automatically rearrange Spaces based on most recent use" should be disabled for commands that rely on the ordering of spaces to work reliably.|
-|System&nbsp;Settings&nbsp;(macOS 14.x, 15.x, 26.x)|In the Desktop & Dock tab, inside the Desktop & Stage Manager pane, the setting "Show Items On Desktop" should be enabled for display and space focus commands to work reliably in multi-display configurations.|
-|System&nbsp;Settings&nbsp;(macOS 14.x, 15.x, 26.x)|In the Desktop & Dock tab, inside the Desktop & Stage Manager pane, the setting "Click wallpaper to reveal Desktop" should be set to "Only in Stage Manager" for display and space focus commands to work reliably.|
+## Usage
 
-## License and Attribution
+yabai reads `~/.config/yabai/yabairc` on start. Copy the example config as a starting point:
 
-yabai is licensed under the [&nearr;&nbsp;MIT&nbsp;License][yabai-license], a short and simple permissive license with conditions only requiring preservation of copyright and license notices.
-Licensed works, modifications, and larger works may be distributed under different terms and without source code.
+```sh
+mkdir -p ~/.config/yabai
+cp "$(brew --prefix)/share/yabai/examples/yabairc" ~/.config/yabai/yabairc
+```
 
-Thanks to [@fools-mate][gh-fools-mate] for creating a logo and banner for this project and making them available for free.
+Common commands:
 
-Thanks to [@dominiklohmann][gh-dominiklohmann] for contributing great documentation, support, and more, for free.
+```sh
+yabai -m config layout bsp          # tile windows on all spaces
+yabai -m window --focus west        # focus the window to the left
+yabai -m space --focus 3            # go to space 3
+yabai -m window --space 2           # move the focused window to space 2
+yabai -m query --windows --window   # print the focused window as JSON
+```
 
-## Disclaimer
+Every command and setting is documented in [doc/yabai.asciidoc](doc/yabai.asciidoc) (`man yabai`). The [upstream wiki](https://github.com/asmvik/yabai/wiki) covers configuration and common setups.
 
-Use at your own discretion.
-I take no responsibility if anything should happen to your machine while trying to install, test or otherwise use this software in any form.
-You acknowledge that you understand the potential risk that may come from disabling [&nearr;&nbsp;System&nbsp;Integrity&nbsp;Protection][external-about-sip] on your system, and I make no recommendation as to whether you should or should not disable System Integrity Protection.
+## Requirements and caveats
 
-<!-- Project internal links -->
-[yabai-license]: LICENSE.txt
-[yabai-examples]: https://github.com/Christian-SC26/yabai/tree/master/examples
-[yabai-wiki]: https://github.com/Christian-SC26/yabai/wiki
-[yabai-docs]: https://github.com/Christian-SC26/yabai/blob/master/doc/yabai.asciidoc
+- macOS 11 Big Sur or later on Intel, macOS 12 Monterey or later on Apple Silicon.
+- System Settings → Desktop & Dock → Mission Control: turn **on** "Displays have separate Spaces" and turn **off** "Automatically rearrange Spaces based on most recent use".
+- Window animations need Screen Recording permission. Nothing else does.
+- Do not disable the Finder desktop (`defaults write com.apple.finder CreateDesktop`). Without it, empty spaces cannot be focused.
+- Native tabs in NSDocument apps such as Finder and Terminal [do not tile correctly](https://github.com/asmvik/yabai/issues/68). Avoid tabs there, or make those windows float with a rule.
+- Disabling SIP lowers the security of your Mac. Read [Apple's notes on SIP](https://support.apple.com/en-us/HT204899) before you do it. The core features work with SIP enabled.
 
-<!-- Links to other GitHub projects/users -->
-[gh-skhd]: https://github.com/asmvik/skhd
-[gh-fools-mate]: https://github.com/fools-mate
-[gh-dominiklohmann]: https://github.com/dominiklohmann
+## When to use upstream instead
 
-<!-- External links -->
-[external-about-sip]: https://support.apple.com/en-us/HT204899
+If you are not on macOS 27 and upstream yabai works for you, stay with [asmvik/yabai](https://github.com/asmvik/yabai). Its author maintains the project and the wiki. This fork follows upstream and adds fixes on top.
+
+## License and credits
+
+MIT, see [LICENSE.txt](LICENSE.txt). [Åsmund Vikane](https://github.com/asmvik) created and maintains yabai. [@fools-mate](https://github.com/fools-mate) drew the logo and banner, and [@dominiklohmann](https://github.com/dominiklohmann) wrote much of the documentation.
