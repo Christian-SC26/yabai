@@ -192,7 +192,7 @@ static bool test_observe_first_window(void) {
         if (app.activationPolicy != NSApplicationActivationPolicyRegular) continue;
         AXUIElementRef app_ref = AXUIElementCreateApplication(app.processIdentifier);
         CFArrayRef win_list = NULL;
-        AXUIElementCopyAttributeValues(app_ref, kAXWindowsAttribute, 0, 5, &win_list);
+        AXUIElementCopyAttributeValue(app_ref, kAXWindowsAttribute, (CFTypeRef *) &win_list);
         if (win_list) {
             if (CFArrayGetCount(win_list) > 0) {
                 AXUIElementRef win_ref = CFArrayGetValueAtIndex(win_list, 0);
