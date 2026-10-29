@@ -5,6 +5,8 @@ All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [7.1.37] - 2026-10-29
 ### Fixed
 - **Multi-Space Jumps Without the Scripting Addition (SIP enabled) on macOS 27**:
   - Jumping across several spaces with `yabai -m space --focus` (e.g. 4 -> 1) could stop one space short, because the 25ms pause between synthesized swipes let the Dock drop a step. Steps are now posted back to back, and the ended phase uses the same 9999 velocity as InstantSpaceSwitcher ([asmvik#2822](https://github.com/asmvik/yabai/issues/2822))
@@ -927,7 +929,8 @@ The *window_destroyed* signal is now triggered for windows that are implicitly d
 ### Added
 - First official release
 
-[Unreleased]: https://github.com/Christian-SC26/yabai/compare/v7.1.36...HEAD
+[Unreleased]: https://github.com/Christian-SC26/yabai/compare/v7.1.37...HEAD
+[7.1.37]: https://github.com/Christian-SC26/yabai/compare/v7.1.36...v7.1.37
 [7.1.36]: https://github.com/Christian-SC26/yabai/compare/v7.1.35...v7.1.36
 [7.1.35]: https://github.com/Christian-SC26/yabai/compare/v7.1.34...v7.1.35
 [7.1.34]: https://github.com/Christian-SC26/yabai/compare/v7.1.33...v7.1.34
