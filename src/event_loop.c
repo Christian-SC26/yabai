@@ -1865,16 +1865,9 @@ static EVENT_HANDLER(MISSION_CONTROL_ENTER)
     mission_control_record_state();
     g_mission_control_mode = MISSION_CONTROL_MODE_SHOW;
 
-    if (!workspace_is_macos_monterey() &&
-        !workspace_is_macos_ventura() &&
-        !workspace_is_macos_sonoma() &&
-        !workspace_is_macos_sequoia() &&
-        !workspace_is_macos_tahoe() &&
-        !workspace_is_macos_goldengate()) {
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 0.1f * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
-            event_loop_post(&g_event_loop, MISSION_CONTROL_CHECK_FOR_EXIT, NULL, 0);
-        });
-    }
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 0.1f * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
+        event_loop_post(&g_event_loop, MISSION_CONTROL_CHECK_FOR_EXIT, NULL, 0);
+    });
 
     event_signal_push(SIGNAL_MISSION_CONTROL_ENTER, (void*)(uintptr_t)g_mission_control_mode);
 }
@@ -1886,6 +1879,19 @@ static EVENT_HANDLER(MISSION_CONTROL_CHECK_FOR_EXIT)
         workspace_is_macos_sonoma() ||
         workspace_is_macos_sequoia() ||
         (workspace_is_macos_tahoe() || workspace_is_macos_goldengate())) {
+        //
+        // NOTE: The Dock does not always report that Mission Control closed (e.g. when cancelled with escape),
+        // and mission_control_is_active() only checks the window list when an event asks for it. Until then
+        // every application activation is ignored as happening inside Mission Control, and we stay on the
+        // space that Mission Control previewed. Keep checking, so that the exit is posted as soon as it closes.
+        //
+
+        if (g_mission_control_mode == MISSION_CONTROL_MODE_INACTIVE) return;
+
+        mission_control_is_active();
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 0.1f * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
+            event_loop_post(&g_event_loop, MISSION_CONTROL_CHECK_FOR_EXIT, NULL, 0);
+        });
         return;
     }
 
@@ -1961,9 +1967,14 @@ static EVENT_HANDLER(MISSION_CONTROL_EXIT)
         uint64_t last_gesture_time = __atomic_load_n(&__last_gesture_time, __ATOMIC_RELAXED);
         uint64_t dt_gesture_ms = (now > last_gesture_time) ? (now - last_gesture_time) / 1000000ULL : 0;
         bool exited_via_gesture = dt_gesture_ms < 800 || __atomic_load_n(&__pending_gesture, __ATOMIC_RELAXED);
-        bool is_cancellation = exited_via_gesture || !mouse_clicked;
+        bool is_cancellation = !mouse_clicked;
 
-        if (prev_sid && (current_sid == prev_sid || is_cancellation)) {
+        //
+        // NOTE: A click in Mission Control selects a window, also one on the current space. Only restore the
+        // previous window when Mission Control was cancelled (escape, gesture or hotkey without a click).
+        //
+
+        if (prev_sid && is_cancellation) {
             if (current_sid != prev_sid) {
                 debug("%s: returning from previewed space %lld to original space %lld (gesture=%d, clicked=%d)\n",
                       __FUNCTION__, current_sid, prev_sid, exited_via_gesture, mouse_clicked);
@@ -2013,6 +2024,15 @@ static EVENT_HANDLER(MISSION_CONTROL_EXIT)
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 0.15f * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
         restore_focus();
     });
+
+    //
+    // NOTE: When a window was clicked in Mission Control, the space change to its space arrived while Mission Control
+    // was still active and was ignored. Process it now, so that the current space is not left stale.
+    //
+
+    if (mouse_clicked && space_manager_active_space() != g_space_manager.current_space_id) {
+        event_loop_post(&g_event_loop, SPACE_CHANGED, NULL, 0);
+    }
 
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 0.6f * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
         __atomic_store_n(&g_mission_control_prev_wid, 0, __ATOMIC_RELEASE);

@@ -20,6 +20,14 @@ void mission_control_record_state(void)
         uint32_t wid = g_window_manager.focused_window_id ? g_window_manager.focused_window_id : g_window_manager.last_window_id;
         uint64_t sid = g_space_manager.current_space_id;
         pid_t pid = g_process_manager.front_pid;
+
+        //
+        // NOTE: A space change that happened inside the previous Mission Control session was ignored,
+        // so current_space_id can be stale. The focused window knows which space the user is on.
+        //
+
+        uint64_t wid_sid = (wid && window_manager_find_window(&g_window_manager, wid)) ? window_space(wid) : 0;
+        if (wid_sid && space_is_user(wid_sid) && space_is_visible(wid_sid)) sid = wid_sid;
         if (sid) {
             __atomic_store_n(&g_mission_control_prev_wid, wid, __ATOMIC_RELEASE);
             __atomic_store_n(&g_mission_control_prev_pid, pid, __ATOMIC_RELEASE);
