@@ -60,6 +60,8 @@ extern CFStringRef SLSCopyManagedDisplayForSpace(int cid, uint64_t sid);
 extern void SLSMoveWindowsToManagedSpace(int cid, CFArrayRef window_list, uint64_t sid);
 extern void SLSShowSpaces(int cid, CFArrayRef space_list);
 extern void SLSHideSpaces(int cid, CFArrayRef space_list);
+extern CFArrayRef SLSCopyManagedDisplaySpaces(int cid);
+extern CGError SLSMoveManagedSpaceToDisplayIndex(int cid, uint64_t sid, CFStringRef display_ref, int index);
 extern CFTypeRef SLSTransactionCreate(int cid);
 extern CGError SLSTransactionCommit(CFTypeRef transaction, int synchronous);
 extern CGError SLSTransactionOrderWindowGroup(CFTypeRef transaction, uint32_t wid, int order, uint32_t rel_wid);
@@ -85,6 +87,7 @@ static uint64_t remove_space_fp;
 static uint64_t move_space_fp;
 static uint64_t set_front_window_fp;
 static uint64_t animation_time_addr;
+static bool sls_space_move;
 static bool macOSSequoia;
 
 static pthread_t daemon_thread;
@@ -385,6 +388,15 @@ static void init_instances()
 #endif
     }
 
+    //
+    // NOTE: macOS 27.2 no longer has the Dock function (and desktop picture manager) we used to move spaces.
+    // The Dock keeps its own space list in sync with the WindowServer, so we can move the space there directly.
+    //
+
+    bool is_macos_27_2 = os_version.majorVersion > 27 || (os_version.majorVersion == 27 && os_version.minorVersion >= 2);
+    sls_space_move = is_macos_27_2 && dock_spaces != nil && move_space_fp == 0;
+    if (sls_space_move) NSLog(@"[yabai-sa] moving spaces through the WindowServer..");
+
     animation_time_addr = hex_find_seq(baseaddr + get_fix_animation_offset(os_version), get_fix_animation_pattern(os_version));
     if (animation_time_addr == 0x0) {
         NSLog(@"[yabai-sa] failed to get pointer to animation-time..");
@@ -503,9 +515,54 @@ static inline id display_space_for_space_with_id(uint64_t space_id)
 }
 
 
+static int managed_space_index(CFArrayRef display_spaces_ref, CFStringRef display_uuid, uint64_t sid)
+{
+    int display_spaces_count = CFArrayGetCount(display_spaces_ref);
+    for (int i = 0; i < display_spaces_count; ++i) {
+        CFDictionaryRef display_ref = CFArrayGetValueAtIndex(display_spaces_ref, i);
+        CFStringRef identifier = CFDictionaryGetValue(display_ref, CFSTR("Display Identifier"));
+        if (!identifier || !CFEqual(identifier, display_uuid)) continue;
+
+        CFArrayRef spaces_ref = CFDictionaryGetValue(display_ref, CFSTR("Spaces"));
+        int spaces_count = CFArrayGetCount(spaces_ref);
+        for (int j = 0; j < spaces_count; ++j) {
+            CFDictionaryRef space_ref = CFArrayGetValueAtIndex(spaces_ref, j);
+            CFNumberRef sid_ref = CFDictionaryGetValue(space_ref, CFSTR("ManagedSpaceID"));
+            if (!sid_ref) sid_ref = CFDictionaryGetValue(space_ref, CFSTR("id64"));
+            if (!sid_ref) continue;
+
+            uint64_t result = 0;
+            CFNumberGetValue(sid_ref, CFNumberGetType(sid_ref), &result);
+            if (result == sid) return j;
+        }
+    }
+
+    return -1;
+}
+
+static bool sls_move_space_after_space(uint64_t source_space_id, uint64_t dest_space_id, CFStringRef dest_display_uuid)
+{
+    CFArrayRef display_spaces_ref = SLSCopyManagedDisplaySpaces(SLSMainConnectionID());
+    if (!display_spaces_ref) return false;
+
+    int dest_index = managed_space_index(display_spaces_ref, dest_display_uuid, dest_space_id);
+    int source_index = managed_space_index(display_spaces_ref, dest_display_uuid, source_space_id);
+    CFRelease(display_spaces_ref);
+    if (dest_index == -1) return false;
+
+    //
+    // NOTE: The index is the final position of the space on the destination display.
+    // Removing a space that sits before the destination shifts the destination down by one.
+    //
+
+    int index = (source_index != -1 && source_index < dest_index) ? dest_index : dest_index + 1;
+    return SLSMoveManagedSpaceToDisplayIndex(SLSMainConnectionID(), source_space_id, dest_display_uuid, index) == kCGErrorSuccess;
+}
+
 static void do_space_move(char *message)
 {
-    if (dock_spaces == nil || dp_desktop_picture_manager == nil || move_space_fp == 0) return;
+    if (dock_spaces == nil) return;
+    if (!sls_space_move && (dp_desktop_picture_manager == nil || move_space_fp == 0)) return;
 
     uint64_t source_space_id, dest_space_id, source_prev_space_id;
     unpack(source_space_id);
@@ -543,11 +600,15 @@ static void do_space_move(char *message)
         [ns_source_space release];
     }
 
-    asm__call_move_space(source_space, dest_space, dest_display_uuid, dock_spaces, move_space_fp);
+    if (sls_space_move) {
+        sls_move_space_after_space(source_space_id, dest_space_id, dest_display_uuid);
+    } else {
+        asm__call_move_space(source_space, dest_space, dest_display_uuid, dock_spaces, move_space_fp);
 
-    dispatch_sync(dispatch_get_main_queue(), ^{
-        ((void (*)(id, SEL, id, unsigned, CFStringRef)) objc_msgSend)(dp_desktop_picture_manager, @selector(moveSpace:toDisplay:displayUUID:), source_space, dest_display_id, dest_display_uuid);
-    });
+        dispatch_sync(dispatch_get_main_queue(), ^{
+            ((void (*)(id, SEL, id, unsigned, CFStringRef)) objc_msgSend)(dp_desktop_picture_manager, @selector(moveSpace:toDisplay:displayUUID:), source_space, dest_display_id, dest_display_uuid);
+        });
+    }
 
     if (focus_dest_space) {
         uint64_t new_source_space_id = SLSManagedDisplayGetCurrentSpace(SLSMainConnectionID(), source_display_uuid);
@@ -1010,7 +1071,7 @@ static void do_handshake(int sockfd)
     if (dp_desktop_picture_manager != nil) attrib |= OSAX_ATTRIB_DPPM;
     if (add_space_fp)                      attrib |= OSAX_ATTRIB_ADD_SPACE;
     if (remove_space_fp)                   attrib |= OSAX_ATTRIB_REM_SPACE;
-    if (move_space_fp)                     attrib |= OSAX_ATTRIB_MOV_SPACE;
+    if ((move_space_fp && dp_desktop_picture_manager != nil) || sls_space_move) attrib |= OSAX_ATTRIB_MOV_SPACE;
     if (set_front_window_fp)               attrib |= OSAX_ATTRIB_SET_WINDOW;
     if (animation_time_addr)               attrib |= OSAX_ATTRIB_ANIM_TIME;
 
