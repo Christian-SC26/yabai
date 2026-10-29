@@ -45,6 +45,7 @@ struct space_manager
 };
 
 extern volatile uint64_t __last_space_change_time;
+extern volatile uint64_t __last_empty_space_focus_time;
 
 enum space_op_error
 {

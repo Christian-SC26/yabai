@@ -13,6 +13,7 @@ volatile bool __pending_gesture;
 volatile uint64_t __last_gesture_time;
 volatile uint64_t __last_cmd_tab_time;
 volatile uint64_t __last_space_change_time;
+volatile uint64_t __last_empty_space_focus_time;
 
 void update_window_notifications(void)
 {
@@ -524,7 +525,18 @@ static EVENT_HANDLER(APPLICATION_FRONT_SWITCHED)
                 uint64_t dt_gesture_ms = (now > last_gesture_time) ? (now - last_gesture_time) / 1000000ULL : 0;
                 bool in_mc = mission_control_is_active();
 
-                if (in_mc || gesture_in_progress || dt_gesture_ms < 400) {
+                //
+                // NOTE: When we move to an empty space, the system activates the next application in its
+                // activation order. That is not a user request to visit that application, so stay on the empty space.
+                //
+
+                uint64_t last_empty_focus_time = __atomic_load_n(&__last_empty_space_focus_time, __ATOMIC_RELAXED);
+                uint64_t dt_empty_focus_ms = (now > last_empty_focus_time) ? (now - last_empty_focus_time) / 1000000ULL : 0;
+
+                if (dt_empty_focus_ms < 400) {
+                    debug("%s: suppressing space switch to %lld after focusing an empty space (dt=%llums)\n",
+                          __FUNCTION__, target_sid, dt_empty_focus_ms);
+                } else if (in_mc || gesture_in_progress || dt_gesture_ms < 400) {
                     debug("%s: suppressing space switch to %lld during %s (in_prog=%d, dt=%llums, mc=%d)\n",
                           __FUNCTION__, target_sid, in_mc ? "mission control" : "trackpad gesture", gesture_in_progress, dt_gesture_ms, in_mc);
                 } else {
@@ -1340,6 +1352,7 @@ static EVENT_HANDLER(SPACE_CHANGED)
                         window_manager_focus_window_with_raise(&top_window->application->psn, top_window->id, top_window->ref);
                     } else if (!psn_equals(&front_application->psn, &g_process_manager.finder_psn)) {
                         debug("%s: front process %s has no windows on visible spaces, activating finder\n", __FUNCTION__, front_application->name);
+                        __atomic_store_n(&__last_empty_space_focus_time, read_os_timer(), __ATOMIC_RELEASE);
                         _SLPSSetFrontProcessWithOptions(&g_process_manager.finder_psn, 0, kCPSNoWindows);
                     }
                 }

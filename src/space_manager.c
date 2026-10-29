@@ -1089,6 +1089,9 @@ enum space_op_error space_manager_focus_space(uint64_t sid)
     if (is_animating) return SPACE_OP_ERROR_DISPLAY_IS_ANIMATING;
 
     __atomic_store_n(&__last_space_change_time, read_os_timer(), __ATOMIC_RELEASE);
+    if (!window_manager_find_window_on_space_by_rank_filtering_window(&g_window_manager, sid, 1, 0)) {
+        __atomic_store_n(&__last_empty_space_focus_time, read_os_timer(), __ATOMIC_RELEASE);
+    }
 
     bool disable_sa = getenv("YABAI_DISABLE_SA") != NULL || getenv("YABAI_SIMULATE_SIP_ON") != NULL;
     if (!disable_sa && scripting_addition_focus_space(sid)) {
@@ -1128,6 +1131,9 @@ enum space_op_error space_manager_switch_space(uint64_t sid)
     }
 
     __atomic_store_n(&__last_space_change_time, read_os_timer(), __ATOMIC_RELEASE);
+    if (!window_manager_find_window_on_space_by_rank_filtering_window(&g_window_manager, sid, 1, 0)) {
+        __atomic_store_n(&__last_empty_space_focus_time, read_os_timer(), __ATOMIC_RELEASE);
+    }
 
     bool disable_sa = getenv("YABAI_DISABLE_SA") != NULL || getenv("YABAI_SIMULATE_SIP_ON") != NULL;
     if (!disable_sa && scripting_addition_focus_space(sid)) {
