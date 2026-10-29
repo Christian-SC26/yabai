@@ -1005,8 +1005,13 @@ bool space_manager_focus_space_using_gesture(uint32_t new_did, uint64_t new_sid)
 
     if (iss_requires_event_augmentation()) {
         const double progress = is_right ? -0.000016 : 0.000016;
-        const double modern_vel = is_right ? -500.0 : 500.0;
+        const double modern_vel = is_right ? -9999.0 : 9999.0;
         const int phases[3] = { /* Began */ 1, /* Changed */ 2, /* Ended */ 4 };
+
+        //
+        // NOTE: Post the steps back to back. A pause between them lets the Dock drop
+        // a step of a multi-space jump (e.g. 4 -> 1 ending up on space 2).
+        //
 
         for (int i = 0; i < count; ++i) {
             for (int p = 0; p < 3; ++p) {
@@ -1034,10 +1039,6 @@ bool space_manager_focus_space_using_gesture(uint32_t new_did, uint64_t new_sid)
 
                 CGEventPost(kCGSessionEventTap, augmented);
                 CFRelease(augmented);
-                usleep(1000);
-            }
-            if (i + 1 < count) {
-                usleep(25000);
             }
         }
     } else {

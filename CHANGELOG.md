@@ -5,6 +5,9 @@ All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Fixed
+- **Multi-Space Jumps Without the Scripting Addition (SIP enabled) on macOS 27**:
+  - Jumping across several spaces with `yabai -m space --focus` (e.g. 4 -> 1) could stop one space short, because the 25ms pause between synthesized swipes let the Dock drop a step. Steps are now posted back to back, and the ended phase uses the same 9999 velocity as InstantSpaceSwitcher ([asmvik#2822](https://github.com/asmvik/yabai/issues/2822))
 
 ## [7.1.36] - 2026-10-29
 ### Fixed
