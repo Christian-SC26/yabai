@@ -1,0 +1,71 @@
+name: Update Homebrew Formula
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to update formula for (e.g. v7.1.35)'
+        required: true
+        default: 'v7.1.35'
+
+jobs:
+  update-formula:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Determine release tag
+        id: vars
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ github.event.inputs.tag }}"
+          else
+            TAG="${{ github.event.release.tag_name }}"
+          fi
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "Processing release tag: ${TAG}"
+
+      - name: Download release tarball & compute SHA-256
+        id: sha
+        run: |
+          TAG="${{ steps.vars.outputs.tag }}"
+          URL="https://github.com/${{ github.repository }}/releases/download/${TAG}/yabai-${TAG}.tar.gz"
+          echo "Downloading from: ${URL}"
+          curl -f -sL "${URL}" -o yabai.tar.gz
+          SHA256=$(sha256sum yabai.tar.gz | awk '{print $1}')
+          if [ -z "$SHA256" ] || [ "${#SHA256}" -ne 64 ]; then
+            echo "Error: Failed to compute valid SHA-256 for release archive"
+            exit 1
+          fi
+          echo "Computed SHA-256: ${SHA256}"
+          echo "sha256=${SHA256}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout Homebrew tap repository
+        uses: actions/checkout@v4
+        with:
+          repository: Christian-SC26/homebrew-formulae
+          ssh-key: ${{ secrets.HOMEBREW_TAP_DEPLOY_KEY }}
+          path: homebrew-formulae
+
+      - name: Update Formula/yabai.rb and push
+        run: |
+          cd homebrew-formulae
+          TAG="${{ steps.vars.outputs.tag }}"
+          SHA256="${{ steps.sha.outputs.sha256 }}"
+          FORMULA="Formula/yabai.rb"
+
+          echo "Updating ${FORMULA}..."
+          sed -i -E "s|url \"https://github.com/[^/]+/yabai/releases/download/[^/]+/yabai-.*\.tar\.gz\"|url \"https://github.com/${{ github.repository }}/releases/download/${TAG}/yabai-${TAG}.tar.gz\"|" "${FORMULA}"
+          sed -i -E "s|sha256 \"[a-f0-9]{64}\"|sha256 \"${SHA256}\"|" "${FORMULA}"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add "${FORMULA}"
+
+          if git diff --staged --quiet; then
+            echo "Formula is already up-to-date with tag ${TAG} and hash ${SHA256}."
+          else
+            git commit -m "chore: bump yabai formula to ${TAG}"
+            git push origin master
+            echo "Successfully pushed updated formula for ${TAG}!"
+          fi
