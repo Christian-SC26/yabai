@@ -6,6 +6,13 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [7.1.39] - 2026-10-29
+### Added
+- **`space --move`, `--swap` and `--display` on macOS 27.2**:
+  - macOS 27.2 removed the Dock function that the scripting addition called to move a space. The scripting addition (2.1.37) now moves spaces through the WindowServer with `SLSMoveManagedSpaceToDisplayIndex`, the call the Dock itself uses when it adds a space. The Dock keeps its own space list in sync, so Mission Control shows the new order. Tested on one and two displays, including moving the active space
+- **Release check for the scripting-addition version**:
+  - `scripts/check-osax-version.sh` fails when `src/osax` changed since the last tag but `OSAX_VERSION` did not. It runs first in `scripts/release.sh` and in CI for changes to `src/osax`
+
 ## [7.1.38] - 2026-10-29
 ### Fixed
 - **Scripting Addition Not Updating (macOS 27.2 payload never installed)**:
@@ -938,7 +945,8 @@ The *window_destroyed* signal is now triggered for windows that are implicitly d
 ### Added
 - First official release
 
-[Unreleased]: https://github.com/Christian-SC26/yabai/compare/v7.1.38...HEAD
+[Unreleased]: https://github.com/Christian-SC26/yabai/compare/v7.1.39...HEAD
+[7.1.39]: https://github.com/Christian-SC26/yabai/compare/v7.1.38...v7.1.39
 [7.1.38]: https://github.com/Christian-SC26/yabai/compare/v7.1.37...v7.1.38
 [7.1.37]: https://github.com/Christian-SC26/yabai/compare/v7.1.36...v7.1.37
 [7.1.36]: https://github.com/Christian-SC26/yabai/compare/v7.1.35...v7.1.36
