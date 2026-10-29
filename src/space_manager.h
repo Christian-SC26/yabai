@@ -7,6 +7,20 @@ struct space_label
     char *label;
 };
 
+enum space_gesture_natural_scrolling
+{
+    SPACE_GESTURE_NATURAL_SCROLL_AUTO = 0,
+    SPACE_GESTURE_NATURAL_SCROLL_ON   = 1,
+    SPACE_GESTURE_NATURAL_SCROLL_OFF  = 2,
+};
+
+static const char *space_gesture_natural_scrolling_str[] =
+{
+    "auto",
+    "on",
+    "off",
+};
+
 struct space_manager
 {
     struct table view;
@@ -27,6 +41,7 @@ struct space_manager
     uint32_t auto_balance;
     struct space_label *labels;
     bool skip_window_focus_animation;
+    enum space_gesture_natural_scrolling gesture_natural_scrolling;
 };
 
 extern volatile uint64_t __last_space_change_time;
@@ -108,6 +123,7 @@ void space_manager_mark_spaces_invalid_for_display(struct space_manager *sm, uin
 void space_manager_mark_spaces_invalid(struct space_manager *sm);
 bool space_manager_refresh_application_windows(struct space_manager *sm);
 void space_manager_handle_display_add(struct space_manager *sm, uint32_t did);
+bool space_manager_is_natural_scrolling_active(struct space_manager *sm);
 void space_manager_begin(struct space_manager *sm);
 
 #endif

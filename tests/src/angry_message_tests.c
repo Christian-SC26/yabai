@@ -172,6 +172,16 @@ ANGRY_TEST(dispatchesConfigDomainModifyingRuntimeSettings) {
     ANGRY_ASSERT(g_space_manager.window_gap == 12, "handle_domain_config failed setting window_gap");
 }
 
+ANGRY_TEST(configuresSpaceGestureNaturalScrollingMode) {
+    char buf[512] = {0};
+    FILE *f = fmemopen(buf, sizeof(buf), "w");
+    char msg[] = "space_gesture_natural_scrolling\0" "off\0\0";
+    struct token dom = { .text = "config", .length = 6 };
+    handle_domain_config(f, dom, msg);
+    fclose(f);
+    ANGRY_ASSERT(g_space_manager.gesture_natural_scrolling == SPACE_GESTURE_NATURAL_SCROLL_OFF, "handle_domain_config failed setting natural scrolling");
+}
+
 ANGRY_TEST(dispatchesDisplayDomainExecutingDisplayCommands) {
     char buf[512] = {0};
     FILE *f = fmemopen(buf, sizeof(buf), "w");

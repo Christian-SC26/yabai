@@ -303,3 +303,14 @@ ANGRY_TEST(evaluatesIsSpaceLastUserSpaceAndFindFirstUserSpace) {
     uint64_t first = space_manager_find_first_user_space_for_display(did);
     ANGRY_ASSERT((last == true || last == false) && first > 0, "space user helpers failed");
 }
+
+ANGRY_TEST(evaluatesNaturalScrollingActiveForAutoAndExplicitModes) {
+    struct space_manager sm = {0};
+    sm.gesture_natural_scrolling = SPACE_GESTURE_NATURAL_SCROLL_ON;
+    bool on_val = space_manager_is_natural_scrolling_active(&sm);
+    sm.gesture_natural_scrolling = SPACE_GESTURE_NATURAL_SCROLL_OFF;
+    bool off_val = space_manager_is_natural_scrolling_active(&sm);
+    sm.gesture_natural_scrolling = SPACE_GESTURE_NATURAL_SCROLL_AUTO;
+    bool auto_val = space_manager_is_natural_scrolling_active(&sm);
+    ANGRY_ASSERT(on_val == true && off_val == false && (auto_val == true || auto_val == false), "natural scrolling active failed check");
+}

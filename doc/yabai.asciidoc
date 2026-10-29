@@ -180,6 +180,11 @@ Global Settings
     You should only enable this if you do NOT use the scripting addition. +
     The scripting addition implements the same functionality in a more robust way.
 
+*space_gesture_natural_scrolling* ['auto|on|off']::
+    Specify the trackpad swipe scroll direction when synthesizing space switching gestures without the scripting-addition. +
+    When set to 'auto', yabai automatically detects whether macOS Natural Scrolling is enabled in system preferences. +
+    When set to 'off', swipe velocity direction is inverted to match classic non-natural scrolling.
+
 *window_shadow* ['<BOOL_SEL>|float']::
     Draw shadow for windows. +
     System Integrity Protection must be partially disabled.

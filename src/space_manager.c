@@ -999,6 +999,9 @@ bool space_manager_focus_space_using_gesture(uint32_t new_did, uint64_t new_sid)
     //
 
     bool is_right = (new_index - cur_index) > 0;
+    if (!space_manager_is_natural_scrolling_active(&g_space_manager)) {
+        is_right = !is_right;
+    }
 
     if (iss_requires_event_augmentation()) {
         const double progress = is_right ? -0.000016 : 0.000016;
@@ -1300,6 +1303,23 @@ void space_manager_handle_display_add(struct space_manager *sm, uint32_t did)
     sm->last_space_id = sm->current_space_id;
 }
 
+bool space_manager_is_natural_scrolling_active(struct space_manager *sm)
+{
+    if (sm->gesture_natural_scrolling == SPACE_GESTURE_NATURAL_SCROLL_ON) {
+        return true;
+    } else if (sm->gesture_natural_scrolling == SPACE_GESTURE_NATURAL_SCROLL_OFF) {
+        return false;
+    }
+
+    Boolean exists = false;
+    Boolean natural = CFPreferencesGetAppBooleanValue(
+        CFSTR("com.apple.swipescrolldirection"),
+        kCFPreferencesAnyApplication,
+        &exists
+    );
+    return exists ? (bool)natural : true;
+}
+
 void space_manager_begin(struct space_manager *sm)
 {
     sm->layout = VIEW_FLOAT;
@@ -1311,6 +1331,7 @@ void space_manager_begin(struct space_manager *sm)
     sm->window_zoom_persist = true;
     sm->labels = NULL;
     sm->skip_window_focus_animation = false;
+    sm->gesture_natural_scrolling = SPACE_GESTURE_NATURAL_SCROLL_AUTO;
     table_init(&sm->view, 23, hash_view, compare_view);
 
     int display_count;

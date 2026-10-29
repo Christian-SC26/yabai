@@ -665,6 +665,7 @@ CFArrayRef CGWindowListCopyWindowInfo(CGWindowListOption option, CGWindowID rela
     ANGRY_ENTRY(refreshesApplicationWindowsReturningStatus)                     \
     ANGRY_ENTRY(handlesDisplayAddUpdatingSpaceViews)                            \
     ANGRY_ENTRY(evaluatesIsSpaceLastUserSpaceAndFindFirstUserSpace)            \
+    ANGRY_ENTRY(evaluatesNaturalScrollingActiveForAutoAndExplicitModes)         \
     ANGRY_ENTRY(advancesTokenPointerAndExtractsTokenText)                       \
     ANGRY_ENTRY(evaluatesTokenPrefixMatchingStartOfString)                      \
     ANGRY_ENTRY(evaluatesTokenEqualsAgainstExactStrings)                        \
@@ -684,6 +685,7 @@ CFArrayRef CGWindowListCopyWindowInfo(CGWindowListOption option, CGWindowID rela
     ANGRY_ENTRY(parsesInsertSelectorForCardinalDirectionsAndStack)              \
     ANGRY_ENTRY(parsesRuleSpecifyingAppFilterAndManageEffect)                   \
     ANGRY_ENTRY(dispatchesConfigDomainModifyingRuntimeSettings)                 \
+    ANGRY_ENTRY(configuresSpaceGestureNaturalScrollingMode)                     \
     ANGRY_ENTRY(dispatchesDisplayDomainExecutingDisplayCommands)                \
     ANGRY_ENTRY(dispatchesSpaceDomainExecutingSpaceCommands)                    \
     ANGRY_ENTRY(dispatchesWindowDomainExecutingWindowCommands)                  \

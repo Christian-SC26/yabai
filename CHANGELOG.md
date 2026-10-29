@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- **Non-Natural Scrolling Space Switching (`space_gesture_natural_scrolling`)**:
+  - Automatically detect macOS natural scrolling system preference (`com.apple.swipescrolldirection`) when synthesizing Dock space gestures, inverting gesture swipe velocity when natural scrolling is disabled ([#6](https://github.com/Christian-SC26/yabai/issues/6))
+  - Added `yabai -m config space_gesture_natural_scrolling auto|on|off` to allow manual override
 
 ## [7.1.34] - 2026-10-26
 ### Fixed
