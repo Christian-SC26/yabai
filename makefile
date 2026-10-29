@@ -51,6 +51,7 @@ archive: man install sign icon
 	cp -r $(BUILD_PATH) $(ARCH_PATH)/
 	cp -r $(DOC_PATH) $(ARCH_PATH)/
 	cp -r $(SMP_PATH) $(ARCH_PATH)/
+	cp -r $(ASSET_PATH) $(ARCH_PATH)/
 	tar -cvzf $(BUILD_PATH)/$(shell $(BUILD_PATH)/yabai --version).tar.gz $(ARCH_PATH)
 	rm -rf $(ARCH_PATH)
 

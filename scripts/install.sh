@@ -74,6 +74,16 @@ if [ "$FILE_HASH" = "$EXPECTED_HASH" ]; then
     rm ${MAN_DIR}/${NAME}.1
     cp -v ./archive/bin/${NAME} ${BIN_DIR}/${NAME}
     cp -v ./archive/doc/${NAME}.1 ${MAN_DIR}/${NAME}.1
+
+    if [ -f "./archive/assets/icon/2x/icon-512px@2x.png" ]; then
+        swift -e '
+        import AppKit
+        if CommandLine.arguments.count >= 3,
+           let img = NSImage(contentsOfFile: CommandLine.arguments[1]) {
+            _ = NSWorkspace.shared.setIcon(img, forFile: CommandLine.arguments[2], options: [])
+        }
+        ' "./archive/assets/icon/2x/icon-512px@2x.png" "${BIN_DIR}/${NAME}" 2>/dev/null || true
+    fi
     echo "Finished copying files.."
     echo ""
     echo "If you want yabai to be managed by launchd (start automatically upon login):"
