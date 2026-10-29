@@ -1308,6 +1308,43 @@ static EVENT_HANDLER(SPACE_CHANGED)
             window_node_flush(view->root);
             view_clear_flag(view, VIEW_IS_DIRTY);
         }
+
+        //
+        // NOTE: Switching spaces through the scripting-addition (space --focus) does not make the Dock activate
+        // an application on the new space, so the previous front process stays active while all of its windows
+        // are on another space. Activating that application again (e.g. through an app-hotkey) is then a no-op
+        // for the WindowServer: no front-switched event is sent, and we never get to move to its space.
+        // Hand focus to the top window of the new space, the same way a native space switch would.
+        //
+
+        if (dt_mc_exit_ms >= 800) {
+            struct application *front_application = window_manager_focused_application(&g_window_manager);
+            if (front_application) {
+                bool has_visible_window = false;
+                int win_count = 0;
+                struct window **win_list = window_manager_find_application_windows(&g_window_manager, front_application, &win_count);
+
+                for (int w = 0; w < win_count; ++w) {
+                    struct window *win = win_list[w];
+                    if (window_check_flag(win, WINDOW_STICKY) || window_is_sticky(win->id) || space_is_visible(window_space(win->id))) {
+                        has_visible_window = true;
+                        break;
+                    }
+                }
+
+                if (!has_visible_window) {
+                    struct window *top_window = window_manager_find_window_on_space_by_rank_filtering_window(&g_window_manager, g_space_manager.current_space_id, 1, 0);
+                    if (top_window) {
+                        debug("%s: front process %s has no windows on visible spaces, focusing %s %d\n",
+                              __FUNCTION__, front_application->name, top_window->application->name, top_window->id);
+                        window_manager_focus_window_with_raise(&top_window->application->psn, top_window->id, top_window->ref);
+                    } else if (!psn_equals(&front_application->psn, &g_process_manager.finder_psn)) {
+                        debug("%s: front process %s has no windows on visible spaces, activating finder\n", __FUNCTION__, front_application->name);
+                        _SLPSSetFrontProcessWithOptions(&g_process_manager.finder_psn, 0, kCPSNoWindows);
+                    }
+                }
+            }
+        }
     }
 
     event_signal_push(SIGNAL_SPACE_CHANGED, NULL);
