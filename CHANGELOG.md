@@ -6,6 +6,18 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [7.1.40] - 2026-10-30
+### Fixed
+- **App Hotkeys Ignored After Cancelling Mission Control**:
+  - On macOS 27 the Dock does not always report that Mission Control closed (e.g. cancelled with escape). yabai kept treating app activations as happening inside Mission Control, so app hotkeys only moved menu bar focus for up to ~10 seconds, and the first one was overridden by the late return to the original space. yabai now notices the exit within ~0.3s and returns right away
+- **Clicking a Window in Mission Control**:
+  - Clicking a window on the current space no longer restores focus to the previously focused window
+  - After clicking a window on another space, cancelling the next Mission Control no longer bounces between two spaces
+
+### Known issues
+- **macOS 27.2 activates an app on another space when Mission Control opens**:
+  - Opening Mission Control activates an app from another space (on our machine, the one on the last space) and switches the preview to its space. This also happens with yabai stopped. yabai returns to the original space when Mission Control is cancelled, so the other space shows briefly. Details and how to report it to Apple: [#7](https://github.com/Christian-SC26/yabai/issues/7)
+
 ## [7.1.39] - 2026-10-29
 ### Added
 - **`space --move`, `--swap` and `--display` on macOS 27.2**:
@@ -945,7 +957,8 @@ The *window_destroyed* signal is now triggered for windows that are implicitly d
 ### Added
 - First official release
 
-[Unreleased]: https://github.com/Christian-SC26/yabai/compare/v7.1.39...HEAD
+[Unreleased]: https://github.com/Christian-SC26/yabai/compare/v7.1.40...HEAD
+[7.1.40]: https://github.com/Christian-SC26/yabai/compare/v7.1.39...v7.1.40
 [7.1.39]: https://github.com/Christian-SC26/yabai/compare/v7.1.38...v7.1.39
 [7.1.38]: https://github.com/Christian-SC26/yabai/compare/v7.1.37...v7.1.38
 [7.1.37]: https://github.com/Christian-SC26/yabai/compare/v7.1.36...v7.1.37
