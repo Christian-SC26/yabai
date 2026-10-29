@@ -476,8 +476,25 @@ bool scripting_addition_destroy_space(uint64_t sid)
     return sa_payload_send(SA_OPCODE_SPACE_DESTROY);
 }
 
+//
+// NOTE: The payload ignores a space move when it could not locate the required Dock functions (e.g. macOS 27.2),
+// but the socket write itself still succeeds. Ask for the supported attributes first, so that we can report failure.
+//
+
+static bool scripting_addition_can_move_space(void)
+{
+    uint32_t attrib = 0;
+    char version[SA_SOCKET_BUFF_LEN] = {0};
+    if (!scripting_addition_request_handshake(version, &attrib)) return false;
+
+    uint32_t required = OSAX_ATTRIB_DPPM | OSAX_ATTRIB_MOV_SPACE;
+    return (attrib & required) == required;
+}
+
 bool scripting_addition_move_space_to_display(uint64_t src_sid, uint64_t dst_sid, uint64_t src_prev_sid, bool focus)
 {
+    if (!scripting_addition_can_move_space()) return false;
+
     sa_payload_init();
     pack(src_sid);
     pack(dst_sid);
@@ -488,6 +505,8 @@ bool scripting_addition_move_space_to_display(uint64_t src_sid, uint64_t dst_sid
 
 bool scripting_addition_move_space_after_space(uint64_t src_sid, uint64_t dst_sid, bool focus)
 {
+    if (!scripting_addition_can_move_space()) return false;
+
     uint64_t dummy_sid = 0;
     sa_payload_init();
     pack(src_sid);

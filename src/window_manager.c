@@ -2334,7 +2334,9 @@ void window_manager_toggle_window_native_fullscreen(struct window *window)
     //
 
     window_manager_focus_window_with_raise(&window->application->psn, window->id, window->ref);
-    while (sid != space_manager_active_space()) { usleep(100000); }
+
+    int timeout = 30;
+    while (sid != space_manager_active_space() && --timeout > 0) { usleep(100000); }
 
 
     if (!window_is_fullscreen(window)) {
