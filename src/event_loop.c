@@ -403,6 +403,38 @@ static EVENT_HANDLER(APPLICATION_FRONT_SWITCHED)
     }
 
     if (mission_control_is_active()) {
+        //
+        // NOTE: When Mission Control opens, macOS 27.2 activates an application on another space by itself, and
+        // Mission Control then shows that space. Hovering a window also activates it. Activations that do not match
+        // the window under the cursor (the window a gesture would select) are not the user's doing, so put the
+        // application that Mission Control was opened from back in front.
+        //
+
+        pid_t prev_pid = __atomic_load_n(&g_mission_control_prev_pid, __ATOMIC_RELAXED);
+        uint32_t prev_wid = __atomic_load_n(&g_mission_control_prev_wid, __ATOMIC_RELAXED);
+        uint64_t prev_sid = __atomic_load_n(&g_mission_control_prev_sid, __ATOMIC_RELAXED);
+        int reverted = __atomic_load_n(&g_mission_control_reverted_activations, __ATOMIC_RELAXED);
+
+        if (prev_pid && process->pid != prev_pid && reverted < 3) {
+            CGEventRef cursor_event = CGEventCreate(NULL);
+            CGPoint cursor = CGEventGetLocation(cursor_event);
+            CFRelease(cursor_event);
+
+            uint64_t shown_sid = display_space_id(display_manager_point_display_id(cursor));
+            struct window *hover_window = window_manager_find_window(&g_window_manager, workspace_mission_control_window_at_point(cursor, shown_sid));
+            bool cursor_moved = __atomic_load_n(&g_mission_control_cursor_moved, __ATOMIC_RELAXED);
+            bool hovered = hover_window && hover_window->application->pid == process->pid && (window_space(hover_window->id) == prev_sid || cursor_moved);
+
+            struct window *prev_window = window_manager_find_window(&g_window_manager, prev_wid);
+            if (!hovered && prev_window) {
+                debug("%s: %s (%d) activated during mission control without being under the cursor, reactivating %s..\n",
+                      __FUNCTION__, process->name, process->pid, prev_window->application->name);
+                __atomic_store_n(&g_mission_control_reverted_activations, reverted + 1, __ATOMIC_RELEASE);
+                _SLPSSetFrontProcessWithOptions(&prev_window->application->psn, prev_window->id, kCPSUserGenerated);
+                return;
+            }
+        }
+
         debug("%s: %s (%d) front switched during mission control, ignoring..\n", __FUNCTION__, process->name, process->pid);
         return;
     }

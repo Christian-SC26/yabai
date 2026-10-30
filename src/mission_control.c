@@ -15,6 +15,7 @@ volatile uint64_t g_mission_control_exit_time = 0;
 volatile bool g_mission_control_posted_exit = false;
 volatile uint32_t g_mission_control_hover_wid = 0;
 volatile bool g_mission_control_cursor_moved = false;
+volatile int g_mission_control_reverted_activations = 0;
 CGPoint g_mission_control_enter_cursor;
 
 void mission_control_record_state(void)
@@ -38,6 +39,7 @@ void mission_control_record_state(void)
             __atomic_store_n(&g_mission_control_mouse_clicked, false, __ATOMIC_RELEASE);
             __atomic_store_n(&g_mission_control_hover_wid, 0, __ATOMIC_RELEASE);
             __atomic_store_n(&g_mission_control_cursor_moved, false, __ATOMIC_RELEASE);
+            __atomic_store_n(&g_mission_control_reverted_activations, 0, __ATOMIC_RELEASE);
             CGEventRef cursor_event = CGEventCreate(NULL);
             g_mission_control_enter_cursor = CGEventGetLocation(cursor_event);
             CFRelease(cursor_event);
