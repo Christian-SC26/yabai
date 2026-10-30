@@ -9,13 +9,14 @@ yabai is a tiling window manager for macOS. It arranges windows with binary spac
 
 <img align="right" width="40%" src="assets/screenshot.png" alt="Two code editor windows tiled side by side by yabai, with a floating terminal window on top">
 
-**Status:** maintained, with 12 releases between September 22 and October 29, 2026. Commands and config format match upstream. I test fixes on macOS 27.2.
+**Status:** maintained, with 16 releases between September 22 and October 30, 2026. Commands and config format match upstream. I test fixes on macOS 27.2.
 
 ## What's different from upstream
 
-- **Scripting addition on macOS 27.0–27.2.** `sudo yabai --load-sa` works on macOS 27, including the reduced capability mask on 27.2+.
+- **Scripting addition on macOS 27.0–27.2.** `sudo yabai --load-sa` works on macOS 27. On 27.2, where Apple removed the Dock function for moving spaces, `space --move`, `--swap` and `--display` move spaces through the WindowServer instead.
 - **Space switching with SIP enabled.** `yabai -m space --focus` works without the scripting addition on macOS 27. Jumps across several spaces land on the right space (7.1.37). The swipe direction follows your natural scrolling setting, or set it with `space_gesture_natural_scrolling`.
 - **Focus fixes.** Activating an app switches to its space, even after `space --focus`. Focusing an empty space stays there. Focus and the menu bar stay in sync after Mission Control.
+- **Mission Control on macOS 27 (7.2.0).** A swipe down leaves Mission Control on the window under the cursor, like a click. macOS 27.2 activates an app on another space when Mission Control opens ([#7](https://github.com/Christian-SC26/yabai/issues/7)); yabai undoes that, so Mission Control stays on your space.
 - **Mouse.** BSP splits resize live while you drag (`mouse_bsp_live_resize`). The mouse event tap runs on its own thread, so clicks are not dropped while an app blocks the Accessibility API.
 - **Sessions and layouts.** `yabai -m space --save-session`, `--load-session`, `--save-layout` and `--load-layout` save and restore spaces and window trees.
 - **Signed and notarized releases.** Each release binary carries a Developer ID signature and Apple notarization.
