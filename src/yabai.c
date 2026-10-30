@@ -21,8 +21,8 @@
 #define HELP_OPT_SHRT           "-h"
 
 #define MAJOR  7
-#define MINOR  1
-#define PATCH 40
+#define MINOR  2
+#define PATCH  0
 
 struct signal *g_signal_event[SIGNAL_TYPE_COUNT];
 struct process_manager g_process_manager;

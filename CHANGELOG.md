@@ -6,6 +6,18 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [7.2.0] - 2026-10-30
+### Added
+- **Swipe Down in Mission Control Selects the Window Under the Cursor (macOS 27)**:
+  - Leaving Mission Control with a swipe down now switches to the window under the cursor, on the current space or another one, the same way a click does. Escape, or a swipe with the cursor over empty space, still returns to the window Mission Control was opened from
+  - yabai finds the window through the accessibility elements that WindowManager exposes for each Mission Control thumbnail. A window on another space is only selected if you moved the cursor, so a space macOS showed by itself is never selected by accident
+
+### Fixed
+- **Mission Control Jumping to Another Space When Opened (macOS 27.2)**:
+  - When Mission Control opens, macOS 27.2 activates an app on another space by itself and Mission Control shows that space ([#7](https://github.com/Christian-SC26/yabai/issues/7)). yabai now puts the app you opened Mission Control from back in front right away, so Mission Control stays on your space and cancelling no longer flashes the other one
+- **Mission Control Noticed Late After a Swipe**:
+  - yabai checks for Mission Control right after a vertical swipe, instead of waiting for the next window or app event
+
 ## [7.1.40] - 2026-10-30
 ### Fixed
 - **App Hotkeys Ignored After Cancelling Mission Control**:
@@ -957,7 +969,8 @@ The *window_destroyed* signal is now triggered for windows that are implicitly d
 ### Added
 - First official release
 
-[Unreleased]: https://github.com/Christian-SC26/yabai/compare/v7.1.40...HEAD
+[Unreleased]: https://github.com/Christian-SC26/yabai/compare/v7.2.0...HEAD
+[7.2.0]: https://github.com/Christian-SC26/yabai/compare/v7.1.40...v7.2.0
 [7.1.40]: https://github.com/Christian-SC26/yabai/compare/v7.1.39...v7.1.40
 [7.1.39]: https://github.com/Christian-SC26/yabai/compare/v7.1.38...v7.1.39
 [7.1.38]: https://github.com/Christian-SC26/yabai/compare/v7.1.37...v7.1.38
