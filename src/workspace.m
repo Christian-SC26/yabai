@@ -149,6 +149,74 @@ pid_t workspace_get_dock_pid(void)
     return 0;
 }
 
+//
+// NOTE: On macOS 27 Mission Control is drawn by WindowManager, which exposes every window thumbnail as an
+// accessibility element with a "wid" attribute holding the window id, and an identifier ending in ".space.<sid>".
+// It keeps thumbnails for other spaces too, so only look at the space being shown. Hit-testing the point
+// directly fails while the hovered thumbnail animates, so compare the point with each thumbnail frame instead.
+//
+
+uint32_t workspace_mission_control_window_at_point(CGPoint point, uint64_t sid)
+{
+    static AXUIElementRef window_manager_ref;
+    static pid_t window_manager_pid;
+
+    uint32_t result = 0;
+
+    @autoreleasepool {
+        NSArray *list = [NSRunningApplication runningApplicationsWithBundleIdentifier:@"com.apple.WindowManager"];
+        pid_t pid = list.count == 1 ? [list[0] processIdentifier] : 0;
+        if (!pid) return 0;
+
+        if (pid != window_manager_pid) {
+            if (window_manager_ref) CFRelease(window_manager_ref);
+            window_manager_ref = AXUIElementCreateApplication(pid);
+            AXUIElementSetMessagingTimeout(window_manager_ref, 0.25f);
+            window_manager_pid = pid;
+        }
+
+        CFArrayRef group_list = NULL;
+        if (AXUIElementCopyAttributeValue(window_manager_ref, kAXChildrenAttribute, (CFTypeRef *) &group_list) != kAXErrorSuccess || !group_list) return 0;
+
+        NSString *space_suffix = [NSString stringWithFormat:@".space.%lld", sid];
+
+        for (int i = 0; i < CFArrayGetCount(group_list) && !result; ++i) {
+            CFArrayRef thumbnail_list = NULL;
+            if (AXUIElementCopyAttributeValue(CFArrayGetValueAtIndex(group_list, i), kAXChildrenAttribute, (CFTypeRef *) &thumbnail_list) != kAXErrorSuccess || !thumbnail_list) continue;
+
+            for (int j = 0; j < CFArrayGetCount(thumbnail_list) && !result; ++j) {
+                AXUIElementRef thumbnail = CFArrayGetValueAtIndex(thumbnail_list, j);
+
+                CFTypeRef identifier = NULL;
+                AXUIElementCopyAttributeValue(thumbnail, kAXIdentifierAttribute, &identifier);
+                bool on_space = identifier && CFGetTypeID(identifier) == CFStringGetTypeID() && [(__bridge NSString *) identifier hasSuffix:space_suffix];
+                if (identifier) CFRelease(identifier);
+                if (!on_space) continue;
+
+                CGRect frame = CGRectZero;
+                CFTypeRef frame_ref = NULL;
+                if (AXUIElementCopyAttributeValue(thumbnail, CFSTR("AXFrame"), &frame_ref) == kAXErrorSuccess && frame_ref) {
+                    if (CFGetTypeID(frame_ref) == AXValueGetTypeID()) AXValueGetValue(frame_ref, kAXValueCGRectType, &frame);
+                    CFRelease(frame_ref);
+                }
+                if (!CGRectContainsPoint(frame, point)) continue;
+
+                CFTypeRef wid_ref = NULL;
+                if (AXUIElementCopyAttributeValue(thumbnail, CFSTR("wid"), &wid_ref) == kAXErrorSuccess && wid_ref) {
+                    if (CFGetTypeID(wid_ref) == CFNumberGetTypeID()) CFNumberGetValue(wid_ref, kCFNumberSInt32Type, &result);
+                    CFRelease(wid_ref);
+                }
+            }
+
+            CFRelease(thumbnail_list);
+        }
+
+        CFRelease(group_list);
+    }
+
+    return result;
+}
+
 extern struct event_loop g_event_loop;
 @implementation workspace_context
 - (id)init

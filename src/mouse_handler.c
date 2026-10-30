@@ -93,6 +93,14 @@ static MOUSE_HANDLER(mouse_handler)
                 } else if (phase == /* kCGSGesturePhaseEnded */ 4 || phase == /* kCGSGesturePhaseCancelled */ 8) {
                     __atomic_store_n(&__pending_gesture, false, __ATOMIC_RELEASE);
                     __atomic_store_n(&__last_gesture_time, read_os_timer(), __ATOMIC_RELEASE);
+                    if (motion == /* kCGGestureMotionVertical */ 2) {
+                        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 0.2f * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
+                            event_loop_post(&g_event_loop, MISSION_CONTROL_CHECK_FOR_EXIT, NULL, 0);
+                        });
+                        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 0.5f * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
+                            event_loop_post(&g_event_loop, MISSION_CONTROL_CHECK_FOR_EXIT, NULL, 0);
+                        });
+                    }
                 }
             }
         }

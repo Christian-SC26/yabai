@@ -1886,7 +1886,57 @@ static EVENT_HANDLER(MISSION_CONTROL_CHECK_FOR_EXIT)
         // space that Mission Control previewed. Keep checking, so that the exit is posted as soon as it closes.
         //
 
-        if (g_mission_control_mode == MISSION_CONTROL_MODE_INACTIVE) return;
+        //
+        // NOTE: Also posted after a vertical swipe, to notice that Mission Control opened without waiting for an event.
+        //
+
+        if (g_mission_control_mode == MISSION_CONTROL_MODE_INACTIVE) {
+            mission_control_is_active();
+            return;
+        }
+
+        //
+        // NOTE: Several checks can be scheduled at once (enter event, swipe), keep only one of them polling.
+        //
+
+        static uint64_t last_poll_time;
+        uint64_t poll_time = read_os_timer();
+        if (poll_time > last_poll_time && (poll_time - last_poll_time) / 1000000ULL < 80) return;
+        last_poll_time = poll_time;
+
+        //
+        // NOTE: Remember the window under the cursor, so that leaving Mission Control with a gesture can select it.
+        //
+
+        CGEventRef cursor_event = CGEventCreate(NULL);
+        CGPoint cursor = CGEventGetLocation(cursor_event);
+        CFRelease(cursor_event);
+
+        //
+        // NOTE: The thumbnails start moving away as soon as the closing gesture begins, while the cursor stays put.
+        // Keep the window found at this cursor position instead of replacing it with whatever is there by then.
+        //
+
+        static CGPoint hover_cursor;
+        float dx = cursor.x - g_mission_control_enter_cursor.x;
+        float dy = cursor.y - g_mission_control_enter_cursor.y;
+        float hx = cursor.x - hover_cursor.x;
+        float hy = cursor.y - hover_cursor.y;
+        uint32_t last_hover_wid = __atomic_load_n(&g_mission_control_hover_wid, __ATOMIC_RELAXED);
+
+        if (dx*dx + dy*dy >= 20.0f*20.0f) {
+            __atomic_store_n(&g_mission_control_cursor_moved, true, __ATOMIC_RELEASE);
+        }
+
+        if (!last_hover_wid || hx*hx + hy*hy >= 4.0f*4.0f) {
+            uint64_t shown_sid = display_space_id(display_manager_point_display_id(cursor));
+            uint32_t hover_wid = workspace_mission_control_window_at_point(cursor, shown_sid);
+            if (hover_wid != last_hover_wid) {
+                debug("%s: window under the cursor %d\n", __FUNCTION__, hover_wid);
+            }
+            __atomic_store_n(&g_mission_control_hover_wid, hover_wid, __ATOMIC_RELEASE);
+            hover_cursor = cursor;
+        }
 
         mission_control_is_active();
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 0.1f * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
@@ -1957,9 +2007,41 @@ static EVENT_HANDLER(MISSION_CONTROL_EXIT)
     extern volatile bool g_mission_control_posted_exit;
     __atomic_store_n(&g_mission_control_posted_exit, false, __ATOMIC_RELEASE);
 
+    bool mouse_clicked = __atomic_load_n(&g_mission_control_mouse_clicked, __ATOMIC_RELAXED);
+
+    //
+    // NOTE: Leaving Mission Control with a gesture while the cursor is on a window selects that window,
+    // instead of returning to the window that was focused before Mission Control. Escape still cancels.
+    //
+
+    uint32_t hover_wid = __atomic_load_n(&g_mission_control_hover_wid, __ATOMIC_RELAXED);
+    __atomic_store_n(&g_mission_control_hover_wid, 0, __ATOMIC_RELEASE);
+
+    uint64_t exit_gesture_time = __atomic_load_n(&__last_gesture_time, __ATOMIC_RELAXED);
+    uint64_t dt_exit_gesture_ms = (exit_now > exit_gesture_time) ? (exit_now - exit_gesture_time) / 1000000ULL : 0;
+    bool exit_via_gesture = dt_exit_gesture_ms < 800 || __atomic_load_n(&__pending_gesture, __ATOMIC_RELAXED);
+
+    //
+    // When Mission Control opens, macOS may show another space by itself. A window on that space under a resting
+    // cursor is not a choice the user made, so windows on other spaces need the cursor to have moved.
+    //
+
+    if (!mouse_clicked && exit_via_gesture && hover_wid && hover_wid != __atomic_load_n(&g_mission_control_prev_wid, __ATOMIC_RELAXED)) {
+        struct window *hover_window = window_manager_find_window(&g_window_manager, hover_wid);
+        uint64_t hover_sid = hover_window ? window_space(hover_window->id) : 0;
+        bool cursor_moved = __atomic_load_n(&g_mission_control_cursor_moved, __ATOMIC_RELAXED);
+        bool on_prev_space = hover_sid == __atomic_load_n(&g_mission_control_prev_sid, __ATOMIC_RELAXED);
+
+        if (hover_window && hover_sid && space_is_user(hover_sid) && (on_prev_space || cursor_moved)) {
+            debug("%s: selecting window %s %d on space %lld under the cursor\n", __FUNCTION__, hover_window->application->name, hover_window->id, hover_sid);
+            __atomic_store_n(&g_mission_control_prev_wid, hover_window->id, __ATOMIC_RELEASE);
+            __atomic_store_n(&g_mission_control_prev_pid, hover_window->application->pid, __ATOMIC_RELEASE);
+            __atomic_store_n(&g_mission_control_prev_sid, hover_sid, __ATOMIC_RELEASE);
+        }
+    }
+
     uint32_t prev_wid = __atomic_load_n(&g_mission_control_prev_wid, __ATOMIC_RELAXED);
     uint64_t prev_sid = __atomic_load_n(&g_mission_control_prev_sid, __ATOMIC_RELAXED);
-    bool mouse_clicked = __atomic_load_n(&g_mission_control_mouse_clicked, __ATOMIC_RELAXED);
 
     void (^restore_focus)(void) = ^{
         uint64_t current_sid = space_manager_active_space();

@@ -13,6 +13,9 @@ volatile pid_t g_mission_control_prev_pid = 0;
 volatile bool g_mission_control_mouse_clicked = false;
 volatile uint64_t g_mission_control_exit_time = 0;
 volatile bool g_mission_control_posted_exit = false;
+volatile uint32_t g_mission_control_hover_wid = 0;
+volatile bool g_mission_control_cursor_moved = false;
+CGPoint g_mission_control_enter_cursor;
 
 void mission_control_record_state(void)
 {
@@ -33,6 +36,11 @@ void mission_control_record_state(void)
             __atomic_store_n(&g_mission_control_prev_pid, pid, __ATOMIC_RELEASE);
             __atomic_store_n(&g_mission_control_prev_sid, sid, __ATOMIC_RELEASE);
             __atomic_store_n(&g_mission_control_mouse_clicked, false, __ATOMIC_RELEASE);
+            __atomic_store_n(&g_mission_control_hover_wid, 0, __ATOMIC_RELEASE);
+            __atomic_store_n(&g_mission_control_cursor_moved, false, __ATOMIC_RELEASE);
+            CGEventRef cursor_event = CGEventCreate(NULL);
+            g_mission_control_enter_cursor = CGEventGetLocation(cursor_event);
+            CFRelease(cursor_event);
             debug("%s: recorded prev_wid=%d, prev_pid=%d, prev_sid=%lld\n", __FUNCTION__, wid, pid, sid);
         }
     }

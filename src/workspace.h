@@ -34,6 +34,7 @@ void workspace_application_observe_finished_launching(void *context, struct proc
 void workspace_application_observe_activation_policy(void *context, struct process *process);
 int workspace_display_notch_height(uint32_t did);
 pid_t workspace_get_dock_pid(void);
+uint32_t workspace_mission_control_window_at_point(CGPoint point, uint64_t sid);
 bool workspace_event_handler_begin(void **context);
 bool workspace_use_macos_space_workaround(void);
 
