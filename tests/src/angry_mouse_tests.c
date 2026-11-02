@@ -25,6 +25,21 @@ ANGRY_TEST(populatesMouseWindowInfoCalculatingDeltasAndFlags) {
     ANGRY_ASSERT(info.dx == 20.0f && info.dy == 10.0f && info.dw == 50.0f && info.dh == 0.0f && info.changed_position && info.changed_size, "mouse_window_info_populate calculated incorrect deltas");
 }
 
+ANGRY_TEST(treatsReleaseNearGestureOriginAsStationaryClick) {
+    struct mouse_state ms = { .origin_location = { 100, 100 } };
+    ANGRY_ASSERT(!mouse_gesture_moved(&ms, CGPointMake(102, 101.5)), "mouse_gesture_moved reported movement for a stationary click");
+}
+
+ANGRY_TEST(treatsReleaseFarFromGestureOriginAsDrag) {
+    struct mouse_state ms = { .origin_location = { 100, 100 } };
+    ANGRY_ASSERT(mouse_gesture_moved(&ms, CGPointMake(103, 100)), "mouse_gesture_moved missed movement of three pixels");
+}
+
+ANGRY_TEST(treatsResizedGestureAsMovedWhenCursorReturnsToOrigin) {
+    struct mouse_state ms = { .origin_location = { 100, 100 }, .resize_applied = true };
+    ANGRY_ASSERT(mouse_gesture_moved(&ms, CGPointMake(100, 100)), "mouse_gesture_moved ignored a resize that was already applied");
+}
+
 ANGRY_TEST(determinesStackDropActionWhenCursorInCenterAndModeIsStack) {
     struct mouse_state ms = { .drop_action = MOUSE_MODE_STACK };
     struct window_node src = { .window_count = 1 };

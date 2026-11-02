@@ -169,6 +169,71 @@ ANGRY_TEST(handlesMouseInteractionEventsSafely)
     ANGRY_ASSERT(true, "expected mouse events to execute cleanly");
 }
 
+ANGRY_TEST(keepsResizeGestureMovedAfterDragReturnsNearOrigin)
+{
+    struct application app = {0};
+    struct window win = { .id = 9988, .application = &app, .frame = {{700,400},{400,300}} };
+    win.id_ptr = &win.id;
+    CGPoint origin = CGPointMake(1000, 700);
+    CGPoint far = CGPointMake(1040, 740);
+    CGPoint release = CGPointMake(1001, 701);
+
+    g_mouse_state.window = &win;
+    g_mouse_state.window_frame = win.frame;
+    g_mouse_state.down_location = origin;
+    g_mouse_state.origin_location = origin;
+    g_mouse_state.resize_applied = false;
+    g_mouse_state.direction = HANDLE_RIGHT | HANDLE_BOTTOM;
+    g_mouse_state.current_action = MOUSE_MODE_RESIZE;
+    g_mouse_state.last_moved_time = 0;
+
+    EVENT_HANDLER_MOUSE_DRAGGED(CGEventCreateMouseEvent(NULL, kCGEventRightMouseDragged, far, kCGMouseButtonRight), 0);
+    g_mouse_state.last_moved_time = 0;
+    EVENT_HANDLER_MOUSE_DRAGGED(CGEventCreateMouseEvent(NULL, kCGEventRightMouseDragged, release, kCGMouseButtonRight), 0);
+    bool moved = mouse_gesture_moved(&g_mouse_state, release);
+
+    g_mouse_state.window = NULL;
+    g_mouse_state.current_action = MOUSE_MODE_NONE;
+    ANGRY_ASSERT(moved, "expected a resize released at the last drag position to count as moved, even near its origin");
+}
+
+ANGRY_TEST(ignoresFencelessLiveResizeStepAfterSplitHasMoved)
+{
+    struct application app = {0};
+    struct window win = { .id = 9989, .application = &app, .frame = {{0,0},{496,300}} };
+    win.id_ptr = &win.id;
+    struct window_node root = { .split = SPLIT_Y, .ratio = 0.5f, .area = { 0, 0, 1000, 300 } };
+    struct window_node left = { .parent = &root, .area = { 0, 0, 496, 300 }, .window_count = 1 };
+    struct window_node right = { .parent = &root, .area = { 504, 0, 496, 300 } };
+    left.window_list[0] = win.id;
+    root.left = &left;
+    root.right = &right;
+    struct view view = { .layout = VIEW_BSP, .root = &root };
+    table_add(&g_window_manager.managed_window, &win.id, &view);
+
+    bool saved_live_resize = g_mouse_state.bsp_live_resize;
+    g_mouse_state.bsp_live_resize = true;
+    g_mouse_state.window = &win;
+    g_mouse_state.window_frame = win.frame;
+    g_mouse_state.down_location = CGPointMake(300, 200);
+    g_mouse_state.live_resized = false;
+    g_mouse_state.direction = HANDLE_RIGHT | HANDLE_BOTTOM;
+    g_mouse_state.current_action = MOUSE_MODE_RESIZE;
+    g_mouse_state.last_moved_time = 0;
+
+    EVENT_HANDLER_MOUSE_DRAGGED(CGEventCreateMouseEvent(NULL, kCGEventRightMouseDragged, CGPointMake(340, 220), kCGMouseButtonRight), 0);
+    g_mouse_state.last_moved_time = 0;
+    EVENT_HANDLER_MOUSE_DRAGGED(CGEventCreateMouseEvent(NULL, kCGEventRightMouseDragged, CGPointMake(340, 270), kCGMouseButtonRight), 0);
+    float height = win.frame.size.height;
+
+    g_mouse_state.window = NULL;
+    g_mouse_state.live_resized = false;
+    g_mouse_state.current_action = MOUSE_MODE_NONE;
+    g_mouse_state.bsp_live_resize = saved_live_resize;
+    table_remove(&g_window_manager.managed_window, &win.id);
+    ANGRY_ASSERT(height == 300.0f, "expected a vertical step with no fence to leave the window alone once the split has moved");
+}
+
 ANGRY_TEST(handlesMissionControlPresentationModeEventsSafely)
 {
     EVENT_HANDLER_MISSION_CONTROL_SHOW_ALL_WINDOWS(NULL, 0);

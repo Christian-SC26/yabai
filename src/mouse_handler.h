@@ -75,12 +75,14 @@ struct mouse_state
     enum mouse_mode drop_action;
     enum mouse_mode current_action;
     CGPoint down_location;
+    CGPoint origin_location;
     uint64_t last_moved_time;
     struct window *window;
     CGRect window_frame;
     uint32_t ffm_window_id;
     uint8_t direction;
     bool live_resized;
+    bool resize_applied;
     bool bsp_live_resize;
     struct window_node *feedback_node;
 };
@@ -105,6 +107,7 @@ static char *mouse_mode_str[] =
 };
 
 void mouse_window_info_populate(struct mouse_state *ms, struct mouse_window_info *info);
+bool mouse_gesture_moved(struct mouse_state *ms, CGPoint point);
 enum mouse_drop_action mouse_determine_drop_action(struct mouse_state *ms, struct window_node *src_node, struct window *dst_window, CGPoint point);
 void mouse_drop_action_stack(struct window_manager *wm, struct view *src_view, struct window *src_window, struct view *dst_view, struct window *dst_window);
 void mouse_drop_action_swap(struct window_manager *wm, struct view *src_view, struct window_node *src_node, struct window *src_window, struct view *dst_view, struct window_node *dst_node, struct window *dst_window);

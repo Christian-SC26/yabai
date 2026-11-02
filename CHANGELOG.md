@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Fixed
+- **Tiled Window Staying Resized After a Mouse Resize**:
+  - Releasing a mouse resize skipped the BSP adjustment when the cursor stopped before the button came up. A window resized from an edge with no split stayed outside its tile, and with `mouse_bsp_live_resize off` the split was not updated. Both now apply on release, and a stationary click still changes nothing
+  - With `mouse_bsp_live_resize on`, a drag that had already moved a split could stretch the window along the axis with no split, and it stayed that way after release. Those steps are now ignored
 
 ## [7.2.0] - 2026-10-30
 ### Added

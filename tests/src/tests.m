@@ -500,6 +500,9 @@ CFArrayRef CGWindowListCopyWindowInfo(CGWindowListOption option, CGWindowID rela
     ANGRY_ENTRY(parsesMouseModifierFromCommandAndAltFlags)                      \
     ANGRY_ENTRY(parsesMouseModifierFromShiftAndControlFlags)                    \
     ANGRY_ENTRY(populatesMouseWindowInfoCalculatingDeltasAndFlags)              \
+    ANGRY_ENTRY(treatsReleaseNearGestureOriginAsStationaryClick)                \
+    ANGRY_ENTRY(treatsReleaseFarFromGestureOriginAsDrag)                        \
+    ANGRY_ENTRY(treatsResizedGestureAsMovedWhenCursorReturnsToOrigin)           \
     ANGRY_ENTRY(determinesStackDropActionWhenCursorInCenterAndModeIsStack)       \
     ANGRY_ENTRY(determinesSwapDropActionWhenCursorInCenterAndModeIsSwap)        \
     ANGRY_ENTRY(determinesWarpTopDropActionWhenCursorInTopTriangle)             \
@@ -769,6 +772,8 @@ CFArrayRef CGWindowListCopyWindowInfo(CGWindowListOption option, CGWindowID rela
     ANGRY_ENTRY(handlesSpaceChangedEventSafely)                                 \
     ANGRY_ENTRY(handlesDisplayLifecycleAndGeometryChangeEventsSafely)          \
     ANGRY_ENTRY(handlesMouseInteractionEventsSafely)                            \
+    ANGRY_ENTRY(keepsResizeGestureMovedAfterDragReturnsNearOrigin)              \
+    ANGRY_ENTRY(ignoresFencelessLiveResizeStepAfterSplitHasMoved)               \
     ANGRY_ENTRY(handlesMissionControlPresentationModeEventsSafely)              \
     ANGRY_ENTRY(handlesMissionControlEnterWithDispatchBlocks)                   \
     ANGRY_ENTRY(handlesMissionControlCheckForExitWithLegacyDispatchBlocks)      \

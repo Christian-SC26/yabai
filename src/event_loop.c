@@ -1496,6 +1496,8 @@ static EVENT_HANDLER(MOUSE_DOWN)
     g_mouse_state.window = window;
     g_mouse_state.window_frame = g_mouse_state.window->frame;
     g_mouse_state.down_location = point;
+    g_mouse_state.origin_location = point;
+    g_mouse_state.resize_applied = false;
     g_mouse_state.direction = 0;
 
     int64_t button = CGEventGetIntegerValueField(context, kCGMouseEventButtonNumber);
@@ -1544,9 +1546,7 @@ static EVENT_HANDLER(MOUSE_UP)
     struct mouse_window_info info;
     mouse_window_info_populate(&g_mouse_state, &info);
 
-    double cursor_dx = fabs(point.x - g_mouse_state.down_location.x);
-    double cursor_dy = fabs(point.y - g_mouse_state.down_location.y);
-    bool cursor_moved = cursor_dx >= 3.0f || cursor_dy >= 3.0f;
+    bool cursor_moved = mouse_gesture_moved(&g_mouse_state, point);
 
     if (cursor_moved && info.changed_position && !info.changed_size) {
         uint64_t cursor_sid = display_space_id(display_manager_point_display_id(point));
@@ -1665,7 +1665,8 @@ static EVENT_HANDLER(MOUSE_DRAGGED)
                 enum window_op_error err = window_manager_resize_window_relative(&g_window_manager, g_mouse_state.window, direction, dx, dy, false);
                 if (err == WINDOW_OP_ERROR_SUCCESS) {
                     g_mouse_state.live_resized = true;
-                } else {
+                } else if (!g_mouse_state.live_resized) {
+                    // Once a split has moved, the release skips the BSP adjustment, so nothing would undo this resize.
                     window_manager_resize_window_relative_internal(g_mouse_state.window, g_mouse_state.window->frame, g_mouse_state.direction, dx, dy, false);
                 }
             }
@@ -1675,6 +1676,7 @@ static EVENT_HANDLER(MOUSE_DRAGGED)
 
         g_mouse_state.last_moved_time = event_time;
         g_mouse_state.down_location = point;
+        g_mouse_state.resize_applied = true;
         goto out;
     }
 
