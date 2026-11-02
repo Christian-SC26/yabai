@@ -841,6 +841,18 @@ static bool tabbed_window_adopt_hidden(struct window *window)
     return false;
 }
 
+// NOTE: a floating group has no node to swap, so the state has to move to the tab that took over.
+static void tabbed_window_hand_over_float(struct window *from, struct window *to)
+{
+    window_clear_flag(from, WINDOW_FLOAT);
+    window_set_flag(from, WINDOW_TAB_MEMBER);
+    window_set_flag(to, WINDOW_FLOAT);
+    window_clear_flag(to, WINDOW_TAB_MEMBER);
+
+    // NOTE: same as a swap -- the next tab pairs against the focused window.
+    if (g_window_manager.focused_window_id == from->id) g_window_manager.focused_window_id = to->id;
+}
+
 static EVENT_HANDLER(WINDOW_CREATED)
 {
     uint32_t window_id = ax_window_id(context);
@@ -889,7 +901,12 @@ static EVENT_HANDLER(WINDOW_CREATED)
                        (!prev_ordered_in || window_ax_tab_count(window) > 1) &&
                        tabbed_window_swap(tab_view, a, window);
 
-        if (!swapped) {
+        bool floated = !swapped && g_window_manager.window_native_tabs &&
+                       a && a->application == window->application && window_check_flag(a, WINDOW_FLOAT) &&
+                       window_ax_tab_count(window) > 1;
+        if (floated) tabbed_window_hand_over_float(a, window);
+
+        if (!swapped && !floated) {
             uint64_t sid;
 
             if (g_window_manager.window_origin_mode == WINDOW_ORIGIN_DEFAULT) {
@@ -918,6 +935,11 @@ static EVENT_HANDLER(WINDOW_CREATED)
         update_window_notifications();
     }
 }
+
+static struct {
+    pid_t pid;
+    uint64_t time;
+} g_tab_closed_float;
 
 #define TAB_PROMOTE_MS 50.0f
 
@@ -953,6 +975,9 @@ static EVENT_HANDLER(WINDOW_DESTROYED)
     if (view) {
         space_manager_untile_window(view, window);
         window_manager_remove_managed_window(&g_window_manager, window->id);
+    } else if (g_window_manager.window_native_tabs && window_check_flag(window, WINDOW_FLOAT)) {
+        g_tab_closed_float.pid = window->application->pid;
+        g_tab_closed_float.time = read_os_timer();
     }
 
     if (g_mouse_state.window == window) g_mouse_state.window = NULL;
@@ -976,6 +1001,32 @@ static EVENT_HANDLER(WINDOW_DESTROYED)
 
 // NOTE: window_space reports a space for a hidden tab, so ordered-in is the only reliable test for one.
 // Moving a tab out to its own window posts no create and no 1326 -- 815 is the only signal it happened.
+static bool tabbed_window_follow_float(struct window *window)
+{
+    // NOTE: the tab comes forward after the destroy when the floating tab was closed.
+    if (g_tab_closed_float.pid == window->application->pid) {
+        float dt = ((float)(read_os_timer() - g_tab_closed_float.time)) * (1000.0f / (float) read_os_freq());
+        g_tab_closed_float.pid = 0;
+
+        if (dt < TAB_SWITCH_PAIR_MS) {
+            window_set_flag(window, WINDOW_FLOAT);
+            window_clear_flag(window, WINDOW_TAB_MEMBER);
+            return true;
+        }
+    }
+
+    struct window *prev = window_manager_find_window(&g_window_manager, g_window_manager.last_window_id);
+    if (!prev || prev == window || prev->application != window->application) return false;
+    if (!window_check_flag(prev, WINDOW_FLOAT)) return false;
+
+    uint8_t ordered_in = 0;
+    SLSWindowIsOrderedIn(g_connection, prev->id, &ordered_in);
+    if (ordered_in) return false;
+
+    tabbed_window_hand_over_float(prev, window);
+    return true;
+}
+
 static void tabbed_window_promote(struct window *window)
 {
     uint8_t ordered_in = 0;
@@ -988,6 +1039,7 @@ static void tabbed_window_promote(struct window *window)
     // NOTE: keep the flag on a window that cannot be managed yet -- a seeded tab reads its eligibility
     // while ordered out, and clearing here would strand it with neither a node nor a later promote.
     if (!window_manager_should_manage_window(window)) return;
+    if (tabbed_window_follow_float(window)) return;
 
     window_clear_flag(window, WINDOW_TAB_MEMBER);
     if (window_manager_find_managed_window(&g_window_manager, window)) return;
