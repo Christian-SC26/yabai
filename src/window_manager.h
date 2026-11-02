@@ -192,6 +192,7 @@ struct window *window_manager_create_and_add_window(struct space_manager *sm, st
 struct window **window_manager_add_application_windows(struct space_manager *sm, struct window_manager *wm, struct application *application, int *count);
 void window_manager_add_existing_application_tabs(struct space_manager *sm, struct window_manager *wm, struct application *application);
 void window_manager_add_existing_tabs(struct space_manager *sm, struct window_manager *wm);
+void window_manager_release_tab_members(struct window_manager *wm);
 bool window_manager_add_existing_application_windows(struct space_manager *sm, struct window_manager *wm, struct application *application, int refresh_index);
 enum window_op_error window_manager_apply_grid(struct space_manager *sm, struct window_manager *wm, struct window *window, unsigned r, unsigned c, unsigned x, unsigned y, unsigned w, unsigned h);
 void window_manager_purify_window(struct window_manager *wm, struct window *window);

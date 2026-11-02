@@ -1,7 +1,34 @@
-ANGRY_TEST(nativeTabsStayDisabledByDefault)
+ANGRY_TEST(keepsNativeTabsAfterMissionControl)
 {
-    struct window_manager wm = {0};
-    ANGRY_ASSERT(wm.window_native_tabs == false, "expected window_native_tabs to be off by default");
+    bool saved = g_window_manager.window_native_tabs;
+    g_window_manager.window_native_tabs = true;
+    window_manager_correct_for_mission_control_changes(&g_space_manager, &g_window_manager);
+    bool kept = g_window_manager.window_native_tabs;
+    g_window_manager.window_native_tabs = saved;
+    ANGRY_ASSERT(kept, "expected leaving mission control to keep window_native_tabs");
+}
+
+ANGRY_TEST(keepsInsertionPointOnTabSwap)
+{
+    struct window_node node = { .window_count = 1 };
+    node.window_list[0] = node.window_order[0] = 9505;
+    struct view view = { .layout = VIEW_BSP, .root = &node, .insertion_point = 9505 };
+
+    ANGRY_ASSERT(view_swap_node_window(&view, 9505, 9506), "expected the swap to find the outgoing tab");
+    ANGRY_ASSERT(view.insertion_point == 9506, "expected a pending insertion to follow the visible tab");
+}
+
+ANGRY_TEST(releasesTabMembersWhenDisabled)
+{
+    struct window window = { .id = 9507 };
+    window.id_ptr = &window.id;
+    window_set_flag(&window, WINDOW_TAB_MEMBER);
+    table_add(&g_window_manager.window, &window.id, &window);
+
+    window_manager_release_tab_members(&g_window_manager);
+    table_remove(&g_window_manager.window, &window.id);
+
+    ANGRY_ASSERT(!window_check_flag(&window, WINDOW_TAB_MEMBER), "expected the setting to release hidden tabs");
 }
 
 ANGRY_TEST(swapsHiddenTabIntoNode)

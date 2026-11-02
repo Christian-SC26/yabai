@@ -1282,6 +1282,7 @@ static void handle_domain_config(FILE *rsp, struct token domain, char *message)
                 fprintf(rsp, "%s\n", bool_str[g_window_manager.window_native_tabs]);
             } else if (token_equals(value, ARGUMENT_COMMON_VAL_OFF)) {
                 g_window_manager.window_native_tabs = false;
+                window_manager_release_tab_members(&g_window_manager);
             } else if (token_equals(value, ARGUMENT_COMMON_VAL_ON)) {
                 if (!g_window_manager.window_native_tabs) {
                     g_window_manager.window_native_tabs = true;

@@ -1664,6 +1664,7 @@ static uint32_t *window_manager_existing_application_window_list(struct applicat
 
 // NOTE: the tab bar belongs to whichever member is showing, so only a tracked window can name a group.
 // Answer yes when a window will not say -- a skip on no evidence silently costs an application its tabs.
+// An application that times out is the exception: each probe of the scan would block the event loop.
 static bool window_manager_application_has_tab_group(struct window_manager *wm, uint32_t *window_list, int window_count)
 {
     bool answered = false;
@@ -1673,8 +1674,9 @@ static bool window_manager_application_has_tab_group(struct window_manager *wm, 
         if (!window || !window->ref) continue;
 
         CFArrayRef children_ref = NULL;
-        if (AXUIElementCopyAttributeValue(window->ref, kAXChildrenAttribute, (CFTypeRef *) &children_ref) != kAXErrorSuccess) return true;
-        if (!children_ref) return true;
+        AXError error = AXUIElementCopyAttributeValue(window->ref, kAXChildrenAttribute, (CFTypeRef *) &children_ref);
+        if (error == kAXErrorCannotComplete) return false;
+        if (error != kAXErrorSuccess || !children_ref) return true;
 
         answered = true;
         bool found = false;
@@ -1773,8 +1775,8 @@ void window_manager_add_existing_application_tabs(struct space_manager *sm, stru
         if (!element_ref) continue;
 
         CFTypeRef role = NULL;
-        AXUIElementCopyAttributeValue(element_ref, kAXRoleAttribute, &role);
-        bool adopted = false;
+        AXError error = AXUIElementCopyAttributeValue(element_ref, kAXRoleAttribute, &role);
+        bool consumed = false;
 
         if (role) {
             if (CFEqual(role, kAXWindowRole)) {
@@ -1785,10 +1787,20 @@ void window_manager_add_existing_application_tabs(struct space_manager *sm, stru
                     unseen[i] = 0;
                     --remaining;
 
+                    // NOTE: an application can also keep other windows ordered out, like the quick terminal
+                    // of Ghostty, which is a dialog. Tracking one makes it look like the application has a
+                    // window on every space, so it would never pull the user to the space of its real windows.
+                    CFTypeRef subrole = NULL;
+                    AXUIElementCopyAttributeValue(element_ref, kAXSubroleAttribute, &subrole);
+                    bool is_tab = subrole && CFEqual(subrole, kAXStandardWindowSubrole);
+                    if (subrole) CFRelease(subrole);
+                    if (!is_tab) break;
+
+                    // NOTE: the element belongs to the window from here on, even if none is returned.
+                    consumed = true;
                     struct window *window = window_manager_create_and_add_window(sm, wm, application, element_ref, element_wid, false);
                     if (window) {
                         window_set_flag(window, WINDOW_TAB_MEMBER);
-                        adopted = true;
                         ++seeded;
                     }
                     break;
@@ -1797,11 +1809,19 @@ void window_manager_add_existing_application_tabs(struct space_manager *sm, stru
             CFRelease(role);
         }
 
-        if (!adopted) CFRelease(element_ref);
+        if (!consumed) CFRelease(element_ref);
+        if (error == kAXErrorCannotComplete) break;
     }
 
     CFRelease(data_ref);
     debug("%s: %s seeded %d of %d unseen\n", __FUNCTION__, application->name, seeded, unseen_count);
+}
+
+void window_manager_release_tab_members(struct window_manager *wm)
+{
+    table_for (struct window *window, wm->window, {
+        window_clear_flag(window, WINDOW_TAB_MEMBER);
+    })
 }
 
 void window_manager_add_existing_tabs(struct space_manager *sm, struct window_manager *wm)
@@ -2927,7 +2947,6 @@ void window_manager_correct_for_mission_control_changes(struct space_manager *sm
     if (!display_list) return;
 
     float animation_duration = wm->window_animation_duration;
-    wm->window_native_tabs = false;
     wm->window_animation_duration = 0.0f;
 
     for (int i = 0; i < display_count; ++i) {
@@ -2994,6 +3013,7 @@ void window_manager_init(struct window_manager *wm)
     wm->active_window_opacity = 1.0f;
     wm->normal_window_opacity = 1.0f;
     wm->window_opacity_duration = 0.0f;
+    wm->window_native_tabs = false;
     wm->window_animation_duration = 0.0f;
     wm->window_animation_easing = ease_out_circ_type;
     wm->insert_feedback_color = rgba_color_from_hex(0xffd75f5f);

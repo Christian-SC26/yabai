@@ -644,6 +644,7 @@ bool view_swap_node_window(struct view *view, uint32_t old_wid, uint32_t new_wid
 
     // NOTE: insert_feedback is keyed by window_order[0]; re-key it or the entry dangles.
     bool rekey = node->feedback_window.id && node->window_order[0] == old_wid;
+    if (view->insertion_point == old_wid) view->insertion_point = new_wid;
     if (rekey) table_remove(&g_window_manager.insert_feedback, &node->window_order[0]);
 
     for (int i = 0; i < node->window_count; ++i) {

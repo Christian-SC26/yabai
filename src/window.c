@@ -784,22 +784,33 @@ bool window_can_move(struct window *window)
     return window_check_flag(window, WINDOW_MOVABLE);
 }
 
-bool window_ax_has_tab_group(struct window *window)
+int window_ax_tab_count(struct window *window)
 {
     CFArrayRef children = NULL;
     AXUIElementCopyAttributeValue(window->ref, kAXChildrenAttribute, (CFTypeRef *) &children);
-    if (!children) return false;
+    if (!children) return 0;
 
-    bool result = false;
+    int result = 0;
     int child_count = CFArrayGetCount(children);
 
-    for (int i = 0; i < child_count && !result; ++i) {
+    for (int i = 0; i < child_count; ++i) {
+        AXUIElementRef child = CFArrayGetValueAtIndex(children, i);
+
         CFTypeRef role = NULL;
-        AXUIElementCopyAttributeValue(CFArrayGetValueAtIndex(children, i), kAXRoleAttribute, &role);
+        AXUIElementCopyAttributeValue(child, kAXRoleAttribute, &role);
         if (!role) continue;
 
-        result = CFEqual(role, CFSTR("AXTabGroup"));
+        bool is_tab_group = CFEqual(role, CFSTR("AXTabGroup"));
         CFRelease(role);
+        if (!is_tab_group) continue;
+
+        CFArrayRef tabs = NULL;
+        AXUIElementCopyAttributeValue(child, CFSTR("AXTabs"), (CFTypeRef *) &tabs);
+        if (tabs) {
+            result = CFArrayGetCount(tabs);
+            CFRelease(tabs);
+        }
+        break;
     }
 
     CFRelease(children);

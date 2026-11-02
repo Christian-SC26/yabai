@@ -883,10 +883,10 @@ static EVENT_HANDLER(WINDOW_CREATED)
         if (tab_view) SLSWindowIsOrderedIn(g_connection, a->id, &prev_ordered_in);
 
         // NOTE: the predecessor usually leaves the space after this event, which would tile the new
-        // tab until the 1325/1326 pair undoes it. A window that already has a tab bar cannot be anything
-        // else, and the bar is what is missing in a burst of new tabs, where the predecessor is gone.
+        // tab until the 1325/1326 pair undoes it. A tab bar alone proves nothing, as it can be shown on
+        // a standalone window, but a bar with a second tab does -- even in a burst of new tabs.
         bool swapped = tab_view && tab_view->layout != VIEW_FLOAT &&
-                       (!prev_ordered_in || window_ax_has_tab_group(window)) &&
+                       (!prev_ordered_in || window_ax_tab_count(window) > 1) &&
                        tabbed_window_swap(tab_view, a, window);
 
         if (!swapped) {
@@ -897,8 +897,8 @@ static EVENT_HANDLER(WINDOW_CREATED)
                 // active space of a display resolved from unsettled bounds -- the predecessor names
                 // the space the window is about to land on, so prefer it while the query is empty.
                 int space_count = 0;
-                window_space_list(window->id, &space_count);
-                sid = !space_count && tab_view ? tab_view->sid : window_space(window->id);
+                if (tab_view) window_space_list(window->id, &space_count);
+                sid = tab_view && !space_count ? tab_view->sid : window_space(window->id);
             } else if (g_window_manager.window_origin_mode == WINDOW_ORIGIN_FOCUSED) {
                 sid = g_space_manager.current_space_id;
             } else /* if (g_window_manager.window_origin_mode == WINDOW_ORIGIN_CURSOR) */ {

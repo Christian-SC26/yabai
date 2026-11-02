@@ -784,7 +784,9 @@ CFArrayRef CGWindowListCopyWindowInfo(CGWindowListOption option, CGWindowID rela
     ANGRY_ENTRY(abortsWhenClientSendMessageReceivesNoArguments)                 \
     ANGRY_ENTRY(printsVersionAndExitsInParseArguments)                          \
     ANGRY_ENTRY(initializesSettingsAndAttemptsLockAcquisition)                  \
-    ANGRY_ENTRY(nativeTabsStayDisabledByDefault)                                \
+    ANGRY_ENTRY(keepsNativeTabsAfterMissionControl)                             \
+    ANGRY_ENTRY(keepsInsertionPointOnTabSwap)                                   \
+    ANGRY_ENTRY(releasesTabMembersWhenDisabled)                                 \
     ANGRY_ENTRY(swapsHiddenTabIntoNode)                                         \
     ANGRY_ENTRY(rejectsSwapOfUntrackedTab)                                      \
     ANGRY_ENTRY(validatesWindowEligibilityForManagedRules)                      \
