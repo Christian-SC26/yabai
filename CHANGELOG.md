@@ -5,6 +5,8 @@ All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [7.2.1] - 2026-11-02
 ### Fixed
 - **Tiled Window Staying Resized After a Mouse Resize**:
   - Releasing a mouse resize skipped the BSP adjustment when the cursor stopped before the button came up. A window resized from an edge with no split stayed outside its tile, and with `mouse_bsp_live_resize off` the split was not updated. Both now apply on release, and a stationary click still changes nothing
@@ -973,7 +975,8 @@ The *window_destroyed* signal is now triggered for windows that are implicitly d
 ### Added
 - First official release
 
-[Unreleased]: https://github.com/Christian-SC26/yabai/compare/v7.2.0...HEAD
+[Unreleased]: https://github.com/Christian-SC26/yabai/compare/v7.2.1...HEAD
+[7.2.1]: https://github.com/Christian-SC26/yabai/compare/v7.2.0...v7.2.1
 [7.2.0]: https://github.com/Christian-SC26/yabai/compare/v7.1.40...v7.2.0
 [7.1.40]: https://github.com/Christian-SC26/yabai/compare/v7.1.39...v7.1.40
 [7.1.39]: https://github.com/Christian-SC26/yabai/compare/v7.1.38...v7.1.39
