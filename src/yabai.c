@@ -338,6 +338,12 @@ int main(int argc, char **argv)
     SLSRegisterConnectionNotifyProc(g_connection, connection_handler, 808, NULL);
     SLSRegisterConnectionNotifyProc(g_connection, connection_handler, 1202, NULL);
 
+    // NOTE: 808 fires only for a re-order among windows already ordered in; a hidden tab coming
+    // forward takes the ordered-in transition instead, which posts 815 and a 1325/1326 pair.
+    SLSRegisterConnectionNotifyProc(g_connection, connection_handler, 815, NULL);
+    SLSRegisterConnectionNotifyProc(g_connection, connection_handler, 1325, NULL);
+    SLSRegisterConnectionNotifyProc(g_connection, connection_handler, 1326, NULL);
+
     if (workspace_is_macos_sequoia() || (workspace_is_macos_tahoe() || workspace_is_macos_goldengate())) {
         SLSRegisterConnectionNotifyProc(g_connection, connection_handler, 804, NULL);
     }

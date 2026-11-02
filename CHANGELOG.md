@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- **Native macOS Tabs in a Single Tile (`window_native_tabs`)**:
+  - With `yabai -m config window_native_tabs on`, the tabs of an application such as Terminal, Finder or Ghostty share one tile, so opening, switching and closing tabs no longer changes the layout. The setting is off by default
+  - Only the selected tab sits in the layout. yabai follows tab switches through WindowServer events (`1325`, `1326`, `815`) and `AXFocusedTabChanged` instead of guessing from window frames, so holding `cmd + t`, `Merge All Windows` and dragging a tab between windows keep the layout intact
+  - A tab dragged out of the tab bar becomes its own tile, and the tabs that exist when the setting is enabled are picked up right away
+  - Based on the work of @jpatrolla in asmvik/yabai#68
 
 ## [7.2.1] - 2026-11-02
 ### Fixed

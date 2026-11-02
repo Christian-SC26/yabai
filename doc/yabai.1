@@ -243,6 +243,13 @@ Specify where new managed windows will be inserted.
 Windows will keep their zoom\-state through layout changes.
 .RE
 .sp
+\fBwindow_native_tabs\fP [\fI<BOOL_SEL>\fP]
+.RS 4
+Keep the native macOS tabs of an application (Terminal, Finder, Ghostty) in a single tile. Disabled by default.
+.br
+Only the selected tab takes part in the layout, so opening, switching and closing tabs leaves it alone. A tab dragged out of the tab bar becomes its own tile, and a tab dragged into another window joins that group.
+.RE
+.sp
 \fBskip_window_focus_animation\fP [\fI<BOOL_SEL>\fP]
 .RS 4
 Bypass macOS space animation when an application or window on an inactive space is focused.

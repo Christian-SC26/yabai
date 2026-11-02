@@ -1626,6 +1626,159 @@ static uint32_t *window_manager_existing_application_window_list(struct applicat
     return space_list ? space_window_list_for_connection(space_list, space_count, application ? application->connection : 0, window_count, true) : NULL;
 }
 
+#define AX_REMOTE_TOKEN_SCAN_MAX 0x1000
+
+// NOTE: the tab bar belongs to whichever member is showing, so only a tracked window can name a group.
+// Answer yes when a window will not say -- a skip on no evidence silently costs an application its tabs.
+static bool window_manager_application_has_tab_group(struct window_manager *wm, uint32_t *window_list, int window_count)
+{
+    bool answered = false;
+
+    for (int i = 0; i < window_count; ++i) {
+        struct window *window = window_manager_find_window(wm, window_list[i]);
+        if (!window || !window->ref) continue;
+
+        CFArrayRef children_ref = NULL;
+        if (AXUIElementCopyAttributeValue(window->ref, kAXChildrenAttribute, (CFTypeRef *) &children_ref) != kAXErrorSuccess) return true;
+        if (!children_ref) return true;
+
+        answered = true;
+        bool found = false;
+        for (int j = 0; j < CFArrayGetCount(children_ref) && !found; ++j) {
+            CFTypeRef role_ref = NULL;
+            if (AXUIElementCopyAttributeValue(CFArrayGetValueAtIndex(children_ref, j), kAXRoleAttribute, &role_ref) != kAXErrorSuccess) continue;
+            if (!role_ref) continue;
+
+            found = CFEqual(role_ref, CFSTR("AXTabGroup"));
+            CFRelease(role_ref);
+        }
+
+        CFRelease(children_ref);
+        if (found) return true;
+    }
+
+    return !answered;
+}
+
+// NOTE: a hidden native tab is ordered out and on no space, and the AX API hands out no element for
+// one -- hence the remote-token scan. Do not route this through space_window_list_for_connection: its
+// admission is free to reject this exact shape, which is the dead ordered-out window it must filter.
+void window_manager_add_existing_application_tabs(struct space_manager *sm, struct window_manager *wm, struct application *application)
+{
+    uint64_t set_tags = 0;
+    uint64_t clear_tags = 0;
+
+    CFArrayRef space_list_ref = CFArrayCreate(NULL, NULL, 0, &kCFTypeArrayCallBacks);
+    CFArrayRef window_list_ref = SLSCopyWindowsWithOptionsAndTags(g_connection, application->connection, space_list_ref, 0x7, &set_tags, &clear_tags);
+    CFRelease(space_list_ref);
+    if (!window_list_ref) return;
+
+    int count = CFArrayGetCount(window_list_ref);
+    if (!count) {
+        CFRelease(window_list_ref);
+        return;
+    }
+
+    CFTypeRef query = SLSWindowQueryWindows(g_connection, window_list_ref, count);
+    CFTypeRef iterator = SLSWindowQueryResultCopyWindows(query);
+
+    uint32_t unseen[64];
+    uint32_t tracked[64];
+    int unseen_count = 0;
+    int tracked_count = 0;
+
+    while (SLSWindowIteratorAdvance(iterator)) {
+        uint32_t wid = SLSWindowIteratorGetWindowID(iterator);
+
+        if (window_manager_find_window(wm, wid)) {
+            if (tracked_count < array_count(tracked)) tracked[tracked_count++] = wid;
+            continue;
+        }
+
+        if (unseen_count == array_count(unseen))            continue;
+        if (SLSWindowIteratorGetParentID(iterator) != 0)    continue;
+        if (SLSWindowIteratorGetLevel(iterator) != 0)       continue;
+
+        uint64_t attributes = SLSWindowIteratorGetAttributes(iterator);
+        if (attributes != 0x0 && attributes != 0x1)         continue;
+
+        uint64_t tags = SLSWindowIteratorGetTags(iterator);
+        if (!(tags & 0x300000000000000) || !(tags & 0x1))   continue;
+
+        uint8_t ordered_in = 0;
+        SLSWindowIsOrderedIn(g_connection, wid, &ordered_in);
+        if (ordered_in)                                     continue;
+
+        unseen[unseen_count++] = wid;
+    }
+
+    CFRelease(query);
+    CFRelease(iterator);
+    CFRelease(window_list_ref);
+
+    if (!unseen_count || !tracked_count) return;
+
+    if (!window_manager_application_has_tab_group(wm, tracked, tracked_count)) {
+        debug("%s: %s skipped %d candidates, no tab group\n", __FUNCTION__, application->name, unseen_count);
+        return;
+    }
+
+    CFMutableDataRef data_ref = CFDataCreateMutable(NULL, 0x14);
+    CFDataIncreaseLength(data_ref, 0x14);
+
+    uint8_t *data = CFDataGetMutableBytePtr(data_ref);
+    *(uint32_t *) (data + 0x0) = application->pid;
+    *(uint32_t *) (data + 0x8) = 0x636f636f;
+
+    int seeded = 0;
+    int remaining = unseen_count;
+
+    for (uint64_t element_id = 0; element_id < AX_REMOTE_TOKEN_SCAN_MAX && remaining > 0; ++element_id) {
+        memcpy(data + 0xc, &element_id, sizeof(uint64_t));
+        AXUIElementRef element_ref = _AXUIElementCreateWithRemoteToken(data_ref);
+        if (!element_ref) continue;
+
+        CFTypeRef role = NULL;
+        AXUIElementCopyAttributeValue(element_ref, kAXRoleAttribute, &role);
+        bool adopted = false;
+
+        if (role) {
+            if (CFEqual(role, kAXWindowRole)) {
+                uint32_t element_wid = ax_window_id(element_ref);
+
+                for (int i = 0; element_wid && i < unseen_count; ++i) {
+                    if (unseen[i] != element_wid) continue;
+                    unseen[i] = 0;
+                    --remaining;
+
+                    struct window *window = window_manager_create_and_add_window(sm, wm, application, element_ref, element_wid, false);
+                    if (window) {
+                        window_set_flag(window, WINDOW_TAB_MEMBER);
+                        adopted = true;
+                        ++seeded;
+                    }
+                    break;
+                }
+            }
+            CFRelease(role);
+        }
+
+        if (!adopted) CFRelease(element_ref);
+    }
+
+    CFRelease(data_ref);
+    debug("%s: %s seeded %d of %d unseen\n", __FUNCTION__, application->name, seeded, unseen_count);
+}
+
+void window_manager_add_existing_tabs(struct space_manager *sm, struct window_manager *wm)
+{
+    table_for (struct application *application, wm->application, {
+        window_manager_add_existing_application_tabs(sm, wm, application);
+    })
+
+    update_window_notifications();
+}
+
 bool window_manager_add_existing_application_windows(struct space_manager *sm, struct window_manager *wm, struct application *application, int refresh_index)
 {
     bool result = false;
@@ -2647,6 +2800,9 @@ static void window_manager_check_for_windows_on_space(struct window_manager *wm,
 
         if (!window_manager_should_manage_window(window)) continue;
 
+        // NOTE: a tab member reaching a space is a group switching tabs, not a window to tile.
+        if (window_check_flag(window, WINDOW_TAB_MEMBER)) continue;
+
         struct view *existing_view = window_manager_find_managed_window(wm, window);
         if (existing_view && existing_view->layout != VIEW_FLOAT && existing_view != view) {
 
@@ -2737,6 +2893,7 @@ void window_manager_correct_for_mission_control_changes(struct space_manager *sm
     if (!display_list) return;
 
     float animation_duration = wm->window_animation_duration;
+    wm->window_native_tabs = false;
     wm->window_animation_duration = 0.0f;
 
     for (int i = 0; i < display_count; ++i) {

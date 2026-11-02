@@ -175,6 +175,10 @@ Global Settings
 *window_zoom_persist* ['<BOOL_SEL>']::
     Windows will keep their zoom-state through layout changes.
 
+*window_native_tabs* ['<BOOL_SEL>']::
+    Keep the native macOS tabs of an application (Terminal, Finder, Ghostty) in a single tile. Disabled by default. +
+    Only the selected tab takes part in the layout, so opening, switching and closing tabs leaves it alone. A tab dragged out of the tab bar becomes its own tile, and a tab dragged into another window joins that group.
+
 *skip_window_focus_animation* ['<BOOL_SEL>']::
     Bypass macOS space animation when an application or window on an inactive space is focused. +
     You should only enable this if you do NOT use the scripting addition. +

@@ -1,3 +1,30 @@
+ANGRY_TEST(nativeTabsStayDisabledByDefault)
+{
+    struct window_manager wm = {0};
+    ANGRY_ASSERT(wm.window_native_tabs == false, "expected window_native_tabs to be off by default");
+}
+
+ANGRY_TEST(swapsHiddenTabIntoNode)
+{
+    struct window_node node = { .window_count = 1 };
+    node.window_list[0] = node.window_order[0] = 9501;
+    struct view view = { .layout = VIEW_BSP, .root = &node };
+
+    ANGRY_ASSERT(view_swap_node_window(&view, 9501, 9502), "expected the swap to find the outgoing tab");
+    ANGRY_ASSERT(node.window_list[0] == 9502 && node.window_order[0] == 9502, "expected the node to hold the incoming tab");
+    ANGRY_ASSERT(node.window_count == 1, "expected a tab switch to keep the node size");
+}
+
+ANGRY_TEST(rejectsSwapOfUntrackedTab)
+{
+    struct window_node node = { .window_count = 1 };
+    node.window_list[0] = node.window_order[0] = 9511;
+    struct view view = { .layout = VIEW_BSP, .root = &node };
+
+    ANGRY_ASSERT(!view_swap_node_window(&view, 9599, 9512), "expected no swap for a window outside the view");
+    ANGRY_ASSERT(node.window_list[0] == 9511, "expected the node to stay untouched");
+}
+
 ANGRY_TEST(validatesWindowEligibilityForManagedRules)
 {
     struct window win = { .is_root = true };

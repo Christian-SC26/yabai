@@ -238,7 +238,9 @@ static EVENT_HANDLER(APPLICATION_LAUNCHED)
     for (int i = 0; i < window_count; ++i) {
         struct window *window = window_list[i];
 
-        if (window_manager_should_manage_window(window) && !window_manager_find_managed_window(&g_window_manager, window)) {
+        if (window_manager_should_manage_window(window) &&
+            !window_check_flag(window, WINDOW_TAB_MEMBER) &&
+            !window_manager_find_managed_window(&g_window_manager, window)) {
             if (default_origin) sid = window_space(window->id);
 
             struct view *view = space_manager_find_view(&g_space_manager, sid);
@@ -681,7 +683,9 @@ static EVENT_HANDLER(APPLICATION_VISIBLE)
     for (int i = 0; i < window_count; ++i) {
         struct window *window = window_list[i];
 
-        if (window_manager_should_manage_window(window) && !window_manager_find_managed_window(&g_window_manager, window)) {
+        if (window_manager_should_manage_window(window) &&
+            !window_check_flag(window, WINDOW_TAB_MEMBER) &&
+            !window_manager_find_managed_window(&g_window_manager, window)) {
             struct view *view = space_manager_find_view(&g_space_manager, window_space(window->id));
             if (view->layout == VIEW_FLOAT) continue;
 
@@ -788,6 +792,55 @@ static EVENT_HANDLER(APPLICATION_HIDDEN)
     event_signal_push(SIGNAL_APPLICATION_HIDDEN, application);
 }
 
+static bool tabbed_window_swap(struct view *view, struct window *a, struct window *b);
+
+#define TAB_SWITCH_PAIR_MS 250.0f
+#define TAB_ORDERED_OUT_SLOTS 8
+
+// NOTE: deduped by wid -- an open menu repeats the removal for its own untracked wid and would
+// otherwise flush the entry the create reads back.
+static struct {
+    uint32_t wid[TAB_ORDERED_OUT_SLOTS];
+    uint64_t time[TAB_ORDERED_OUT_SLOTS];
+    int index;
+} g_tab_ordered_out;
+
+static void tab_ordered_out_record(uint32_t wid)
+{
+    for (int i = 0; i < TAB_ORDERED_OUT_SLOTS; ++i) {
+        if (g_tab_ordered_out.wid[i] != wid) continue;
+        g_tab_ordered_out.time[i] = read_os_timer();
+        return;
+    }
+
+    g_tab_ordered_out.wid[g_tab_ordered_out.index] = wid;
+    g_tab_ordered_out.time[g_tab_ordered_out.index] = read_os_timer();
+    g_tab_ordered_out.index = (g_tab_ordered_out.index + 1) % TAB_ORDERED_OUT_SLOTS;
+}
+
+// NOTE: a recent removal alone cannot refuse the tile -- a new window of an app that posts the create
+// before the space add is not ordered in either, and gets no 815 to recover on.
+static bool tabbed_window_adopt_hidden(struct window *window)
+{
+    if (!g_window_manager.window_native_tabs) return false;
+
+    uint64_t now = read_os_timer();
+
+    for (int i = 0; i < TAB_ORDERED_OUT_SLOTS; ++i) {
+        if (g_tab_ordered_out.wid[i] != window->id) continue;
+        if (((float)(now - g_tab_ordered_out.time[i])) * (1000.0f / (float) read_os_freq()) >= TAB_SWITCH_PAIR_MS) return false;
+
+        uint8_t ordered_in = 0;
+        SLSWindowIsOrderedIn(g_connection, window->id, &ordered_in);
+        if (ordered_in) return false;
+
+        window_set_flag(window, WINDOW_TAB_MEMBER);
+        return true;
+    }
+
+    return false;
+}
+
 static EVENT_HANDLER(WINDOW_CREATED)
 {
     uint32_t window_id = ax_window_id(context);
@@ -816,19 +869,45 @@ static EVENT_HANDLER(WINDOW_CREATED)
         }
     }
 
-    if (window_manager_should_manage_window(window) && !window_manager_find_managed_window(&g_window_manager, window)) {
-        uint64_t sid;
+    if (window_manager_should_manage_window(window) && !window_manager_find_managed_window(&g_window_manager, window) &&
+        !tabbed_window_adopt_hidden(window)) {
+        // NOTE: a new window whose same-app predecessor just left the space is that group's incoming
+        // tab, and nothing else names the group -- the 1325/1326 pair cannot swap it because the
+        // incoming window is not tracked until this event, so the predecessor is the only signal.
+        uint32_t prev = g_window_manager.focused_window_id;
+        struct window *a = prev && prev != window->id ? window_manager_find_window(&g_window_manager, prev) : NULL;
+        struct view *tab_view = g_window_manager.window_native_tabs && a && a->application == window->application
+                                  ? window_manager_find_managed_window(&g_window_manager, a) : NULL;
 
-        if (g_window_manager.window_origin_mode == WINDOW_ORIGIN_DEFAULT) {
-            sid = window_space(window->id);
-        } else if (g_window_manager.window_origin_mode == WINDOW_ORIGIN_FOCUSED) {
-            sid = g_space_manager.current_space_id;
-        } else /* if (g_window_manager.window_origin_mode == WINDOW_ORIGIN_CURSOR) */ {
-            sid = space_manager_cursor_space();
+        uint8_t prev_ordered_in = 1;
+        if (tab_view) SLSWindowIsOrderedIn(g_connection, a->id, &prev_ordered_in);
+
+        // NOTE: the predecessor usually leaves the space after this event, which would tile the new
+        // tab until the 1325/1326 pair undoes it. A window that already has a tab bar cannot be anything
+        // else, and the bar is what is missing in a burst of new tabs, where the predecessor is gone.
+        bool swapped = tab_view && tab_view->layout != VIEW_FLOAT &&
+                       (!prev_ordered_in || window_ax_has_tab_group(window)) &&
+                       tabbed_window_swap(tab_view, a, window);
+
+        if (!swapped) {
+            uint64_t sid;
+
+            if (g_window_manager.window_origin_mode == WINDOW_ORIGIN_DEFAULT) {
+                // NOTE: a window is on no space yet at this event, and window_space then guesses the
+                // active space of a display resolved from unsettled bounds -- the predecessor names
+                // the space the window is about to land on, so prefer it while the query is empty.
+                int space_count = 0;
+                window_space_list(window->id, &space_count);
+                sid = !space_count && tab_view ? tab_view->sid : window_space(window->id);
+            } else if (g_window_manager.window_origin_mode == WINDOW_ORIGIN_FOCUSED) {
+                sid = g_space_manager.current_space_id;
+            } else /* if (g_window_manager.window_origin_mode == WINDOW_ORIGIN_CURSOR) */ {
+                sid = space_manager_cursor_space();
+            }
+
+            struct view *view = space_manager_tile_window_on_space(&g_space_manager, window, sid);
+            window_manager_add_managed_window(&g_window_manager, window, view);
         }
-
-        struct view *view = space_manager_tile_window_on_space(&g_space_manager, window, sid);
-        window_manager_add_managed_window(&g_window_manager, window, view);
     }
 
     if (window_manager_is_window_eligible(window)) {
@@ -839,6 +918,13 @@ static EVENT_HANDLER(WINDOW_CREATED)
         update_window_notifications();
     }
 }
+
+#define TAB_PROMOTE_MS 50.0f
+
+static struct {
+    uint32_t wid;
+    uint64_t time;
+} g_tab_promoted;
 
 static EVENT_HANDLER(WINDOW_DESTROYED)
 {
@@ -851,6 +937,19 @@ static EVENT_HANDLER(WINDOW_DESTROYED)
     debug("%s: %s %d\n", __FUNCTION__, window->application ? window->application->name : "<unknown>", window->id);
 
     struct view *view = window_manager_find_managed_window(&g_window_manager, window);
+
+    // NOTE: the 1325/1326 pair normally hands the node to the successor tab before this event, but the
+    // pair and the destroy come from different sources -- keep the handover for when the destroy wins.
+    if (view && view->layout != VIEW_FLOAT && g_tab_promoted.wid && g_tab_promoted.wid != window->id) {
+        float dt = ((float)(read_os_timer() - g_tab_promoted.time)) * (1000.0f / (float) read_os_freq());
+        struct window *heir = dt < TAB_PROMOTE_MS ? window_manager_find_window(&g_window_manager, g_tab_promoted.wid) : NULL;
+
+        if (heir && heir->application == window->application && tabbed_window_swap(view, window, heir)) {
+            g_tab_promoted.wid = 0;
+            view = NULL;
+        }
+    }
+
     if (view) {
         space_manager_untile_window(view, window);
         window_manager_remove_managed_window(&g_window_manager, window->id);
@@ -871,6 +970,49 @@ static EVENT_HANDLER(WINDOW_DESTROYED)
     if (workspace_is_macos_sequoia() || (workspace_is_macos_tahoe() || workspace_is_macos_goldengate())) {
         update_window_notifications();
     }
+}
+
+#define WINDOW_FOCUS_FROM_TAB 1
+
+// NOTE: window_space reports a space for a hidden tab, so ordered-in is the only reliable test for one.
+// Moving a tab out to its own window posts no create and no 1326 -- 815 is the only signal it happened.
+static void tabbed_window_promote(struct window *window)
+{
+    uint8_t ordered_in = 0;
+    SLSWindowIsOrderedIn(g_connection, window->id, &ordered_in);
+    if (!ordered_in) return;
+
+    uint64_t sid = window_space(window->id);
+    if (!sid) return;
+
+    // NOTE: keep the flag on a window that cannot be managed yet -- a seeded tab reads its eligibility
+    // while ordered out, and clearing here would strand it with neither a node nor a later promote.
+    if (!window_manager_should_manage_window(window)) return;
+
+    window_clear_flag(window, WINDOW_TAB_MEMBER);
+    if (window_manager_find_managed_window(&g_window_manager, window)) return;
+
+    struct view *view = space_manager_tile_window_on_space(&g_space_manager, window, sid);
+    window_manager_add_managed_window(&g_window_manager, window, view);
+}
+
+// NOTE: merging windows into one group orders each of them out and drops it from the space with no pair
+// and no destroy, so a managed window that is no longer ordered in has become a hidden tab and must give
+// up its node -- never the focused one, which is the group they merge into and the tab a switch replaces.
+static void tabbed_window_demote(struct window *window)
+{
+    if (g_window_manager.focused_window_id == window->id) return;
+
+    uint8_t ordered_in = 0;
+    SLSWindowIsOrderedIn(g_connection, window->id, &ordered_in);
+    if (ordered_in) return;
+
+    struct view *view = window_manager_find_managed_window(&g_window_manager, window);
+    if (!view || view->layout == VIEW_FLOAT) return;
+
+    space_manager_untile_window(view, window);
+    window_manager_remove_managed_window(&g_window_manager, window->id);
+    window_set_flag(window, WINDOW_TAB_MEMBER);
 }
 
 static EVENT_HANDLER(WINDOW_FOCUSED)
@@ -917,6 +1059,17 @@ static EVENT_HANDLER(WINDOW_FOCUSED)
         }
     }
 
+    // NOTE: the tab a swap demoted can still have a plain focus event in flight; letting it land points
+    // focused_window_id at a window with no node, and every later tab pairs against that and opens a
+    // second one. A hidden tab is never ordered in, so it cannot legitimately hold focus.
+    if (param1 != WINDOW_FOCUS_FROM_TAB && window_check_flag(window, WINDOW_TAB_MEMBER)) {
+        uint8_t ordered_in = 0;
+        SLSWindowIsOrderedIn(g_connection, window->id, &ordered_in);
+        if (!ordered_in) return;
+
+        tabbed_window_promote(window);
+    }
+
     debug("%s: %s %d\n", __FUNCTION__, window->application->name, window->id);
 
     bool is_sticky = window_check_flag(window, WINDOW_STICKY) || window_is_sticky(window->id);
@@ -930,6 +1083,68 @@ static EVENT_HANDLER(WINDOW_FOCUSED)
     window_did_receive_focus(&g_window_manager, &g_mouse_state, window);
     event_signal_push(SIGNAL_WINDOW_FOCUSED, window);
     window_manager_validate_and_check_for_windows_on_space(&g_space_manager, &g_window_manager, g_space_manager.current_space_id);
+}
+
+static bool tabbed_window_swap(struct view *view, struct window *a, struct window *b)
+{
+    struct view *b_view = window_manager_find_managed_window(&g_window_manager, b);
+    if ((b_view && b_view != view) ||
+        !window_manager_should_manage_window(b) ||
+        !view_find_window_node(view, a->id)) {
+        debug("%s: %s %d -> %d rejected\n", __FUNCTION__, b->application->name, a->id, b->id);
+        return false;
+    }
+
+    // NOTE: Finder posts kAXFocusedWindowChanged for a tabbed window, which AppKit suppresses
+    // everywhere else, so the incoming tab may already be tiled by the time the pair lands.
+    if (b_view) {
+        space_manager_untile_window(view, b);
+        window_manager_remove_managed_window(&g_window_manager, b->id);
+    }
+
+    if (!view_swap_node_window(view, a->id, b->id)) {
+        debug("%s: %s %d -> %d rejected\n", __FUNCTION__, b->application->name, a->id, b->id);
+        return false;
+    }
+
+    window_manager_adjust_layer(a, LAYER_NORMAL);
+    window_manager_remove_managed_window(&g_window_manager, a->id);
+    window_manager_adjust_layer(b, LAYER_BELOW);
+    window_manager_add_managed_window(&g_window_manager, b, view);
+    window_set_flag(a, WINDOW_TAB_MEMBER);
+    window_clear_flag(b, WINDOW_TAB_MEMBER);
+
+    // NOTE: the create path pairs a new tab against the focused window, so focus has to follow the swap
+    // or the next new tab in that group pairs against a demoted window and opens a second node.
+    if (g_window_manager.focused_window_id == a->id) g_window_manager.focused_window_id = b->id;
+
+    // NOTE: not window_node_flush; that animates the incoming tab in from the frame it kept while hidden.
+    struct window_node *node = view_find_window_node(view, b->id);
+    struct area area = node->zoom ? node->zoom->area : node->area;
+    window_manager_set_window_frame(b, area.x, area.y, area.w, area.h);
+
+    debug("%s: %s %d -> %d\n", __FUNCTION__, b->application->name, a->id, b->id);
+    return true;
+}
+
+// NOTE: AppKit posts this instead of kAXFocusedWindowChanged for a tabbed window and names only the
+// INCOMING tab; the outgoing one is named by the 1325/1326 pair, which is where the node swap happens.
+// An unknown wid is a window still being created -- adopting it here would starve WINDOW_CREATED.
+static EVENT_HANDLER(TABBED_WINDOW_FOCUSED)
+{
+    uint32_t wid = (uint32_t) param1;
+    CFRelease(context);
+
+    if (!g_window_manager.window_native_tabs) return;
+
+    debug("%s: %d\n", __FUNCTION__, wid);
+
+    if (!window_manager_find_window(&g_window_manager, wid)) return;
+
+    g_tab_promoted.wid = wid;
+    g_tab_promoted.time = read_os_timer();
+
+    event_loop_post(&g_event_loop, WINDOW_FOCUSED, (void *)(intptr_t) wid, WINDOW_FOCUS_FROM_TAB);
 }
 
 static EVENT_HANDLER(WINDOW_MOVED)
@@ -1206,7 +1421,9 @@ static EVENT_HANDLER(WINDOW_DEMINIMIZED)
     uint64_t sid = space_manager_active_space();
     if (space_manager_is_window_on_space(sid, window)) {
         debug("%s: window %s %d is deminimized on active space\n", __FUNCTION__, window->application->name, window->id);
-        if (window_manager_should_manage_window(window) && !window_manager_find_managed_window(&g_window_manager, window)) {
+        if (window_manager_should_manage_window(window) &&
+            !window_check_flag(window, WINDOW_TAB_MEMBER) &&
+            !window_manager_find_managed_window(&g_window_manager, window)) {
             struct window *last_window = window_manager_find_window(&g_window_manager, g_window_manager.last_window_id);
             uint32_t insertion_point = last_window && last_window->application->pid != window->application->pid ? last_window->id : 0;
             struct view *view = space_manager_tile_window_on_space_with_insertion_point(&g_space_manager, window, sid, insertion_point);
@@ -1250,6 +1467,69 @@ static EVENT_HANDLER(SLS_WINDOW_ORDERED)
     debug("%s: %d\n", __FUNCTION__, wid);
     struct window_node *node = table_find(&g_window_manager.insert_feedback, &wid);
     if (node) SLSOrderWindow(g_connection, node->feedback_window.id, 1, node->window_order[0]);
+}
+
+static EVENT_HANDLER(SLS_WINDOW_VISIBLE)
+{
+    if (!g_window_manager.window_native_tabs) return;
+
+    uint32_t wid = (uint64_t)(intptr_t) context;
+    debug("%s: %d\n", __FUNCTION__, wid);
+
+    struct window *window = window_manager_find_window(&g_window_manager, wid);
+    if (window && window_check_flag(window, WINDOW_TAB_MEMBER)) tabbed_window_promote(window);
+}
+
+static struct {
+    uint32_t wid;
+    uint64_t time;
+} g_tab_ordered_in;
+
+static EVENT_HANDLER(SLS_ADDED_TO_SPACE)
+{
+    if (!g_window_manager.window_native_tabs) return;
+
+    uint32_t wid = (uint64_t)(intptr_t) context;
+    debug("%s: %d\n", __FUNCTION__, wid);
+
+    // NOTE: tearing a tab out puts an untracked drag proxy on the space between the pair, and stashing
+    // it would shadow the tab actually coming forward -- only a tracked window can be the incoming one.
+    if (!window_manager_find_window(&g_window_manager, wid)) return;
+
+    g_tab_ordered_in.wid = wid;
+    g_tab_ordered_in.time = read_os_timer();
+}
+
+// NOTE: a hidden tab coming forward is the one thing that pairs a space add with a space removal, but
+// both notifications are noisy alone -- a tooltip adds and removes the same wid, a closing window
+// repeats the removal -- so the pair is only a tab switch when it names two known windows of one app.
+static EVENT_HANDLER(SLS_REMOVED_FROM_SPACE)
+{
+    if (!g_window_manager.window_native_tabs) return;
+
+    uint32_t wid = (uint64_t)(intptr_t) context;
+    debug("%s: %d\n", __FUNCTION__, wid);
+
+    struct window *a = window_manager_find_window(&g_window_manager, wid);
+    if (!a) {
+        tab_ordered_out_record(wid);
+        return;
+    }
+
+    uint32_t incoming = g_tab_ordered_in.wid;
+    if (incoming && incoming != wid) {
+        float dt = ((float)(read_os_timer() - g_tab_ordered_in.time)) * (1000.0f / (float) read_os_freq());
+        struct window *b = dt < TAB_SWITCH_PAIR_MS ? window_manager_find_window(&g_window_manager, incoming) : NULL;
+        struct view *view = b && b->application == a->application
+                              ? window_manager_find_managed_window(&g_window_manager, a) : NULL;
+
+        if (view && view->layout != VIEW_FLOAT) {
+            g_tab_ordered_in.wid = 0;
+            if (tabbed_window_swap(view, a, b)) return;
+        }
+    }
+
+    tabbed_window_demote(a);
 }
 
 static EVENT_HANDLER(SLS_WINDOW_DESTROYED)

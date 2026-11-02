@@ -784,6 +784,28 @@ bool window_can_move(struct window *window)
     return window_check_flag(window, WINDOW_MOVABLE);
 }
 
+bool window_ax_has_tab_group(struct window *window)
+{
+    CFArrayRef children = NULL;
+    AXUIElementCopyAttributeValue(window->ref, kAXChildrenAttribute, (CFTypeRef *) &children);
+    if (!children) return false;
+
+    bool result = false;
+    int child_count = CFArrayGetCount(children);
+
+    for (int i = 0; i < child_count && !result; ++i) {
+        CFTypeRef role = NULL;
+        AXUIElementCopyAttributeValue(CFArrayGetValueAtIndex(children, i), kAXRoleAttribute, &role);
+        if (!role) continue;
+
+        result = CFEqual(role, CFSTR("AXTabGroup"));
+        CFRelease(role);
+    }
+
+    CFRelease(children);
+    return result;
+}
+
 bool window_ax_can_resize(struct window *window)
 {
     Boolean result;

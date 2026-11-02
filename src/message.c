@@ -28,6 +28,7 @@ extern bool g_verbose;
 #define COMMAND_CONFIG_WINDOW_PLACEMENT      "window_placement"
 #define COMMAND_CONFIG_WINDOW_INSERT_POINT   "window_insertion_point"
 #define COMMAND_CONFIG_WINDOW_ZOOM_PERSIST   "window_zoom_persist"
+#define COMMAND_CONFIG_WINDOW_NATIVE_TABS    "window_native_tabs"
 #define COMMAND_CONFIG_OPACITY               "window_opacity"
 #define COMMAND_CONFIG_OPACITY_DURATION      "window_opacity_duration"
 #define COMMAND_CONFIG_ANIMATION_DURATION    "window_animation_duration"
@@ -1272,6 +1273,20 @@ static void handle_domain_config(FILE *rsp, struct token domain, char *message)
                 g_space_manager.window_zoom_persist = false;
             } else if (token_equals(value, ARGUMENT_COMMON_VAL_ON)) {
                 g_space_manager.window_zoom_persist = true;
+            } else {
+                daemon_fail(rsp, "unknown value '%.*s' given to command '%.*s' for domain '%.*s'\n", value.length, value.text, command.length, command.text, domain.length, domain.text);
+            }
+        } else if (token_equals(command, COMMAND_CONFIG_WINDOW_NATIVE_TABS)) {
+            struct token value = get_token(&message);
+            if (!token_is_valid(value)) {
+                fprintf(rsp, "%s\n", bool_str[g_window_manager.window_native_tabs]);
+            } else if (token_equals(value, ARGUMENT_COMMON_VAL_OFF)) {
+                g_window_manager.window_native_tabs = false;
+            } else if (token_equals(value, ARGUMENT_COMMON_VAL_ON)) {
+                if (!g_window_manager.window_native_tabs) {
+                    g_window_manager.window_native_tabs = true;
+                    window_manager_add_existing_tabs(&g_space_manager, &g_window_manager);
+                }
             } else {
                 daemon_fail(rsp, "unknown value '%.*s' given to command '%.*s' for domain '%.*s'\n", value.length, value.text, command.length, command.text, domain.length, domain.text);
             }
