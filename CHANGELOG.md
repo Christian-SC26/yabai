@@ -12,6 +12,10 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   - A tab dragged out of the tab bar becomes its own tile, and the tabs that exist when the setting is enabled are picked up right away
   - Based on the work of @jpatrolla in asmvik/yabai#68
 
+### Fixed
+- **Keyboard Focus After Leaving Mission Control**:
+  - Leaving Mission Control any other way than with escape, such as with a gesture, left the application in front without a key window, so the keyboard reached nothing until the next click. The restored window is now made the key window
+
 ## [7.2.1] - 2026-11-02
 ### Fixed
 - **Tiled Window Staying Resized After a Mouse Resize**:

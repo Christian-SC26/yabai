@@ -2400,8 +2400,21 @@ static EVENT_HANDLER(MISSION_CONTROL_EXIT)
 
             if (restore_window) {
                 debug("%s: restoring focus to previous window %s %d on space %lld\n", __FUNCTION__, restore_window->application->name, restore_window->id, current_sid);
+                // NOTE: read before the raise, which can already change what the application reports.
+                uint32_t old_key_ids[2] = {
+                    application_focused_window(restore_window->application),
+                    psn_equals(&g_window_manager.focused_window_psn, &restore_window->application->psn) ? g_window_manager.focused_window_id : 0
+                };
+
                 SLSSpaceSetFrontPSN(g_connection, current_sid, restore_window->application->psn);
                 window_manager_focus_window_with_raise(&restore_window->application->psn, restore_window->id, restore_window->ref);
+
+                //
+                // NOTE: Only escape hands the key window back by itself. After a gesture the application is
+                // in front, but without a key window, so the keyboard reaches nothing until the next click.
+                //
+
+                window_manager_transfer_key_window(&restore_window->application->psn, restore_window->id, old_key_ids);
 
                 g_process_manager.last_front_pid = g_process_manager.front_pid;
                 g_process_manager.front_pid = restore_window->application->pid;

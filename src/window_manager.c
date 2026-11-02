@@ -1281,7 +1281,7 @@ struct window *window_manager_find_second_cousin_for_managed_window(struct windo
     return window_manager_find_window(wm, uncle_node->right->window_order[0]);
 }
 
-static void window_manager_make_key_window(ProcessSerialNumber *window_psn, uint32_t window_id)
+void window_manager_make_key_window(ProcessSerialNumber *window_psn, uint32_t window_id)
 {
     //
     // :SynthesizedEvent
@@ -1291,18 +1291,52 @@ static void window_manager_make_key_window(ProcessSerialNumber *window_psn, uint
     // event-tap is placed at the point where session events have been
     // annotated to flow to an application.
     //
+    // NOTE: the buffer is local because leaving Mission Control also calls this from the main queue.
+    //
 
-    memset(g_event_bytes, 0, 0xf8);
-    g_event_bytes[0x04] = 0xf8;
-    g_event_bytes[0x3a] = 0x10;
-    memcpy(g_event_bytes + 0x3c, &window_id, sizeof(uint32_t));
-    memset(g_event_bytes + 0x20, 0xff, 0x10);
+    uint8_t event_bytes[0xf8] = {0};
+    event_bytes[0x04] = 0xf8;
+    event_bytes[0x3a] = 0x10;
+    memcpy(event_bytes + 0x3c, &window_id, sizeof(uint32_t));
+    memset(event_bytes + 0x20, 0xff, 0x10);
 
-    g_event_bytes[0x08] = 0x01;
-    SLPSPostEventRecordTo(window_psn, g_event_bytes);
+    event_bytes[0x08] = 0x01;
+    SLPSPostEventRecordTo(window_psn, event_bytes);
 
-    g_event_bytes[0x08] = 0x02;
-    SLPSPostEventRecordTo(window_psn, g_event_bytes);
+    event_bytes[0x08] = 0x02;
+    SLPSPostEventRecordTo(window_psn, event_bytes);
+}
+
+//
+// NOTE: A key event alone does not make the window that had the keyboard give it up, which leaves two windows
+// of one application drawn as active. They have to be deactivated first, like when focusing a window normally.
+//
+void window_manager_transfer_key_window(ProcessSerialNumber *window_psn, uint32_t window_id, uint32_t old_ids[2])
+{
+    uint8_t event_bytes[0xf8] = {0};
+    event_bytes[0x04] = 0xf8;
+    event_bytes[0x08] = 0x0d;
+
+    bool deactivated = false;
+    for (int i = 0; i < 2; ++i) {
+        if (!old_ids[i] || old_ids[i] == window_id) continue;
+        if (i == 1 && old_ids[1] == old_ids[0]) continue;
+
+        event_bytes[0x8a] = 0x02;
+        memcpy(event_bytes + 0x3c, &old_ids[i], sizeof(uint32_t));
+        SLPSPostEventRecordTo(window_psn, event_bytes);
+        deactivated = true;
+    }
+
+    if (deactivated) {
+        usleep(40000);
+
+        event_bytes[0x8a] = 0x01;
+        memcpy(event_bytes + 0x3c, &window_id, sizeof(uint32_t));
+        SLPSPostEventRecordTo(window_psn, event_bytes);
+    }
+
+    window_manager_make_key_window(window_psn, window_id);
 }
 
 void window_manager_focus_window_without_raise(ProcessSerialNumber *window_psn, uint32_t window_id)
