@@ -71,10 +71,27 @@ void event_loop_reset_open_menus(void)
     open_menus = 0;
 }
 
+// NOTE: tabs of one group share a frame, and a window of the same application in the same frame that
+// loses focus to another is the tab being hidden. Its opacity is what shows for a moment when it is
+// selected again, since WindowServer drops alpha changes while it is hidden, so it must not be dimmed.
+static bool window_is_outgoing_tab(struct window *outgoing, struct window *incoming)
+{
+    if (!g_window_manager.window_native_tabs) return false;
+    if (outgoing->application != incoming->application) return false;
+
+    CGRect a = {}, b = {};
+    SLSGetWindowBounds(g_connection, outgoing->id, &a);
+    SLSGetWindowBounds(g_connection, incoming->id, &b);
+
+    return fabs(a.origin.x - b.origin.x) < 2.0 && fabs(a.origin.y - b.origin.y) < 2.0 &&
+           fabs(a.size.width - b.size.width) < 2.0 && fabs(a.size.height - b.size.height) < 2.0;
+}
+
 static void window_did_receive_focus(struct window_manager *wm, struct mouse_state *ms, struct window *window)
 {
     struct window *focused_window = window_manager_find_window(wm, wm->focused_window_id);
-    if (focused_window && focused_window != window && window_space(focused_window->id) == window_space(window->id)) {
+    if (focused_window && focused_window != window && window_space(focused_window->id) == window_space(window->id) &&
+        !window_is_outgoing_tab(focused_window, window)) {
         window_manager_set_window_opacity(wm, focused_window, g_window_manager.normal_window_opacity);
     }
 
@@ -864,12 +881,12 @@ static void tabbed_window_sync_opacity(struct window *window)
 
 // NOTE: the incoming tab's own focus event names a window that is not tracked yet and is dropped, so
 // the handover is the only place that sees focus move -- it has to carry the opacity along, or the new
-// tab keeps the normal_window_opacity it was given when it was created.
+// tab keeps the normal_window_opacity it was given when it was created. The outgoing tab is left alone:
+// it is about to be hidden, and the opacity it keeps is what shows for a moment when it is selected again.
 static void tabbed_window_hand_over_focus(struct window *from, struct window *to)
 {
     if (g_window_manager.focused_window_id == from->id) {
         g_window_manager.focused_window_id = to->id;
-        window_manager_set_window_opacity(&g_window_manager, from, g_window_manager.normal_window_opacity);
     }
 
     tabbed_window_sync_opacity(to);
