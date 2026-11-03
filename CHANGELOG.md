@@ -5,13 +5,15 @@ All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [7.3.0] - 2026-11-03
 ### Added
 - **Native macOS Tabs in a Single Tile (`window_native_tabs`)**:
   - With `yabai -m config window_native_tabs on`, the tabs of an application such as Terminal, Finder or Ghostty share one tile, so opening, switching and closing tabs no longer changes the layout. The setting is off by default
   - Only the selected tab sits in the layout. yabai follows tab switches through WindowServer events (`1325`, `1326`, `815`) and `AXFocusedTabChanged` instead of guessing from window frames, so holding `cmd + t`, `Merge All Windows` and dragging a tab between windows keep the layout intact
   - A tab dragged out of the tab bar becomes its own tile, and the tabs that exist when the setting is enabled are picked up right away
   - `--warp`, `--swap`, `--stack` and `zoom-fullscreen` act on the group, and a floating group stays floating when tabs are switched, opened or closed
-  - Based on the work of @jpatrolla in asmvik/yabai#68
+  - Based on the work of @jpatrolla in asmvik/yabai#68 ([#9](https://github.com/Christian-SC26/yabai/issues/9))
 
 ### Fixed
 - **Keyboard Focus After Leaving Mission Control**:
@@ -986,7 +988,8 @@ The *window_destroyed* signal is now triggered for windows that are implicitly d
 ### Added
 - First official release
 
-[Unreleased]: https://github.com/Christian-SC26/yabai/compare/v7.2.1...HEAD
+[Unreleased]: https://github.com/Christian-SC26/yabai/compare/v7.3.0...HEAD
+[7.3.0]: https://github.com/Christian-SC26/yabai/compare/v7.2.1...v7.3.0
 [7.2.1]: https://github.com/Christian-SC26/yabai/compare/v7.2.0...v7.2.1
 [7.2.0]: https://github.com/Christian-SC26/yabai/compare/v7.1.40...v7.2.0
 [7.1.40]: https://github.com/Christian-SC26/yabai/compare/v7.1.39...v7.1.40
