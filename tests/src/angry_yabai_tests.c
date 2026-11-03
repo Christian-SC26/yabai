@@ -29,5 +29,6 @@ ANGRY_TEST(printsVersionAndExitsInParseArguments)
 ANGRY_TEST(initializesSettingsAndAttemptsLockAcquisition)
 {
     bool locked = configure_settings_and_acquire_lock();
+    tests_isolate_scripting_addition();
     ANGRY_ASSERT(locked || !locked, "expected configure_settings_and_acquire_lock to initialize environment");
 }

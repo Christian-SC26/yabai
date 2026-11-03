@@ -253,6 +253,19 @@ CFArrayRef CGWindowListCopyWindowInfo(CGWindowListOption option, CGWindowID rela
 - (NSApplicationActivationPolicy)mock_activationPolicy { return NSApplicationActivationPolicyRegular; }
 @end
 
+//
+// NOTE: the suite runs inside the user's session, and the scripting addition acts on every window in it.
+// window_manager_scratchpad_recover_windows alone orders in every window of every application, minimized
+// ones included, which leaves them drawn on their space while the Dock still lists them as minimized.
+// No test may reach the real Dock, so the socket points nowhere for the whole run.
+//
+#define TESTS_SA_SOCKET_FILE "/tmp/yabai-tests-no-sa.socket"
+
+static void tests_isolate_scripting_addition(void)
+{
+    snprintf(g_sa_socket_file, sizeof(g_sa_socket_file), "%s", TESTS_SA_SOCKET_FILE);
+}
+
 #include "area.c"
 #include "structures.c"
 #include "angry_tests.c"
@@ -889,6 +902,7 @@ static struct {
 int main(int argc, char **argv)
 {
     ts_init(MEGABYTES(8));
+    tests_isolate_scripting_addition();
     g_connection = SLSMainConnectionID();
     CGSGetConnectionPortById = macho_find_symbol("/System/Library/PrivateFrameworks/SkyLight.framework/Versions/A/SkyLight", "_CGSGetConnectionPortById");
     g_layer_below_window_level  = CGWindowLevelForKey(LAYER_BELOW);
