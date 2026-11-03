@@ -6,6 +6,13 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [7.3.1] - 2026-11-04
+### Fixed
+- **Native Tab Opacity ([#9](https://github.com/Christian-SC26/yabai/issues/9))**:
+  - With `window_opacity on`, a tab opened with `cmd + t` kept `normal_window_opacity` although it had focus. It now gets `active_window_opacity` right away
+  - Switching tabs no longer flashes the selected tab at `normal_window_opacity` for a moment. The tab being hidden was dimmed while still on screen and came back that way when it was selected again
+  - After `window_opacity off`, the other tabs of a group stayed dimmed and showed up that way when selected. A tab now gets the opacity it should have when it is shown
+
 ## [7.3.0] - 2026-11-03
 ### Added
 - **Native macOS Tabs in a Single Tile (`window_native_tabs`)**:
@@ -988,7 +995,8 @@ The *window_destroyed* signal is now triggered for windows that are implicitly d
 ### Added
 - First official release
 
-[Unreleased]: https://github.com/Christian-SC26/yabai/compare/v7.3.0...HEAD
+[Unreleased]: https://github.com/Christian-SC26/yabai/compare/v7.3.1...HEAD
+[7.3.1]: https://github.com/Christian-SC26/yabai/compare/v7.3.0...v7.3.1
 [7.3.0]: https://github.com/Christian-SC26/yabai/compare/v7.2.1...v7.3.0
 [7.2.1]: https://github.com/Christian-SC26/yabai/compare/v7.2.0...v7.2.1
 [7.2.0]: https://github.com/Christian-SC26/yabai/compare/v7.1.40...v7.2.0
