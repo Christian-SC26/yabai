@@ -841,16 +841,38 @@ static bool tabbed_window_adopt_hidden(struct window *window)
     return false;
 }
 
+// NOTE: WindowServer drops an alpha change for a window that is ordered out, so a hidden tab keeps the
+// opacity it had when it was hidden -- through window_opacity off and through focus moving elsewhere.
+// Whatever it should have now is applied when it is shown again.
+static void tabbed_window_sync_opacity(struct window *window)
+{
+    float opacity = window->opacity;
+    if (opacity == 0.0f) {
+        if (!g_window_manager.enable_window_opacity) {
+            opacity = 1.0f;
+        } else if (window->id == g_window_manager.focused_window_id) {
+            opacity = g_window_manager.active_window_opacity;
+        } else {
+            opacity = g_window_manager.normal_window_opacity;
+        }
+    }
+
+    if (fabsf(window_opacity(window->id) - opacity) > 0.001f) {
+        window_manager_set_opacity(&g_window_manager, window, opacity);
+    }
+}
+
 // NOTE: the incoming tab's own focus event names a window that is not tracked yet and is dropped, so
 // the handover is the only place that sees focus move -- it has to carry the opacity along, or the new
 // tab keeps the normal_window_opacity it was given when it was created.
 static void tabbed_window_hand_over_focus(struct window *from, struct window *to)
 {
-    if (g_window_manager.focused_window_id != from->id) return;
+    if (g_window_manager.focused_window_id == from->id) {
+        g_window_manager.focused_window_id = to->id;
+        window_manager_set_window_opacity(&g_window_manager, from, g_window_manager.normal_window_opacity);
+    }
 
-    g_window_manager.focused_window_id = to->id;
-    window_manager_set_window_opacity(&g_window_manager, from, g_window_manager.normal_window_opacity);
-    window_manager_set_window_opacity(&g_window_manager, to, g_window_manager.active_window_opacity);
+    tabbed_window_sync_opacity(to);
 }
 
 // NOTE: a floating group has no node to swap, so the state has to move to the tab that took over.
@@ -1058,6 +1080,7 @@ static void tabbed_window_promote(struct window *window)
 
     struct view *view = space_manager_tile_window_on_space(&g_space_manager, window, sid);
     window_manager_add_managed_window(&g_window_manager, window, view);
+    tabbed_window_sync_opacity(window);
 }
 
 // NOTE: merging windows into one group orders each of them out and drops it from the space with no pair
