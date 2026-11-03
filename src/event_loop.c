@@ -841,6 +841,18 @@ static bool tabbed_window_adopt_hidden(struct window *window)
     return false;
 }
 
+// NOTE: the incoming tab's own focus event names a window that is not tracked yet and is dropped, so
+// the handover is the only place that sees focus move -- it has to carry the opacity along, or the new
+// tab keeps the normal_window_opacity it was given when it was created.
+static void tabbed_window_hand_over_focus(struct window *from, struct window *to)
+{
+    if (g_window_manager.focused_window_id != from->id) return;
+
+    g_window_manager.focused_window_id = to->id;
+    window_manager_set_window_opacity(&g_window_manager, from, g_window_manager.normal_window_opacity);
+    window_manager_set_window_opacity(&g_window_manager, to, g_window_manager.active_window_opacity);
+}
+
 // NOTE: a floating group has no node to swap, so the state has to move to the tab that took over.
 static void tabbed_window_hand_over_float(struct window *from, struct window *to)
 {
@@ -850,7 +862,7 @@ static void tabbed_window_hand_over_float(struct window *from, struct window *to
     window_clear_flag(to, WINDOW_TAB_MEMBER);
 
     // NOTE: same as a swap -- the next tab pairs against the focused window.
-    if (g_window_manager.focused_window_id == from->id) g_window_manager.focused_window_id = to->id;
+    tabbed_window_hand_over_focus(from, to);
 }
 
 static EVENT_HANDLER(WINDOW_CREATED)
@@ -1168,7 +1180,7 @@ static bool tabbed_window_swap(struct view *view, struct window *a, struct windo
 
     // NOTE: the create path pairs a new tab against the focused window, so focus has to follow the swap
     // or the next new tab in that group pairs against a demoted window and opens a second node.
-    if (g_window_manager.focused_window_id == a->id) g_window_manager.focused_window_id = b->id;
+    tabbed_window_hand_over_focus(a, b);
 
     // NOTE: not window_node_flush; that animates the incoming tab in from the frame it kept while hidden.
     struct window_node *node = view_find_window_node(view, b->id);
