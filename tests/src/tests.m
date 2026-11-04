@@ -15,6 +15,15 @@ typedef bool (test_function)(void);
 #define TEST_CHECK(r, e) if ((r) != (e)) { printf("                   \e[1;33m%s\e[m\e[1;31m#%d %s == %s\e[m \e[1;31m(%d == %d)\e[m\n", test_name, __LINE__, #r, #e, r, e); result = false; }
 #define TEST_ENTRY(name) { #name, test_##name },
 
+//
+// NOTE: the suite runs inside a logged-in GUI session. Tests may read the real
+// displays, spaces and Dock, and only assert what holds on any such session
+// (the Dock is on some display, the active space is visible, ...). Nothing a
+// test does can change the session: every call yabai uses to move, focus,
+// order, hide or spawn is replaced by a fake below, the scripting addition is
+// out of reach, and window queries use a window the suite owns.
+//
+
 // Angry Tests infrastructure (Yegor Bugayenko rules: verb-named, one assertion, short, explicit message)
 //
 // NOTE: the body runs in its own function so that ANGRY_ASSERT can stop the
@@ -341,16 +350,19 @@ void dispatch_after(dispatch_time_t when, dispatch_queue_t queue, dispatch_block
     if (real_fn) real_fn(when, queue, block);
 }
 
+//
+// NOTE: no accessibility observer is ever registered with another process
+// during the tests; registration succeeds unless a test asks it to fail.
+//
 static bool g_mock_ax_cannot_complete = false;
 AXError AXObserverAddNotification(AXObserverRef observer, AXUIElementRef element, CFStringRef notification, void *refcon)
 {
-    if (g_mock_ax_cannot_complete) {
-        return kAXErrorCannotComplete;
-    }
-    typedef AXError (*real_ax_fn)(AXObserverRef, AXUIElementRef, CFStringRef, void *);
-    static real_ax_fn real_fn = NULL;
-    if (!real_fn) real_fn = (real_ax_fn)dlsym(RTLD_NEXT, "AXObserverAddNotification");
-    return real_fn ? real_fn(observer, element, notification, refcon) : kAXErrorFailure;
+    return g_mock_ax_cannot_complete ? kAXErrorCannotComplete : kAXErrorSuccess;
+}
+
+AXError AXObserverRemoveNotification(AXObserverRef observer, AXUIElementRef element, CFStringRef notification)
+{
+    return kAXErrorSuccess;
 }
 
 static bool g_mock_dock_window_layer18 = false;
@@ -581,7 +593,7 @@ static void tests_isolate_scripting_addition(void)
     ANGRY_ENTRY(convertsInt32ToCfString)                                        \
     ANGRY_ENTRY(resolvesConfigurationFileUnderXdgConfigHome)                    \
     ANGRY_ENTRY(executesConfigurationFileSafelyWhenMissing)                      \
-    ANGRY_ENTRY(resolvesWindowPidFromAccessibilityElement)                      \
+    ANGRY_ENTRY(resolvesPidFromAccessibilityElement)                            \
     ANGRY_ENTRY(reportsNoEnhancedUserInterfaceForTestProcess)                   \
     ANGRY_ENTRY(restoresAlphaChannelInQuartzImage)                              \
     ANGRY_ENTRY(formatsDebugMessageIteratingTokens)                             \
@@ -669,7 +681,8 @@ static void tests_isolate_scripting_addition(void)
     ANGRY_ENTRY(listsNoWindowsForApplicationWithoutWindows)                     \
     ANGRY_ENTRY(reportsNoMainWindowForApplicationWithoutWindows)                \
     ANGRY_ENTRY(reportsNoFocusedWindowForApplicationWithoutWindows)             \
-    ANGRY_ENTRY(observesAndUnobservesApplicationNotifications)                  \
+    ANGRY_ENTRY(observesEveryNotificationOfApplication)                         \
+    ANGRY_ENTRY(stopsObservingApplicationOnUnobserve)                           \
     ANGRY_ENTRY(postsWindowCreatedEventForCreatedNotification)                  \
     ANGRY_ENTRY(postsWindowFocusedEventForFocusedWindowChange)                  \
     ANGRY_ENTRY(postsWindowMovedEventForMovedNotification)                      \
@@ -782,7 +795,6 @@ static void tests_isolate_scripting_addition(void)
     ANGRY_ENTRY(mapsWindowLevelsToLayerStrings)                                 \
     ANGRY_ENTRY(rejectsSystemWideElementAsRootWindow)                           \
     ANGRY_ENTRY(manipulatesWindowFlagsAndRuleFlagsBitmasks)                     \
-    ANGRY_ENTRY(createsAndObservesWindowWhenAccessibilityWindowExists)          \
     ANGRY_ENTRY(queriesAllActiveDisplaysToJsonStream)                           \
     ANGRY_ENTRY(managesDisplayLabelsSettingAndQueryingAndRemoving)              \
     ANGRY_ENTRY(resolvesMainDisplayUuidMatchingMainDisplayId)                   \
@@ -804,7 +816,7 @@ static void tests_isolate_scripting_addition(void)
     ANGRY_ENTRY(queriesSpacesForWindowToJsonStream)                             \
     ANGRY_ENTRY(queriesSpacesForDisplayToJsonStream)                            \
     ANGRY_ENTRY(queriesSpacesForDisplaysToJsonStream)                           \
-    ANGRY_ENTRY(findsAndRefreshesViewForSpace)                                  \
+    ANGRY_ENTRY(returnsSameViewOnRepeatedLookupOfSpace)                         \
     ANGRY_ENTRY(marksViewInvalidForSpace)                                       \
     ANGRY_ENTRY(untilesWindowFromSpaceView)                                     \
     ANGRY_ENTRY(managesSpaceLabelsSettingAndQueryingAndRemoving)                \
@@ -882,21 +894,22 @@ static void tests_isolate_scripting_addition(void)
     ANGRY_ENTRY(savesSessionStateToFileHandlingErrors)                          \
     ANGRY_ENTRY(dumpsSessionStateToJsonStreamHandlingErrors)                    \
     ANGRY_ENTRY(restoresSessionStateFromFileHandlingMissingFile)                \
-    ANGRY_ENTRY(observesFinishedLaunchingForValidAndNullApplications)           \
-    ANGRY_ENTRY(observesActivationPolicyForValidAndNullApplications)            \
+    ANGRY_ENTRY(observesFinishedLaunchingOfApplication)                         \
+    ANGRY_ENTRY(observesActivationPolicyOfApplication)                          \
     ANGRY_ENTRY(treatsProcessWithoutApplicationAsUnobservable)                  \
     ANGRY_ENTRY(evaluatesApplicationFinishedLaunchingState)                     \
     ANGRY_ENTRY(reportsNoNotchForUnknownDisplay)                                \
     ANGRY_ENTRY(deallocatesWorkspaceContextProperly)                            \
     ANGRY_ENTRY(processesActivationPolicyChangeObservation)                     \
     ANGRY_ENTRY(processesFinishedLaunchingChangeObservation)                    \
-    ANGRY_ENTRY(handlesWorkspaceWakeNotificationSafely)                         \
-    ANGRY_ENTRY(handlesMenuBarHidingChangeNotificationSafely)                   \
-    ANGRY_ENTRY(handlesDockRestartNotificationSafely)                           \
-    ANGRY_ENTRY(handlesDockPreferenceChangeNotificationSafely)                  \
-    ANGRY_ENTRY(handlesActiveDisplayChangeNotificationSafely)                   \
-    ANGRY_ENTRY(handlesActiveSpaceChangeNotificationSafely)                     \
-    ANGRY_ENTRY(handlesApplicationHideAndUnhideNotificationsSafely)             \
+    ANGRY_ENTRY(postsSystemWokeEventOnWake)                                     \
+    ANGRY_ENTRY(postsMenuBarHiddenChangedEventOnMenuBarHidingChange)            \
+    ANGRY_ENTRY(postsDockDidRestartEventOnDockRestart)                          \
+    ANGRY_ENTRY(postsDockDidChangePrefEventOnDockPreferenceChange)              \
+    ANGRY_ENTRY(postsDisplayChangedEventOnActiveDisplayChange)                  \
+    ANGRY_ENTRY(postsSpaceChangedEventOnActiveSpaceChange)                      \
+    ANGRY_ENTRY(postsApplicationHiddenEventCarryingPid)                         \
+    ANGRY_ENTRY(postsApplicationVisibleEventCarryingPid)                        \
     ANGRY_ENTRY(configuresOsaxFilesystemPathsProperly)                          \
     ANGRY_ENTRY(failsToCreateOsaxDirectoryWithoutRootPrivileges)                \
     ANGRY_ENTRY(writesAndRemovesTemporaryOsaxFile)                              \
@@ -997,10 +1010,10 @@ static void tests_isolate_scripting_addition(void)
     ANGRY_ENTRY(findsWindowsBelongingToApplication)                             \
     ANGRY_ENTRY(postsTwoEventsToMakeWindowKey)                                  \
     ANGRY_ENTRY(addressesKeyWindowEventsToWindow)                               \
-    ANGRY_ENTRY(createsAndAddsWindowHandlingUnknownWindow)                      \
+    ANGRY_ENTRY(dropsWindowThatCannotBeObserved)                                \
     ANGRY_ENTRY(addsApplicationWindowsSafely)                                   \
     ANGRY_ENTRY(addsExistingApplicationWindowsSafely)                           \
-    ANGRY_ENTRY(setsWindowInsertionPointDirection)                             \
+    ANGRY_ENTRY(refusesInsertionPointForWindowOutsideTheLayout)                 \
     ANGRY_ENTRY(stacksWindowReturningErrorOnSelfStack)                          \
     ANGRY_ENTRY(warpsWindowReturningErrorOnSelfWarp)                            \
     ANGRY_ENTRY(swapsWindowReturningErrorOnSelfSwap)                            \

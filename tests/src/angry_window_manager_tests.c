@@ -514,11 +514,12 @@ ANGRY_TEST(addressesKeyWindowEventsToWindow)
     ANGRY_ASSERT(addressed, "expected both key-window events to carry the window id");
 }
 
-ANGRY_TEST(createsAndAddsWindowHandlingUnknownWindow)
+ANGRY_TEST(dropsWindowThatCannotBeObserved)
 {
+    g_mock_ax_cannot_complete = true;
     struct application app = { .pid = getpid(), .name = "test_app" };
     struct window *win = window_manager_create_and_add_window(&g_space_manager, &g_window_manager, &app, NULL, 0, false);
-    ANGRY_ASSERT(win == NULL, "expected window_create on invalid ref to return null");
+    ANGRY_ASSERT(win == NULL, "expected a window whose notifications can not be observed to be dropped");
 }
 
 ANGRY_TEST(addsApplicationWindowsSafely)
@@ -536,14 +537,13 @@ ANGRY_TEST(addsExistingApplicationWindowsSafely)
     ANGRY_ASSERT(!added, "expected add_existing_application_windows to return false on null ref");
 }
 
-ANGRY_TEST(setsWindowInsertionPointDirection)
+ANGRY_TEST(refusesInsertionPointForWindowOutsideTheLayout)
 {
-    uint64_t active_sid = space_manager_active_space();
-    g_mock_active_space = active_sid;
+    g_mock_active_space = 0x7E574001ULL;
+    space_manager_find_view(&g_space_manager, g_mock_active_space)->layout = VIEW_BSP;
     struct window win = { .id = 9341 };
     enum window_op_error err = window_manager_set_window_insertion(&g_space_manager, &win, DIR_NORTH);
-    g_mock_active_space = 0;
-    ANGRY_ASSERT(err == WINDOW_OP_ERROR_INVALID_SRC_VIEW || err == WINDOW_OP_ERROR_INVALID_SRC_NODE || err == WINDOW_OP_ERROR_SUCCESS, "expected set_window_insertion to execute");
+    ANGRY_ASSERT(err == WINDOW_OP_ERROR_INVALID_SRC_NODE, "expected no insertion point for a window that is not tiled");
 }
 
 ANGRY_TEST(stacksWindowReturningErrorOnSelfStack)

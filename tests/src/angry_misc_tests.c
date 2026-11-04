@@ -382,12 +382,12 @@ ANGRY_TEST(executesConfigurationFileSafelyWhenMissing)
     ANGRY_ASSERT(file_exists(missing) == false, "expected missing config execution to return cleanly");
 }
 
-ANGRY_TEST(resolvesWindowPidFromAccessibilityElement)
+ANGRY_TEST(resolvesPidFromAccessibilityElement)
 {
     AXUIElementRef app = AXUIElementCreateApplication(getpid());
     pid_t pid = ax_window_pid(app);
     CFRelease(app);
-    ANGRY_ASSERT(pid == 0 || pid == getpid(), "expected ax_window_pid to return process id or 0");
+    ANGRY_ASSERT(pid == getpid(), "expected the pid the accessibility element was created for");
 }
 
 ANGRY_TEST(reportsNoEnhancedUserInterfaceForTestProcess)

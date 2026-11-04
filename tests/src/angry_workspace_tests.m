@@ -1,23 +1,21 @@
-ANGRY_TEST(observesFinishedLaunchingForValidAndNullApplications)
+ANGRY_TEST(observesFinishedLaunchingOfApplication)
 {
-    struct process proc_null = { .pid = 99999, .ns_application = NULL, .name = "null_app" };
-    workspace_application_observe_finished_launching(g_workspace_context, &proc_null);
-    struct process proc_valid = { .pid = getpid(), .name = "self_app" };
-    proc_valid.ns_application = [NSRunningApplication currentApplication];
-    workspace_application_observe_finished_launching(g_workspace_context, &proc_valid);
-    @try { [(NSRunningApplication *)proc_valid.ns_application removeObserver:(id)g_workspace_context forKeyPath:@"finishedLaunching" context:&proc_valid]; } @catch (id ex) {}
-    ANGRY_ASSERT(proc_valid.ns_application != NULL, "expected valid ns_application after observing finished launching");
+    struct process proc = { .pid = getpid(), .name = "self_app" };
+    proc.ns_application = [NSRunningApplication currentApplication];
+    workspace_application_observe_finished_launching(g_workspace_context, &proc);
+    bool observed = true;
+    @try { [(NSRunningApplication *)proc.ns_application removeObserver:(id)g_workspace_context forKeyPath:@"finishedLaunching" context:&proc]; } @catch (id ex) { observed = false; }
+    ANGRY_ASSERT(observed, "expected the workspace to observe finishedLaunching of the application");
 }
 
-ANGRY_TEST(observesActivationPolicyForValidAndNullApplications)
+ANGRY_TEST(observesActivationPolicyOfApplication)
 {
-    struct process proc_null = { .pid = 99998, .ns_application = NULL, .name = "null_app" };
-    workspace_application_observe_activation_policy(g_workspace_context, &proc_null);
-    struct process proc_valid = { .pid = getpid(), .name = "self_app" };
-    proc_valid.ns_application = [NSRunningApplication currentApplication];
-    workspace_application_observe_activation_policy(g_workspace_context, &proc_valid);
-    @try { [(NSRunningApplication *)proc_valid.ns_application removeObserver:(id)g_workspace_context forKeyPath:@"activationPolicy" context:&proc_valid]; } @catch (id ex) {}
-    ANGRY_ASSERT(proc_valid.ns_application != NULL, "expected valid ns_application after observing activation policy");
+    struct process proc = { .pid = getpid(), .name = "self_app" };
+    proc.ns_application = [NSRunningApplication currentApplication];
+    workspace_application_observe_activation_policy(g_workspace_context, &proc);
+    bool observed = true;
+    @try { [(NSRunningApplication *)proc.ns_application removeObserver:(id)g_workspace_context forKeyPath:@"activationPolicy" context:&proc]; } @catch (id ex) { observed = false; }
+    ANGRY_ASSERT(observed, "expected the workspace to observe activationPolicy of the application");
 }
 
 ANGRY_TEST(treatsProcessWithoutApplicationAsUnobservable)
@@ -72,46 +70,54 @@ ANGRY_TEST(processesFinishedLaunchingChangeObservation)
     ANGRY_ASSERT(proc.pid == 103, "expected finished launching observation to process change event");
 }
 
-ANGRY_TEST(handlesWorkspaceWakeNotificationSafely)
+ANGRY_TEST(postsSystemWokeEventOnWake)
 {
     [(workspace_context *)g_workspace_context didWake:nil];
-    ANGRY_ASSERT(g_workspace_context != NULL, "expected didWake to dispatch event loop message without crashing");
+    ANGRY_ASSERT(angry_last_posted_event()->type == SYSTEM_WOKE, "expected a system woke event to be posted");
 }
 
-ANGRY_TEST(handlesMenuBarHidingChangeNotificationSafely)
+ANGRY_TEST(postsMenuBarHiddenChangedEventOnMenuBarHidingChange)
 {
     [(workspace_context *)g_workspace_context didChangeMenuBarHiding:nil];
-    ANGRY_ASSERT(g_workspace_context != NULL, "expected didChangeMenuBarHiding to dispatch event loop message");
+    ANGRY_ASSERT(angry_last_posted_event()->type == MENU_BAR_HIDDEN_CHANGED, "expected a menu bar hidden changed event to be posted");
 }
 
-ANGRY_TEST(handlesDockRestartNotificationSafely)
+ANGRY_TEST(postsDockDidRestartEventOnDockRestart)
 {
     [(workspace_context *)g_workspace_context didRestartDock:nil];
-    ANGRY_ASSERT(g_workspace_context != NULL, "expected didRestartDock to dispatch event loop message");
+    ANGRY_ASSERT(angry_last_posted_event()->type == DOCK_DID_RESTART, "expected a dock did restart event to be posted");
 }
 
-ANGRY_TEST(handlesDockPreferenceChangeNotificationSafely)
+ANGRY_TEST(postsDockDidChangePrefEventOnDockPreferenceChange)
 {
     [(workspace_context *)g_workspace_context didChangeDockPref:nil];
-    ANGRY_ASSERT(g_workspace_context != NULL, "expected didChangeDockPref to dispatch event loop message");
+    ANGRY_ASSERT(angry_last_posted_event()->type == DOCK_DID_CHANGE_PREF, "expected a dock did change pref event to be posted");
 }
 
-ANGRY_TEST(handlesActiveDisplayChangeNotificationSafely)
+ANGRY_TEST(postsDisplayChangedEventOnActiveDisplayChange)
 {
     [(workspace_context *)g_workspace_context activeDisplayDidChange:nil];
-    ANGRY_ASSERT(g_workspace_context != NULL, "expected activeDisplayDidChange to dispatch event loop message");
+    ANGRY_ASSERT(angry_last_posted_event()->type == DISPLAY_CHANGED, "expected a display changed event to be posted");
 }
 
-ANGRY_TEST(handlesActiveSpaceChangeNotificationSafely)
+ANGRY_TEST(postsSpaceChangedEventOnActiveSpaceChange)
 {
     [(workspace_context *)g_workspace_context activeSpaceDidChange:nil];
-    ANGRY_ASSERT(g_workspace_context != NULL, "expected activeSpaceDidChange to dispatch event loop message");
+    ANGRY_ASSERT(angry_last_posted_event()->type == SPACE_CHANGED, "expected a space changed event to be posted");
 }
 
-ANGRY_TEST(handlesApplicationHideAndUnhideNotificationsSafely)
+ANGRY_TEST(postsApplicationHiddenEventCarryingPid)
 {
     NSNotification *notif = [NSNotification notificationWithName:@"test_app" object:nil userInfo:@{NSWorkspaceApplicationKey: [NSRunningApplication currentApplication]}];
     [(workspace_context *)g_workspace_context didHideApplication:notif];
+    struct event *e = angry_last_posted_event();
+    ANGRY_ASSERT(e->type == APPLICATION_HIDDEN && (pid_t)(intptr_t)e->context == getpid(), "expected an application hidden event for the application");
+}
+
+ANGRY_TEST(postsApplicationVisibleEventCarryingPid)
+{
+    NSNotification *notif = [NSNotification notificationWithName:@"test_app" object:nil userInfo:@{NSWorkspaceApplicationKey: [NSRunningApplication currentApplication]}];
     [(workspace_context *)g_workspace_context didUnhideApplication:notif];
-    ANGRY_ASSERT(notif.userInfo != nil, "expected didHideApplication and didUnhideApplication to process notification");
+    struct event *e = angry_last_posted_event();
+    ANGRY_ASSERT(e->type == APPLICATION_VISIBLE && (pid_t)(intptr_t)e->context == getpid(), "expected an application visible event for the application");
 }

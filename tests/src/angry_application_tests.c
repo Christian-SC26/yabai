@@ -70,18 +70,29 @@ ANGRY_TEST(reportsNoFocusedWindowForApplicationWithoutWindows) {
     ANGRY_ASSERT(wid == 0, "expected no focused window for the test process");
 }
 
-ANGRY_TEST(observesAndUnobservesApplicationNotifications) {
-    NSRunningApplication *gui = [NSRunningApplication runningApplicationsWithBundleIdentifier:@"com.apple.finder"].firstObject;
-    pid_t pid = gui ? gui.processIdentifier : getpid();
+ANGRY_TEST(observesEveryNotificationOfApplication) {
+    pid_t pid = getpid();
     ProcessSerialNumber psn = {0};
     GetProcessForPID(pid, &psn);
-    struct process proc = { .pid = pid, .psn = psn, .name = "Finder" };
+    struct process proc = { .pid = pid, .psn = psn, .name = "yabai_tests" };
     struct application *app = application_create(&proc);
-    bool obs = application_observe(app);
+    bool observed = application_observe(app);
     application_unobserve(app);
-    bool unobserved = !app->is_observing;
     application_destroy(app);
-    ANGRY_ASSERT(unobserved, "application_unobserve failed to clear observing flag");
+    ANGRY_ASSERT(observed, "expected every accessibility notification of the application to be observed");
+}
+
+ANGRY_TEST(stopsObservingApplicationOnUnobserve) {
+    pid_t pid = getpid();
+    ProcessSerialNumber psn = {0};
+    GetProcessForPID(pid, &psn);
+    struct process proc = { .pid = pid, .psn = psn, .name = "yabai_tests" };
+    struct application *app = application_create(&proc);
+    application_observe(app);
+    application_unobserve(app);
+    bool observing = app->is_observing;
+    application_destroy(app);
+    ANGRY_ASSERT(!observing, "expected the application to be no longer observed");
 }
 
 ANGRY_TEST(postsWindowCreatedEventForCreatedNotification) {

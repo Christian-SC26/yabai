@@ -59,11 +59,10 @@ ANGRY_TEST(queriesSpacesForDisplaysToJsonStream) {
     ANGRY_ASSERT(ok && strstr(buf, "\"id\":"), "space_manager_query_spaces_for_displays failed serialization");
 }
 
-ANGRY_TEST(findsAndRefreshesViewForSpace) {
-    uint64_t sid = space_manager_active_space();
-    struct view *view = space_manager_find_view(&g_space_manager, sid);
-    space_manager_refresh_view(&g_space_manager, sid);
-    ANGRY_ASSERT(view != NULL, "space_manager_find_view returned NULL view");
+ANGRY_TEST(returnsSameViewOnRepeatedLookupOfSpace) {
+    uint64_t sid = ANGRY_PRIVATE_SID(12);
+    struct view *first = space_manager_find_view(&g_space_manager, sid);
+    ANGRY_ASSERT(space_manager_find_view(&g_space_manager, sid) == first, "expected a space to keep the view created for it");
 }
 
 ANGRY_TEST(marksViewInvalidForSpace) {
