@@ -333,10 +333,21 @@ CGError SLSReenableUpdate(int cid) { return kCGErrorSuccess; }
 CGError SLSTransactionCommit(CFTypeRef transaction, int synchronous) { return kCGErrorSuccess; }
 
 static int g_mock_ax_write_count;
+static CGPoint g_mock_ax_position;
+static CGSize g_mock_ax_size;
+static char g_mock_ax_bool_attribute[64];
+static bool g_mock_ax_bool_value;
 AXError AXUIElementSetAttributeValue(AXUIElementRef element, CFStringRef attribute, CFTypeRef value)
 {
     if (!element || CFGetTypeID(element) != AXUIElementGetTypeID()) return kAXErrorIllegalArgument;
     ++g_mock_ax_write_count;
+    if (value && CFGetTypeID(value) == AXValueGetTypeID()) {
+        if (AXValueGetType(value) == kAXValueTypeCGPoint) AXValueGetValue(value, kAXValueTypeCGPoint, &g_mock_ax_position);
+        if (AXValueGetType(value) == kAXValueTypeCGSize)  AXValueGetValue(value, kAXValueTypeCGSize, &g_mock_ax_size);
+    } else if (value && CFGetTypeID(value) == CFBooleanGetTypeID()) {
+        CFStringGetCString(attribute, g_mock_ax_bool_attribute, sizeof(g_mock_ax_bool_attribute), kCFStringEncodingUTF8);
+        g_mock_ax_bool_value = CFBooleanGetValue(value);
+    }
     return kAXErrorSuccess;
 }
 
@@ -487,6 +498,64 @@ static uint32_t angry_test_window(void)
         CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.05, false);
     }
     return (uint32_t)[window windowNumber];
+}
+
+//
+// NOTE: a scripting addition a test stands up for the one request it expects.
+// It answers a single connection on the test socket, the way the real one
+// does, and keeps the payload: int16 length, opcode, then the packed values.
+// It gives up after a second, so a request that never comes fails the test
+// instead of hanging it.
+//
+struct angry_sa_server
+{
+    int fd;
+    pthread_t thread;
+    char payload[1024];
+    int length;
+};
+
+static void *angry_sa_server_run(void *context)
+{
+    struct angry_sa_server *server = context;
+    struct pollfd pfd = { .fd = server->fd, .events = POLLIN };
+    if (poll(&pfd, 1, 1000) != 1) return NULL;
+    int client = accept(server->fd, NULL, NULL);
+    if (client == -1) return NULL;
+    server->length = (int)recv(client, server->payload, sizeof(server->payload), 0);
+    char done = 1;
+    send(client, &done, 1, 0);
+    close(client);
+    return NULL;
+}
+
+static void angry_sa_server_begin(struct angry_sa_server *server)
+{
+    memset(server, 0, sizeof(*server));
+    unlink(g_sa_socket_file);
+    struct sockaddr_un addr = { .sun_family = AF_UNIX };
+    snprintf(addr.sun_path, sizeof(addr.sun_path), "%s", g_sa_socket_file);
+    server->fd = socket(AF_UNIX, SOCK_STREAM, 0);
+    bind(server->fd, (struct sockaddr *) &addr, sizeof(addr));
+    listen(server->fd, 1);
+    pthread_create(&server->thread, NULL, angry_sa_server_run, server);
+}
+
+static void angry_sa_server_end(struct angry_sa_server *server)
+{
+    pthread_join(server->thread, NULL);
+    close(server->fd);
+    unlink(g_sa_socket_file);
+}
+
+static uint8_t angry_sa_opcode(struct angry_sa_server *server)
+{
+    return server->length > 2 ? (uint8_t) server->payload[2] : 0;
+}
+
+static void angry_sa_unpack(struct angry_sa_server *server, int offset, void *value, size_t size)
+{
+    memcpy(value, server->payload + 3 + offset, size);
 }
 
 static pid_t angry_fork(void)
@@ -1080,7 +1149,23 @@ static void tests_isolate_scripting_addition(void)
     ANGRY_ENTRY(togglesScratchpadWindowByLabelReturningFalse)                   \
     ANGRY_ENTRY(togglesScratchpadWindowDirectly)                                \
     ANGRY_ENTRY(setsAndRemovesScratchpadForWindow)                              \
-    ANGRY_ENTRY(findsScratchpadWindowByLabel)
+    ANGRY_ENTRY(findsScratchpadWindowByLabel)                                   \
+    ANGRY_ENTRY(zoomsWindowToItsParentNode)                                     \
+    ANGRY_ENTRY(unzoomsWindowFromParentNodeOnSecondToggle)                      \
+    ANGRY_ENTRY(zoomsWindowToWholeSpace)                                        \
+    ANGRY_ENTRY(unzoomsWindowFromWholeSpaceOnSecondToggle)                      \
+    ANGRY_ENTRY(marksHiddenSpaceDirtyWhenZoomingWindow)                         \
+    ANGRY_ENTRY(leavesSoleWindowOfSpaceUnzoomed)                                \
+    ANGRY_ENTRY(remembersFrameWhenEnteringWindowedFullscreen)                   \
+    ANGRY_ENTRY(fillsDisplayWhenEnteringWindowedFullscreen)                     \
+    ANGRY_ENTRY(restoresFrameWhenLeavingWindowedFullscreen)                     \
+    ANGRY_ENTRY(requestsNativeFullscreenForWindowNotInFullscreen)               \
+    ANGRY_ENTRY(focusesWindowBeforeChangingNativeFullscreen)                    \
+    ANGRY_ENTRY(bringsWindowToFrontBeforeExpose)                                \
+    ANGRY_ENTRY(asksDockToExposeWindowsOfFrontApplication)                      \
+    ANGRY_ENTRY(asksScriptingAdditionToScaleWindowForPictureInPicture)          \
+    ANGRY_ENTRY(scalesWindowToDisplayBoundsForPictureInPicture)                 \
+    ANGRY_ENTRY(keepsSpacePaddingForPictureInPicture)
 
 static struct test {
     char *name;
@@ -1130,6 +1215,10 @@ static void tests_reset_shared_state(void)
     g_mock_windows_moved_to_space = 0;
     g_mock_bridged_operation_count = 0;
     g_mock_ax_write_count = 0;
+    g_mock_ax_position = CGPointZero;
+    g_mock_ax_size = CGSizeZero;
+    g_mock_ax_bool_attribute[0] = '\0';
+    g_mock_ax_bool_value = false;
     g_mock_fast_usleep = false;
     g_mock_active_space = 0;
     g_mock_dispatch_after = false;

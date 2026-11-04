@@ -667,3 +667,281 @@ ANGRY_TEST(findsScratchpadWindowByLabel)
     struct window *win = window_manager_find_scratchpad_window(&g_window_manager, "nonexistent");
     ANGRY_ASSERT(win == NULL, "expected non-existent scratchpad label to return null");
 }
+
+//
+// NOTE: two windows tiled on a fake BSP space that is never visible, and
+// managed by the window manager, so that the zoom commands have a layout to
+// act on and mark the view dirty instead of moving real windows.
+//
+struct angry_managed_pair
+{
+    struct application app;
+    struct window first, second;
+    struct view *view;
+};
+
+static void angry_managed_pair_begin(struct angry_managed_pair *pair, uint64_t sid)
+{
+    pair->view = space_manager_find_view(&g_space_manager, sid);
+    pair->view->layout = VIEW_BSP;
+    pair->app = (struct application) { .pid = 4400, .name = "zoom_app" };
+    pair->first  = (struct window) { .id = 94001, .application = &pair->app, .ref = (AXUIElementRef) CFRetain(CFSTR("dummy")), .frame = {{0,0},{400,400}} };
+    pair->second = (struct window) { .id = 94002, .application = &pair->app, .ref = (AXUIElementRef) CFRetain(CFSTR("dummy")), .frame = {{0,0},{400,400}} };
+    space_manager_tile_window_on_space(&g_space_manager, &pair->first, sid);
+    window_manager_add_managed_window(&g_window_manager, &pair->first, pair->view);
+    space_manager_tile_window_on_space(&g_space_manager, &pair->second, sid);
+    window_manager_add_managed_window(&g_window_manager, &pair->second, pair->view);
+}
+
+static void angry_managed_pair_end(struct angry_managed_pair *pair)
+{
+    window_manager_remove_managed_window(&g_window_manager, pair->first.id);
+    window_manager_remove_managed_window(&g_window_manager, pair->second.id);
+    space_manager_untile_window(pair->view, &pair->first);
+    space_manager_untile_window(pair->view, &pair->second);
+    CFRelease(pair->first.ref);
+    CFRelease(pair->second.ref);
+}
+
+ANGRY_TEST(zoomsWindowToItsParentNode)
+{
+    struct angry_managed_pair pair;
+    angry_managed_pair_begin(&pair, 0x7E575001ULL);
+    window_manager_toggle_window_zoom_parent(&g_window_manager, &pair.second);
+    struct window_node *node = view_find_window_node(pair.view, pair.second.id);
+    bool zoomed = node->zoom == node->parent;
+    angry_managed_pair_end(&pair);
+    ANGRY_ASSERT(zoomed, "expected the window to be zoomed to its parent node");
+}
+
+ANGRY_TEST(unzoomsWindowFromParentNodeOnSecondToggle)
+{
+    struct angry_managed_pair pair;
+    angry_managed_pair_begin(&pair, 0x7E575002ULL);
+    window_manager_toggle_window_zoom_parent(&g_window_manager, &pair.second);
+    window_manager_toggle_window_zoom_parent(&g_window_manager, &pair.second);
+    struct window_node *zoom = view_find_window_node(pair.view, pair.second.id)->zoom;
+    angry_managed_pair_end(&pair);
+    ANGRY_ASSERT(zoom == NULL, "expected a second toggle to undo the zoom to the parent node");
+}
+
+ANGRY_TEST(zoomsWindowToWholeSpace)
+{
+    struct angry_managed_pair pair;
+    angry_managed_pair_begin(&pair, 0x7E575003ULL);
+    window_manager_toggle_window_zoom_fullscreen(&g_window_manager, &pair.second);
+    bool zoomed = view_find_window_node(pair.view, pair.second.id)->zoom == pair.view->root;
+    angry_managed_pair_end(&pair);
+    ANGRY_ASSERT(zoomed, "expected the window to be zoomed to the root of the space");
+}
+
+ANGRY_TEST(unzoomsWindowFromWholeSpaceOnSecondToggle)
+{
+    struct angry_managed_pair pair;
+    angry_managed_pair_begin(&pair, 0x7E575004ULL);
+    window_manager_toggle_window_zoom_fullscreen(&g_window_manager, &pair.second);
+    window_manager_toggle_window_zoom_fullscreen(&g_window_manager, &pair.second);
+    struct window_node *zoom = view_find_window_node(pair.view, pair.second.id)->zoom;
+    angry_managed_pair_end(&pair);
+    ANGRY_ASSERT(zoom == NULL, "expected a second toggle to undo the zoom to the whole space");
+}
+
+ANGRY_TEST(marksHiddenSpaceDirtyWhenZoomingWindow)
+{
+    struct angry_managed_pair pair;
+    angry_managed_pair_begin(&pair, 0x7E575005ULL);
+    view_clear_flag(pair.view, VIEW_IS_DIRTY);
+    window_manager_toggle_window_zoom_fullscreen(&g_window_manager, &pair.second);
+    bool dirty = view_check_flag(pair.view, VIEW_IS_DIRTY);
+    angry_managed_pair_end(&pair);
+    ANGRY_ASSERT(dirty, "expected a zoom on a space that is not visible to be applied when the space is shown");
+}
+
+ANGRY_TEST(leavesSoleWindowOfSpaceUnzoomed)
+{
+    struct view *view = space_manager_find_view(&g_space_manager, 0x7E575006ULL);
+    view->layout = VIEW_BSP;
+    struct application app = { .pid = 4401, .name = "zoom_app" };
+    struct window win = { .id = 94003, .application = &app, .ref = (AXUIElementRef) CFRetain(CFSTR("dummy")), .frame = {{0,0},{400,400}} };
+    space_manager_tile_window_on_space(&g_space_manager, &win, view->sid);
+    window_manager_add_managed_window(&g_window_manager, &win, view);
+    window_manager_toggle_window_zoom_fullscreen(&g_window_manager, &win);
+    struct window_node *zoom = view_find_window_node(view, win.id)->zoom;
+    window_manager_remove_managed_window(&g_window_manager, win.id);
+    space_manager_untile_window(view, &win);
+    CFRelease(win.ref);
+    ANGRY_ASSERT(zoom == NULL, "expected the only window of a space to have nothing to zoom to");
+}
+
+//
+// NOTE: the test window, wrapped so that frame changes reach the accessibility
+// fake: its element belongs to the test process, which the fake accepts.
+//
+struct angry_framed_window
+{
+    struct application app;
+    struct window window;
+    float saved_duration;
+};
+
+static void angry_framed_window_begin(struct angry_framed_window *framed)
+{
+    framed->saved_duration = g_window_manager.window_animation_duration;
+    g_window_manager.window_animation_duration = 0.0f;
+    framed->app = (struct application) { .pid = getpid(), .name = "framed_app", .ref = AXUIElementCreateApplication(getpid()) };
+    framed->window = (struct window) { .id = angry_test_window(), .application = &framed->app, .ref = AXUIElementCreateApplication(getpid()), .frame = {{10,20},{300,200}} };
+}
+
+static void angry_framed_window_end(struct angry_framed_window *framed)
+{
+    g_window_manager.window_animation_duration = framed->saved_duration;
+    CFRelease(framed->window.ref);
+    CFRelease(framed->app.ref);
+}
+
+ANGRY_TEST(remembersFrameWhenEnteringWindowedFullscreen)
+{
+    struct angry_framed_window framed;
+    angry_framed_window_begin(&framed);
+    window_manager_toggle_window_windowed_fullscreen(&framed.window);
+    CGRect remembered = framed.window.windowed_frame;
+    bool windowed = window_check_flag(&framed.window, WINDOW_WINDOWED);
+    angry_framed_window_end(&framed);
+    ANGRY_ASSERT_ALL("expected the window to enter windowed fullscreen and remember where it was",
+                     windowed,
+                     CGRectEqualToRect(remembered, CGRectMake(10, 20, 300, 200)));
+}
+
+ANGRY_TEST(fillsDisplayWhenEnteringWindowedFullscreen)
+{
+    struct angry_framed_window framed;
+    angry_framed_window_begin(&framed);
+    window_manager_toggle_window_windowed_fullscreen(&framed.window);
+    angry_framed_window_end(&framed);
+    CGRect bounds = display_bounds_constrained(CGMainDisplayID(), false);
+    ANGRY_ASSERT_ALL("expected the window to be given the bounds of its display",
+                     CGPointEqualToPoint(g_mock_ax_position, bounds.origin),
+                     CGSizeEqualToSize(g_mock_ax_size, bounds.size));
+}
+
+ANGRY_TEST(restoresFrameWhenLeavingWindowedFullscreen)
+{
+    struct angry_framed_window framed;
+    angry_framed_window_begin(&framed);
+    window_set_flag(&framed.window, WINDOW_WINDOWED);
+    framed.window.windowed_frame = CGRectMake(40, 50, 600, 500);
+    window_manager_toggle_window_windowed_fullscreen(&framed.window);
+    bool windowed = window_check_flag(&framed.window, WINDOW_WINDOWED);
+    angry_framed_window_end(&framed);
+    ANGRY_ASSERT_ALL("expected the window to leave windowed fullscreen at the frame it had before",
+                     !windowed,
+                     CGPointEqualToPoint(g_mock_ax_position, CGPointMake(40, 50)),
+                     CGSizeEqualToSize(g_mock_ax_size, CGSizeMake(600, 500)));
+}
+
+ANGRY_TEST(requestsNativeFullscreenForWindowNotInFullscreen)
+{
+    g_mock_fast_usleep = true;
+    struct angry_framed_window framed;
+    angry_framed_window_begin(&framed);
+    window_manager_toggle_window_native_fullscreen(&framed.window);
+    angry_framed_window_end(&framed);
+    ANGRY_ASSERT_ALL("expected the window to be asked to enter native fullscreen",
+                     strcmp(g_mock_ax_bool_attribute, "AXFullScreen") == 0,
+                     g_mock_ax_bool_value);
+}
+
+ANGRY_TEST(focusesWindowBeforeChangingNativeFullscreen)
+{
+    g_mock_fast_usleep = true;
+    struct angry_framed_window framed;
+    angry_framed_window_begin(&framed);
+    window_manager_toggle_window_native_fullscreen(&framed.window);
+    angry_framed_window_end(&framed);
+    ANGRY_ASSERT(g_mock_front_process_wid == framed.window.id, "expected the window to be brought to the front first");
+}
+
+ANGRY_TEST(bringsWindowToFrontBeforeExpose)
+{
+    struct application app = { .pid = 4402 };
+    struct window win = { .id = 94004, .application = &app };
+    window_manager_toggle_window_expose(&win);
+    ANGRY_ASSERT(g_mock_front_process_wid == win.id, "expected the window to be brought to the front for expose");
+}
+
+ANGRY_TEST(asksDockToExposeWindowsOfFrontApplication)
+{
+    struct application app = { .pid = 4403 };
+    struct window win = { .id = 94005, .application = &app };
+    window_manager_toggle_window_expose(&win);
+    ANGRY_ASSERT(strcmp(g_mock_dock_notification, "com.apple.expose.front.awake") == 0, "expected the Dock to be asked to expose the windows of the application");
+}
+
+//
+// NOTE: the picture-in-picture tests make the fake active space the current
+// space of the main display, so that its padding is the one applied.
+//
+static struct view *angry_pip_space(uint64_t sid)
+{
+    g_mock_active_space = sid;
+    struct view *view = space_manager_find_view(&g_space_manager, sid);
+    view_clear_flag(view, VIEW_ENABLE_PADDING);
+    return view;
+}
+
+static CGRect angry_pip_request(struct angry_sa_server *server, uint32_t *wid)
+{
+    float x, y, w, h;
+    angry_sa_unpack(server, 0, wid, sizeof(*wid));
+    angry_sa_unpack(server, 4, &x, sizeof(x));
+    angry_sa_unpack(server, 8, &y, sizeof(y));
+    angry_sa_unpack(server, 12, &w, sizeof(w));
+    angry_sa_unpack(server, 16, &h, sizeof(h));
+    return CGRectMake(x, y, w, h);
+}
+
+ANGRY_TEST(asksScriptingAdditionToScaleWindowForPictureInPicture)
+{
+    angry_pip_space(0x7E575007ULL);
+    struct window win = { .id = angry_test_window() };
+    struct angry_sa_server server;
+    angry_sa_server_begin(&server);
+    window_manager_toggle_window_pip(&g_space_manager, &win);
+    angry_sa_server_end(&server);
+    uint32_t wid = 0;
+    angry_pip_request(&server, &wid);
+    ANGRY_ASSERT_ALL("expected a scale request for the window",
+                     angry_sa_opcode(&server) == SA_OPCODE_WINDOW_SCALE,
+                     wid == win.id);
+}
+
+ANGRY_TEST(scalesWindowToDisplayBoundsForPictureInPicture)
+{
+    angry_pip_space(0x7E575008ULL);
+    struct window win = { .id = angry_test_window() };
+    struct angry_sa_server server;
+    angry_sa_server_begin(&server);
+    window_manager_toggle_window_pip(&g_space_manager, &win);
+    angry_sa_server_end(&server);
+    uint32_t wid = 0;
+    CGRect requested = angry_pip_request(&server, &wid);
+    ANGRY_ASSERT(CGRectEqualToRect(requested, display_bounds_constrained(CGMainDisplayID(), false)),
+                 "expected the window to be scaled to the bounds of its display");
+}
+
+ANGRY_TEST(keepsSpacePaddingForPictureInPicture)
+{
+    struct view *view = angry_pip_space(0x7E575009ULL);
+    view_set_flag(view, VIEW_ENABLE_PADDING);
+    view->top_padding = 10; view->bottom_padding = 20; view->left_padding = 30; view->right_padding = 40;
+    struct window win = { .id = angry_test_window() };
+    struct angry_sa_server server;
+    angry_sa_server_begin(&server);
+    window_manager_toggle_window_pip(&g_space_manager, &win);
+    angry_sa_server_end(&server);
+    uint32_t wid = 0;
+    CGRect requested = angry_pip_request(&server, &wid);
+    CGRect b = display_bounds_constrained(CGMainDisplayID(), false);
+    CGRect expected = CGRectMake(b.origin.x + 30, b.origin.y + 10, b.size.width - 70, b.size.height - 30);
+    ANGRY_ASSERT(CGRectEqualToRect(requested, expected), "expected the padding of the space to stay around the scaled window");
+}
