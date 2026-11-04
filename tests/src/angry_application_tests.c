@@ -8,7 +8,7 @@ ANGRY_TEST(createsApplicationInstanceFromCurrentProcess) {
     GetProcessForPID(pid, &psn);
     struct process proc = { .pid = pid, .psn = psn, .name = "yabai_tests" };
     struct application *app = application_create(&proc);
-    bool ok = app != NULL && app->pid == pid && app->ref != NULL;
+    bool ok = ANGRY_ALL(app != NULL, app->pid == pid, app->ref != NULL);
     application_destroy(app);
     ANGRY_ASSERT(ok, "application_create failed to instantiate application from current process");
 }
@@ -150,7 +150,7 @@ ANGRY_TEST(postsMenuOpenedEventCarryingApplicationPid) {
     AXUIElementRef ref = AXUIElementCreateApplication(app.pid);
     application_notification_handler(NULL, ref, kAXMenuOpenedNotification, &app);
     struct event *e = angry_last_posted_event();
-    bool posted = e->type == MENU_OPENED && (pid_t)(intptr_t)e->context == app.pid;
+    bool posted = ANGRY_ALL(e->type == MENU_OPENED, (pid_t)(intptr_t)e->context == app.pid);
     CFRelease(ref);
     ANGRY_ASSERT(posted, "expected a menu opened event for the application to be posted");
 }
@@ -160,7 +160,7 @@ ANGRY_TEST(postsMenuClosedEventCarryingApplicationPid) {
     AXUIElementRef ref = AXUIElementCreateApplication(app.pid);
     application_notification_handler(NULL, ref, kAXMenuClosedNotification, &app);
     struct event *e = angry_last_posted_event();
-    bool posted = e->type == MENU_CLOSED && (pid_t)(intptr_t)e->context == app.pid;
+    bool posted = ANGRY_ALL(e->type == MENU_CLOSED, (pid_t)(intptr_t)e->context == app.pid);
     CFRelease(ref);
     ANGRY_ASSERT(posted, "expected a menu closed event for the application to be posted");
 }
@@ -170,7 +170,7 @@ ANGRY_TEST(postsWindowMinimizedEventCarryingContext) {
     AXUIElementRef ref = AXUIElementCreateApplication(app.pid);
     application_notification_handler(NULL, ref, kAXWindowMiniaturizedNotification, &app);
     struct event *e = angry_last_posted_event();
-    bool posted = e->type == WINDOW_MINIMIZED && e->context == &app;
+    bool posted = ANGRY_ALL(e->type == WINDOW_MINIMIZED, e->context == &app);
     CFRelease(ref);
     ANGRY_ASSERT(posted, "expected a window minimized event to be posted");
 }
@@ -180,7 +180,7 @@ ANGRY_TEST(postsWindowDeminimizedEventCarryingContext) {
     AXUIElementRef ref = AXUIElementCreateApplication(app.pid);
     application_notification_handler(NULL, ref, kAXWindowDeminiaturizedNotification, &app);
     struct event *e = angry_last_posted_event();
-    bool posted = e->type == WINDOW_DEMINIMIZED && e->context == &app;
+    bool posted = ANGRY_ALL(e->type == WINDOW_DEMINIMIZED, e->context == &app);
     CFRelease(ref);
     ANGRY_ASSERT(posted, "expected a window deminimized event to be posted");
 }

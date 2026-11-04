@@ -4,7 +4,11 @@
 ANGRY_TEST(initializesMouseStateWithDefaultParameters) {
     struct mouse_state ms;
     mouse_state_init(&ms);
-    ANGRY_ASSERT(ms.modifier == MOUSE_MOD_FN && ms.action1 == MOUSE_MODE_MOVE && ms.action2 == MOUSE_MODE_RESIZE && ms.bsp_live_resize == true, "mouse_state_init failed to populate default values");
+    ANGRY_ASSERT_ALL("mouse_state_init failed to populate default values",
+                     ms.modifier == MOUSE_MOD_FN,
+                     ms.action1 == MOUSE_MODE_MOVE,
+                     ms.action2 == MOUSE_MODE_RESIZE,
+                     ms.bsp_live_resize == true);
 }
 
 ANGRY_TEST(parsesMouseModifierFromCommandAndAltFlags) {
@@ -22,7 +26,13 @@ ANGRY_TEST(populatesMouseWindowInfoCalculatingDeltasAndFlags) {
     struct mouse_state ms = { .window = &win, .window_frame = {{ 100, 150 }, { 750, 600 }} };
     struct mouse_window_info info = {0};
     mouse_window_info_populate(&ms, &info);
-    ANGRY_ASSERT(info.dx == 20.0f && info.dy == 10.0f && info.dw == 50.0f && info.dh == 0.0f && info.changed_position && info.changed_size, "mouse_window_info_populate calculated incorrect deltas");
+    ANGRY_ASSERT_ALL("mouse_window_info_populate calculated incorrect deltas",
+                     info.dx == 20.0f,
+                     info.dy == 10.0f,
+                     info.dw == 50.0f,
+                     info.dh == 0.0f,
+                     info.changed_position,
+                     info.changed_size);
 }
 
 ANGRY_TEST(treatsReleaseNearGestureOriginAsStationaryClick) {
@@ -104,7 +114,9 @@ ANGRY_TEST(swapsWindowsBetweenNodesUpdatingInsertionPoints) {
     struct window src_w = { .id = 10 };
     struct window dst_w = { .id = 20 };
     mouse_drop_action_swap(&g_window_manager, &src_v, &src_n, &src_w, &dst_v, &dst_n, &dst_w);
-    ANGRY_ASSERT(src_n.window_list[0] == 20 && dst_n.window_list[0] == 10, "mouse_drop_action_swap failed to exchange window lists");
+    ANGRY_ASSERT_ALL("mouse_drop_action_swap failed to exchange window lists",
+                     src_n.window_list[0] == 20,
+                     dst_n.window_list[0] == 10);
 }
 
 ANGRY_TEST(consumesMouseClickWhenModifiersMatchAndFreesOnRelease) {
@@ -115,7 +127,9 @@ ANGRY_TEST(consumesMouseClickWhenModifiersMatchAndFreesOnRelease) {
     bool consumed = res == NULL && ms.consume_mouse_click;
     mouse_handler(NULL, kCGEventLeftMouseUp, ev, &ms);
     CFRelease(ev);
-    ANGRY_ASSERT(consumed && !ms.consume_mouse_click, "mouse_handler failed to consume and release click");
+    ANGRY_ASSERT_ALL("mouse_handler failed to consume and release click",
+                     consumed,
+                     !ms.consume_mouse_click);
 }
 
 ANGRY_TEST(stacksWindowIntoDestinationNodeOnMouseDropActionStack) {
@@ -127,7 +141,7 @@ ANGRY_TEST(stacksWindowIntoDestinationNodeOnMouseDropActionStack) {
     table_add(&g_window_manager.window, &src_w.id, &src_w);
     table_add(&g_window_manager.window, &dst_w.id, &dst_w);
     mouse_drop_action_stack(&g_window_manager, &src_v, &src_w, &dst_v, &dst_w);
-    bool stacked = dst_n.window_count == 2 && dst_n.window_list[1] == 201;
+    bool stacked = ANGRY_ALL(dst_n.window_count == 2, dst_n.window_list[1] == 201);
     table_remove(&g_window_manager.window, &src_w.id);
     table_remove(&g_window_manager.window, &dst_w.id);
     ANGRY_ASSERT(stacked, "mouse_drop_action_stack failed to stack source window into target node");
@@ -142,7 +156,9 @@ ANGRY_TEST(warpsWindowBetweenSiblingsWithMatchingSplitSwappingNodes) {
     struct window src_w = { .id = 301 };
     struct window dst_w = { .id = 302 };
     mouse_drop_action_warp(&g_window_manager, &src_v, &src_n, &src_w, &dst_v, &dst_n, &dst_w, SPLIT_X, CHILD_FIRST);
-    ANGRY_ASSERT(src_n.window_list[0] == 302 && dst_n.window_list[0] == 301, "mouse_drop_action_warp failed to swap siblings with matching split");
+    ANGRY_ASSERT_ALL("mouse_drop_action_warp failed to swap siblings with matching split",
+                     src_n.window_list[0] == 302,
+                     dst_n.window_list[0] == 301);
 }
 
 ANGRY_TEST(handlesMouseRightMouseDownConsumingWhenModifierMatches) {
@@ -150,7 +166,7 @@ ANGRY_TEST(handlesMouseRightMouseDownConsumingWhenModifierMatches) {
     CGEventRef ev = CGEventCreateMouseEvent(NULL, kCGEventRightMouseDown, (CGPoint){10, 20}, kCGMouseButtonRight);
     CGEventSetFlags(ev, kCGEventFlagMaskAlternate);
     CGEventRef res = mouse_handler(NULL, kCGEventRightMouseDown, ev, &ms);
-    bool consumed = res == NULL && ms.consume_mouse_click;
+    bool consumed = ANGRY_ALL(res == NULL, ms.consume_mouse_click);
     mouse_handler(NULL, kCGEventRightMouseUp, ev, &ms);
     CFRelease(ev);
     ANGRY_ASSERT(consumed, "mouse_handler failed to consume RightMouseDown with matching modifier");
@@ -186,7 +202,9 @@ ANGRY_TEST(handlesDockSwipeGestureBeganAndEndedEvents) {
     mouse_handler(NULL, 30, ev, &g_mouse_state);
     bool ended = __pending_gesture == false;
     CFRelease(ev);
-    ANGRY_ASSERT(began && ended, "mouse_handler failed to track dock swipe gesture began and ended");
+    ANGRY_ASSERT_ALL("mouse_handler failed to track dock swipe gesture began and ended",
+                     began,
+                     ended);
 }
 
 ANGRY_TEST(swapsWindowsAcrossDifferentSpacesUpdatingManagedTable) {
@@ -201,7 +219,9 @@ ANGRY_TEST(swapsWindowsAcrossDifferentSpacesUpdatingManagedTable) {
     mouse_drop_action_swap(&g_window_manager, &src_v, &src_n, &src_w, &dst_v, &dst_n, &dst_w);
     table_remove(&g_window_manager.window, &src_w.id);
     table_remove(&g_window_manager.window, &dst_w.id);
-    ANGRY_ASSERT(src_n.window_list[0] == 402 && dst_n.window_list[0] == 401, "mouse_drop_action_swap failed across different spaces");
+    ANGRY_ASSERT_ALL("mouse_drop_action_swap failed across different spaces",
+                     src_n.window_list[0] == 402,
+                     dst_n.window_list[0] == 401);
 }
 
 ANGRY_TEST(warpsWindowBetweenSiblingsWithDifferentSplitModifyingParent) {
@@ -213,7 +233,9 @@ ANGRY_TEST(warpsWindowBetweenSiblingsWithDifferentSplitModifyingParent) {
     struct window src_w = { .id = 501 };
     struct window dst_w = { .id = 502 };
     mouse_drop_action_warp(&g_window_manager, &src_v, &src_n, &src_w, &dst_v, &dst_n, &dst_w, SPLIT_Y, CHILD_SECOND);
-    ANGRY_ASSERT(parent.split == SPLIT_Y && parent.child == CHILD_SECOND, "mouse_drop_action_warp failed to reassign parent split and child");
+    ANGRY_ASSERT_ALL("mouse_drop_action_warp failed to reassign parent split and child",
+                     parent.split == SPLIT_Y,
+                     parent.child == CHILD_SECOND);
 }
 
 ANGRY_TEST(handlesMouseMovedEventPostingEventWhenModifierDiffers) {
@@ -234,7 +256,7 @@ ANGRY_TEST(handlesZoomedNodeOnMouseDropActionStack) {
     table_add(&g_window_manager.window, &src_w.id, &src_w);
     table_add(&g_window_manager.window, &dst_w.id, &dst_w);
     mouse_drop_action_stack(&g_window_manager, &src_v, &src_w, &dst_v, &dst_w);
-    bool stacked = dst_n.window_count == 2 && dst_n.window_list[1] == 601;
+    bool stacked = ANGRY_ALL(dst_n.window_count == 2, dst_n.window_list[1] == 601);
     table_remove(&g_window_manager.window, &src_w.id);
     table_remove(&g_window_manager.window, &dst_w.id);
     ANGRY_ASSERT(stacked, "mouse_drop_action_stack failed on zoomed destination node");

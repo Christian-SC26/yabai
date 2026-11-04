@@ -30,7 +30,7 @@ ANGRY_TEST(createsProcessInstanceForCurrentProcess) {
     ProcessSerialNumber psn;
     GetCurrentProcess(&psn);
     struct process *proc = process_create(psn, getpid());
-    bool ok = proc != NULL && proc->pid == getpid() && proc->name != NULL;
+    bool ok = ANGRY_ALL(proc != NULL, proc->pid == getpid(), proc->name != NULL);
     if (proc) process_destroy(proc);
     ANGRY_ASSERT(ok, "process_create failed to instantiate process for current task");
 }
@@ -53,7 +53,9 @@ ANGRY_TEST(findsProcessInProcessManagerTable) {
     struct process *found = process_manager_find_process(&pm, &proc.psn);
     table_remove(&pm.process, &proc.psn);
     table_free(&pm.process);
-    ANGRY_ASSERT(found && found->pid == 888, "process_manager_find_process failed to retrieve added process");
+    ANGRY_ASSERT_ALL("process_manager_find_process failed to retrieve added process",
+                     found,
+                     found->pid == 888);
 }
 
 ANGRY_TEST(returnsNullWhenProcessNotFoundInProcessManager) {
@@ -79,7 +81,9 @@ ANGRY_TEST(handlesProcessLaunchEventInProcessHandler) {
     if (p) { table_remove(&pm.process, &psn); process_destroy(p); }
     table_free(&pm.process);
     ReleaseEvent(ev);
-    ANGRY_ASSERT(status == noErr && added, "process_handler failed to handle kEventAppLaunched");
+    ANGRY_ASSERT_ALL("process_handler failed to handle kEventAppLaunched",
+                     status == noErr,
+                     added);
 }
 
 ANGRY_TEST(handlesDuplicateProcessLaunchEventDiscardingDupe) {
@@ -127,7 +131,9 @@ ANGRY_TEST(handlesProcessTerminatedEventMarkingProcessTerminated) {
     ReleaseEvent(ev);
     bool term = p.terminated;
     table_free(&pm.process);
-    ANGRY_ASSERT(status == noErr && term, "process_handler failed to mark terminated on kEventAppTerminated");
+    ANGRY_ASSERT_ALL("process_handler failed to mark terminated on kEventAppTerminated",
+                     status == noErr,
+                     term);
 }
 
 ANGRY_TEST(returnsErrorWhenProcessEventLacksProcessIdParameter) {
@@ -155,5 +161,7 @@ ANGRY_TEST(addsRunningProcessesAndCachesFinderPsn) {
 
 ANGRY_TEST(initializesProcessManagerInstallingCarbonEventHandler) {
     bool ok = process_manager_begin(&g_process_manager);
-    ANGRY_ASSERT(ok && g_process_manager.process.count > 0, "process_manager_begin failed to initialize process table");
+    ANGRY_ASSERT_ALL("process_manager_begin failed to initialize process table",
+                     ok,
+                     g_process_manager.process.count > 0);
 }

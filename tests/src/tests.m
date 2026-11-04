@@ -24,6 +24,8 @@ typedef bool (test_function)(void);
 // out of reach, and window queries use a window the suite owns.
 //
 
+static const char *g_angry_failed_part;
+
 // Angry Tests infrastructure (Yegor Bugayenko rules: verb-named, one assertion, short, explicit message)
 //
 // NOTE: the body runs in its own function so that ANGRY_ASSERT can stop the
@@ -42,10 +44,61 @@ typedef bool (test_function)(void);
                    "      \e[1;33mCondition:\e[m %s\n" \
                    "      \e[1;33mLocation:\e[m  %s:%d (%s)\n", \
                    (msg), #cond, __FILE__, __LINE__, angry_name); \
+            if (g_angry_failed_part) printf("      \e[1;33mBroken:\e[m    %s\n", g_angry_failed_part); \
             *angry_ok = false; \
             return; \
         } \
     } while (0)
+
+//
+// NOTE: ANGRY_ASSERT_ALL is a single assertion over several conditions, like
+// allOf in Hamcrest. The conditions are checked in order, so an earlier one
+// can guard a later one, and a failure names the first condition that broke.
+//
+#define ANGRY_ASSERT_PART(cond) \
+    if (!(cond)) { \
+        printf("\n    \e[1;31m✖ [ASSERTION FAILED]\e[m %s\n" \
+               "      \e[1;33mCondition:\e[m %s\n" \
+               "      \e[1;33mOf:\e[m        %s\n" \
+               "      \e[1;33mLocation:\e[m  %s:%d (%s)\n", \
+               angry_msg, #cond, angry_all, __FILE__, __LINE__, angry_name); \
+        *angry_ok = false; \
+        return; \
+    }
+
+#define ANGRY_FE_1(m, x) m(x)
+#define ANGRY_FE_2(m, x, ...) m(x) ANGRY_FE_1(m, __VA_ARGS__)
+#define ANGRY_FE_3(m, x, ...) m(x) ANGRY_FE_2(m, __VA_ARGS__)
+#define ANGRY_FE_4(m, x, ...) m(x) ANGRY_FE_3(m, __VA_ARGS__)
+#define ANGRY_FE_5(m, x, ...) m(x) ANGRY_FE_4(m, __VA_ARGS__)
+#define ANGRY_FE_6(m, x, ...) m(x) ANGRY_FE_5(m, __VA_ARGS__)
+#define ANGRY_FE_7(m, x, ...) m(x) ANGRY_FE_6(m, __VA_ARGS__)
+#define ANGRY_FE_8(m, x, ...) m(x) ANGRY_FE_7(m, __VA_ARGS__)
+#define ANGRY_FE_PICK(_1, _2, _3, _4, _5, _6, _7, _8, name, ...) name
+#define ANGRY_FOR_EACH(m, ...) \
+    ANGRY_FE_PICK(__VA_ARGS__, ANGRY_FE_8, ANGRY_FE_7, ANGRY_FE_6, ANGRY_FE_5, ANGRY_FE_4, ANGRY_FE_3, ANGRY_FE_2, ANGRY_FE_1)(m, __VA_ARGS__)
+
+#define ANGRY_ASSERT_ALL(msg, ...) \
+    do { \
+        const char *angry_msg = (msg); \
+        const char *angry_all = #__VA_ARGS__; \
+        ANGRY_FOR_EACH(ANGRY_ASSERT_PART, __VA_ARGS__) \
+    } while (0)
+
+//
+// NOTE: ANGRY_ALL is the same conjunction as an expression, for a test that
+// has to compute its result before cleaning up and asserting. It remembers
+// the first condition that broke, and ANGRY_ASSERT prints it on a failure.
+//
+#define ANGRY_ALL_PART(cond) \
+    if (angry_all_ok && !(cond)) { angry_all_ok = false; g_angry_failed_part = #cond; }
+
+#define ANGRY_ALL(...) \
+    ({ \
+        bool angry_all_ok = true; \
+        ANGRY_FOR_EACH(ANGRY_ALL_PART, __VA_ARGS__) \
+        angry_all_ok; \
+    })
 
 #define ANGRY_ENTRY(func_name) { #func_name, func_name },
 
@@ -1083,6 +1136,7 @@ static void tests_reset_shared_state(void)
     g_mock_ax_cannot_complete = false;
     g_mock_dock_window_layer18 = false;
     g_mock_posted_event_count = 0;
+    g_angry_failed_part = NULL;
     g_mock_dock_notification[0] = '\0';
 
     g_mission_control_mode = MISSION_CONTROL_MODE_INACTIVE;

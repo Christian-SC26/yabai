@@ -6,13 +6,17 @@ ANGRY_TEST(resolvesLayoutStorePathForNullAndCustomPaths) {
     uint64_t sid = space_manager_active_space();
     NSString *p1 = layout_store_resolve_path(NULL, sid);
     NSString *p2 = layout_store_resolve_path("~/test_layout.json", sid);
-    ANGRY_ASSERT([p1 containsString:@".config/yabai/layouts"] && [p2 containsString:@"test_layout.json"], "layout_store_resolve_path failed");
+    ANGRY_ASSERT_ALL("layout_store_resolve_path failed",
+                     [p1 containsString:@".config/yabai/layouts"],
+                     [p2 containsString:@"test_layout.json"]);
 }
 
 ANGRY_TEST(resolvesLayoutStoreSessionPathForNullAndCustomPaths) {
     NSString *p1 = layout_store_resolve_session_path(NULL);
     NSString *p2 = layout_store_resolve_session_path("/tmp/session.json");
-    ANGRY_ASSERT([p1 hasSuffix:@"session.json"] && [p2 isEqualToString:@"/tmp/session.json"], "layout_store_resolve_session_path failed");
+    ANGRY_ASSERT_ALL("layout_store_resolve_session_path failed",
+                     [p1 hasSuffix:@"session.json"],
+                     [p2 isEqualToString:@"/tmp/session.json"]);
 }
 
 ANGRY_TEST(ensuresDirectoryExistsForTargetFilePath) {
@@ -27,14 +31,18 @@ ANGRY_TEST(serializesLeafAndBranchWindowNodesToDictionary) {
     struct window_node branch = { .split = SPLIT_X, .ratio = 0.5f, .left = &leaf };
     NSDictionary *d_leaf = layout_store_serialize_node(&leaf);
     NSDictionary *d_branch = layout_store_serialize_node(&branch);
-    ANGRY_ASSERT([d_leaf[@"type"] isEqualToString:@"leaf"] && [d_branch[@"type"] isEqualToString:@"branch"], "serialize_node failed");
+    ANGRY_ASSERT_ALL("serialize_node failed",
+                     [d_leaf[@"type"] isEqualToString:@"leaf"],
+                     [d_branch[@"type"] isEqualToString:@"branch"]);
 }
 
 ANGRY_TEST(collectsAppNamesRecursivelyFromSerializedNodeDictionary) {
     NSDictionary *d = @{ @"type": @"leaf", @"apps": @[@"Finder", @"Terminal"] };
     NSMutableArray *apps = [NSMutableArray array];
     layout_store_collect_tree_apps(d, apps);
-    ANGRY_ASSERT([apps count] == 2 && [apps containsObject:@"Finder"], "layout_store_collect_tree_apps failed");
+    ANGRY_ASSERT_ALL("layout_store_collect_tree_apps failed",
+                     [apps count] == 2,
+                     [apps containsObject:@"Finder"]);
 }
 
 ANGRY_TEST(reconstructsWindowNodeHierarchyFromSerializedDictionary) {
@@ -47,7 +55,9 @@ ANGRY_TEST(reconstructsWindowNodeHierarchyFromSerializedDictionary) {
 
 ANGRY_TEST(buildsSessionDictionaryCapturingDisplaysAndSpaces) {
     NSDictionary *dict = layout_store_build_session_dict();
-    ANGRY_ASSERT(dict != nil && [dict[@"type"] isEqualToString:@"session"], "build_session_dict failed");
+    ANGRY_ASSERT_ALL("build_session_dict failed",
+                     dict != nil,
+                     [dict[@"type"] isEqualToString:@"session"]);
 }
 
 ANGRY_TEST(refusesToSaveLayoutOfFloatingSpace) {
@@ -55,7 +65,9 @@ ANGRY_TEST(refusesToSaveLayoutOfFloatingSpace) {
     uint64_t sid = 0x7E573001ULL;
     space_manager_find_view(&g_space_manager, sid)->layout = VIEW_FLOAT;
     bool saved = layout_store_save(sid, "/tmp/yabai_layout_test.json", out_p, sizeof(out_p), err, sizeof(err));
-    ANGRY_ASSERT(!saved && strstr(err, "BSP") != NULL, "expected saving a floating space to be refused");
+    ANGRY_ASSERT_ALL("expected saving a floating space to be refused",
+                     !saved,
+                     strstr(err, "BSP") != NULL);
 }
 
 ANGRY_TEST(refusesToDumpLayoutOfFloatingSpace) {
@@ -65,14 +77,18 @@ ANGRY_TEST(refusesToDumpLayoutOfFloatingSpace) {
     space_manager_find_view(&g_space_manager, sid)->layout = VIEW_FLOAT;
     bool dumped = layout_store_dump(sid, f, err, sizeof(err));
     fclose(f);
-    ANGRY_ASSERT(!dumped && strcmp(err, "can only dump layout for BSP spaces") == 0, "expected dumping a floating space to be refused");
+    ANGRY_ASSERT_ALL("expected dumping a floating space to be refused",
+                     !dumped,
+                     strcmp(err, "can only dump layout for BSP spaces") == 0);
 }
 
 ANGRY_TEST(restoresSpaceLayoutFromFileHandlingMissingFile) {
     char out_p[256] = {0}, err[256] = {0};
     uint64_t sid = space_manager_active_space();
     bool res = layout_store_restore(sid, "/tmp/nonexistent_yabai_layout_store.json", out_p, sizeof(out_p), err, sizeof(err));
-    ANGRY_ASSERT(!res && strstr(err, "not found"), "layout_store_restore failed to detect missing file");
+    ANGRY_ASSERT_ALL("layout_store_restore failed to detect missing file",
+                     !res,
+                     strstr(err, "not found"));
 }
 
 ANGRY_TEST(savesSessionStateToFileHandlingErrors) {
@@ -87,11 +103,15 @@ ANGRY_TEST(dumpsSessionStateToJsonStreamHandlingErrors) {
     FILE *f = fmemopen(buf, sizeof(buf), "w");
     bool ok = layout_store_dump_session(f, err, sizeof(err));
     fclose(f);
-    ANGRY_ASSERT(ok && strstr(buf, "\"type\" : \"session\""), "layout_store_dump_session failed emitting JSON");
+    ANGRY_ASSERT_ALL("layout_store_dump_session failed emitting JSON",
+                     ok,
+                     strstr(buf, "\"type\" : \"session\""));
 }
 
 ANGRY_TEST(restoresSessionStateFromFileHandlingMissingFile) {
     char out_p[256] = {0}, err[256] = {0};
     bool res = layout_store_restore_session("/tmp/nonexistent_yabai_session_store.json", out_p, sizeof(out_p), err, sizeof(err));
-    ANGRY_ASSERT(!res && strstr(err, "not found"), "layout_store_restore_session failed to detect missing file");
+    ANGRY_ASSERT_ALL("layout_store_restore_session failed to detect missing file",
+                     !res,
+                     strstr(err, "not found"));
 }

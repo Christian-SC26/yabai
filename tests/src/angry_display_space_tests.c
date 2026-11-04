@@ -5,25 +5,33 @@
 ANGRY_TEST(postsDisplayAddedEventCarryingDisplayId) {
     display_handler(7001, kCGDisplayAddFlag, NULL);
     struct event *e = angry_last_posted_event();
-    ANGRY_ASSERT(e->type == DISPLAY_ADDED && (uint32_t)(intptr_t)e->context == 7001, "expected a DISPLAY_ADDED event for the display to be posted");
+    ANGRY_ASSERT_ALL("expected a DISPLAY_ADDED event for the display to be posted",
+                     e->type == DISPLAY_ADDED,
+                     (uint32_t)(intptr_t)e->context == 7001);
 }
 
 ANGRY_TEST(postsDisplayRemovedEventCarryingDisplayId) {
     display_handler(7002, kCGDisplayRemoveFlag, NULL);
     struct event *e = angry_last_posted_event();
-    ANGRY_ASSERT(e->type == DISPLAY_REMOVED && (uint32_t)(intptr_t)e->context == 7002, "expected a DISPLAY_REMOVED event for the display to be posted");
+    ANGRY_ASSERT_ALL("expected a DISPLAY_REMOVED event for the display to be posted",
+                     e->type == DISPLAY_REMOVED,
+                     (uint32_t)(intptr_t)e->context == 7002);
 }
 
 ANGRY_TEST(postsDisplayMovedEventCarryingDisplayId) {
     display_handler(7003, kCGDisplayMovedFlag, NULL);
     struct event *e = angry_last_posted_event();
-    ANGRY_ASSERT(e->type == DISPLAY_MOVED && (uint32_t)(intptr_t)e->context == 7003, "expected a DISPLAY_MOVED event for the display to be posted");
+    ANGRY_ASSERT_ALL("expected a DISPLAY_MOVED event for the display to be posted",
+                     e->type == DISPLAY_MOVED,
+                     (uint32_t)(intptr_t)e->context == 7003);
 }
 
 ANGRY_TEST(postsDisplayResizedEventCarryingDisplayId) {
     display_handler(7004, kCGDisplayDesktopShapeChangedFlag, NULL);
     struct event *e = angry_last_posted_event();
-    ANGRY_ASSERT(e->type == DISPLAY_RESIZED && (uint32_t)(intptr_t)e->context == 7004, "expected a DISPLAY_RESIZED event for the display to be posted");
+    ANGRY_ASSERT_ALL("expected a DISPLAY_RESIZED event for the display to be posted",
+                     e->type == DISPLAY_RESIZED,
+                     (uint32_t)(intptr_t)e->context == 7004);
 }
 
 ANGRY_TEST(serializesDisplayPropertiesToJsonStream) {
@@ -32,7 +40,10 @@ ANGRY_TEST(serializesDisplayPropertiesToJsonStream) {
     uint32_t did = display_manager_main_display_id();
     display_serialize(f, did, 0);
     fclose(f);
-    ANGRY_ASSERT(strstr(buf, "\"id\":") && strstr(buf, "\"uuid\":") && strstr(buf, "\"frame\":"), "display_serialize failed to emit complete JSON");
+    ANGRY_ASSERT_ALL("display_serialize failed to emit complete JSON",
+                     strstr(buf, "\"id\":"),
+                     strstr(buf, "\"uuid\":"),
+                     strstr(buf, "\"frame\":"));
 }
 
 ANGRY_TEST(serializesIndividualDisplayPropertyFields) {
@@ -41,7 +52,9 @@ ANGRY_TEST(serializesIndividualDisplayPropertyFields) {
     uint32_t did = display_manager_main_display_id();
     display_serialize(f, did, DISPLAY_PROPERTY_ID | DISPLAY_PROPERTY_FRAME | DISPLAY_PROPERTY_HAS_FOCUS);
     fclose(f);
-    ANGRY_ASSERT(strstr(buf, "\"id\":") && strstr(buf, "\"has-focus\":"), "display_serialize failed to emit selected fields");
+    ANGRY_ASSERT_ALL("display_serialize failed to emit selected fields",
+                     strstr(buf, "\"id\":"),
+                     strstr(buf, "\"has-focus\":"));
 }
 
 ANGRY_TEST(countsSpacesForActiveDisplay) {
@@ -64,7 +77,9 @@ ANGRY_TEST(resolvesDisplayBoundsConstrainedWithExternalBarPadding) {
     g_display_manager.mode = EXTERNAL_BAR_OFF;
     g_display_manager.top_padding = 0;
     g_display_manager.bottom_padding = 0;
-    ANGRY_ASSERT(r.size.width > 0 && r.size.height > 0, "display_bounds_constrained failed with external bar");
+    ANGRY_ASSERT_ALL("display_bounds_constrained failed with external bar",
+                     r.size.width > 0,
+                     r.size.height > 0);
 }
 
 ANGRY_TEST(convertsDisplayIdToUuidAndBack) {

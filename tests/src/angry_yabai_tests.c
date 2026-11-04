@@ -9,7 +9,9 @@ ANGRY_TEST(abortsWhenClientSendMessageReceivesNoArguments)
     }
     int status = 0;
     waitpid(pid, &status, 0);
-    ANGRY_ASSERT(WIFEXITED(status) && WEXITSTATUS(status) == 1, "expected client_send_message with 1 arg to exit 1");
+    ANGRY_ASSERT_ALL("expected client_send_message with 1 arg to exit 1",
+                     WIFEXITED(status),
+                     WEXITSTATUS(status) == 1);
 }
 
 ANGRY_TEST(printsVersionAndExitsInParseArguments)
@@ -23,5 +25,7 @@ ANGRY_TEST(printsVersionAndExitsInParseArguments)
     }
     int status = 0;
     waitpid(pid, &status, 0);
-    ANGRY_ASSERT(WIFEXITED(status) && WEXITSTATUS(status) == 0, "expected --version to exit cleanly with 0");
+    ANGRY_ASSERT_ALL("expected --version to exit cleanly with 0",
+                     WIFEXITED(status),
+                     WEXITSTATUS(status) == 0);
 }

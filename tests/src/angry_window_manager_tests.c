@@ -38,7 +38,9 @@ ANGRY_TEST(swapsHiddenTabIntoNode)
     struct view view = { .layout = VIEW_BSP, .root = &node };
 
     ANGRY_ASSERT(view_swap_node_window(&view, 9501, 9502), "expected the swap to find the outgoing tab");
-    ANGRY_ASSERT(node.window_list[0] == 9502 && node.window_order[0] == 9502, "expected the node to hold the incoming tab");
+    ANGRY_ASSERT_ALL("expected the node to hold the incoming tab",
+                     node.window_list[0] == 9502,
+                     node.window_order[0] == 9502);
     ANGRY_ASSERT(node.window_count == 1, "expected a tab switch to keep the node size");
 }
 
@@ -109,7 +111,9 @@ ANGRY_TEST(appliesGeneralRuleEffectsToWindow)
     struct window win = { .id = 9302 };
     struct rule_effects eff = { .sticky = RULE_PROP_ON, .ffm = RULE_PROP_ON, .mff = RULE_PROP_ON };
     window_manager_apply_rule_effects_to_window(&g_space_manager, &g_window_manager, &win, &eff);
-    ANGRY_ASSERT(window_check_rule_flag(&win, WINDOW_RULE_FFM) && window_check_rule_flag(&win, WINDOW_RULE_MFF), "expected rule effects to set FFM and MFF flags");
+    ANGRY_ASSERT_ALL("expected rule effects to set FFM and MFF flags",
+                     window_check_rule_flag(&win, WINDOW_RULE_FFM),
+                     window_check_rule_flag(&win, WINDOW_RULE_MFF));
 }
 
 ANGRY_TEST(clearsManagedFlagWhenMatchingRuleTurnsManagementOff)
@@ -142,7 +146,9 @@ ANGRY_TEST(togglesGlobalWindowOpacityState)
     window_manager_set_window_opacity_enabled(&g_window_manager, true);
     bool enabled = g_window_manager.enable_window_opacity;
     window_manager_set_window_opacity_enabled(&g_window_manager, false);
-    ANGRY_ASSERT(enabled && !g_window_manager.enable_window_opacity, "expected window opacity enable/disable toggling");
+    ANGRY_ASSERT_ALL("expected window opacity enable/disable toggling",
+                     enabled,
+                     !g_window_manager.enable_window_opacity);
 }
 
 ANGRY_TEST(evaluatesWhetherWindowShouldBeManaged)
@@ -178,7 +184,9 @@ ANGRY_TEST(setsWindowPurifyModeAndIteratesWindows)
     window_manager_set_purify_mode(&g_window_manager, PURIFY_ALWAYS);
     bool is_always = g_window_manager.purify_mode == PURIFY_ALWAYS;
     window_manager_set_purify_mode(&g_window_manager, PURIFY_DISABLED);
-    ANGRY_ASSERT(is_always && g_window_manager.purify_mode == PURIFY_DISABLED, "expected purify mode update");
+    ANGRY_ASSERT_ALL("expected purify mode update",
+                     is_always,
+                     g_window_manager.purify_mode == PURIFY_DISABLED);
 }
 
 ANGRY_TEST(reportsFailedOpacityChangeWithoutScriptingAddition)
@@ -438,7 +446,7 @@ ANGRY_TEST(focusesWindowOfAnotherProcessWithoutRaiseByMakingItKey)
     ProcessSerialNumber psn = { 0, kNoProcess };
     window_manager_focus_window_without_raise(&psn, 9341);
     g_window_manager.focused_window_psn = saved;
-    bool made_key = g_mock_posted_event_count == 2 && angry_posted_event_window_id(1) == 9341;
+    bool made_key = ANGRY_ALL(g_mock_posted_event_count == 2, angry_posted_event_window_id(1) == 9341);
     ANGRY_ASSERT(made_key, "expected only the key-window events for a window of another process");
 }
 
@@ -453,7 +461,7 @@ ANGRY_TEST(deactivatesFocusedWindowBeforeFocusingSiblingWithoutRaise)
     window_manager_focus_window_without_raise(&psn, 9343);
     g_window_manager.focused_window_psn = saved_psn;
     g_window_manager.focused_window_id = saved_wid;
-    bool ordered = angry_posted_event_window_id(0) == 9342 && angry_posted_event_window_id(1) == 9343;
+    bool ordered = ANGRY_ALL(angry_posted_event_window_id(0) == 9342, angry_posted_event_window_id(1) == 9343);
     ANGRY_ASSERT(ordered, "expected the focused window to be deactivated before its sibling is activated");
 }
 
@@ -462,7 +470,9 @@ ANGRY_TEST(tracksLostFrontSwitchedEventInTable)
     window_manager_add_lost_front_switched_event(&g_window_manager, 9335);
     bool found = window_manager_find_lost_front_switched_event(&g_window_manager, 9335);
     window_manager_remove_lost_front_switched_event(&g_window_manager, 9335);
-    ANGRY_ASSERT(found && !window_manager_find_lost_front_switched_event(&g_window_manager, 9335), "expected front switched event to be tracked and removed");
+    ANGRY_ASSERT_ALL("expected front switched event to be tracked and removed",
+                     found,
+                     !window_manager_find_lost_front_switched_event(&g_window_manager, 9335));
 }
 
 ANGRY_TEST(tracksLostFocusedEventInTable)
@@ -470,7 +480,9 @@ ANGRY_TEST(tracksLostFocusedEventInTable)
     window_manager_add_lost_focused_event(&g_window_manager, 9336);
     bool found = window_manager_find_lost_focused_event(&g_window_manager, 9336);
     window_manager_remove_lost_focused_event(&g_window_manager, 9336);
-    ANGRY_ASSERT(found && !window_manager_find_lost_focused_event(&g_window_manager, 9336), "expected focused event to be tracked and removed");
+    ANGRY_ASSERT_ALL("expected focused event to be tracked and removed",
+                     found,
+                     !window_manager_find_lost_focused_event(&g_window_manager, 9336));
 }
 
 ANGRY_TEST(addsAndRemovesWindowFromTable)
@@ -479,7 +491,9 @@ ANGRY_TEST(addsAndRemovesWindowFromTable)
     window_manager_add_window(&g_window_manager, &win);
     struct window *found = window_manager_find_window(&g_window_manager, 9337);
     window_manager_remove_window(&g_window_manager, 9337);
-    ANGRY_ASSERT(found == &win && window_manager_find_window(&g_window_manager, 9337) == NULL, "expected window to be added and removed");
+    ANGRY_ASSERT_ALL("expected window to be added and removed",
+                     found == &win,
+                     window_manager_find_window(&g_window_manager, 9337) == NULL);
 }
 
 ANGRY_TEST(addsAndRemovesApplicationFromTable)
@@ -488,7 +502,9 @@ ANGRY_TEST(addsAndRemovesApplicationFromTable)
     window_manager_add_application(&g_window_manager, &app);
     struct application *found = window_manager_find_application(&g_window_manager, 9338);
     window_manager_remove_application(&g_window_manager, 9338);
-    ANGRY_ASSERT(found == &app && window_manager_find_application(&g_window_manager, 9338) == NULL, "expected application to be added and removed");
+    ANGRY_ASSERT_ALL("expected application to be added and removed",
+                     found == &app,
+                     window_manager_find_application(&g_window_manager, 9338) == NULL);
 }
 
 ANGRY_TEST(findsWindowsBelongingToApplication)
@@ -496,7 +512,9 @@ ANGRY_TEST(findsWindowsBelongingToApplication)
     struct application app = { .pid = 9339 };
     int count = 0;
     struct window **list = window_manager_find_application_windows(&g_window_manager, &app, &count);
-    ANGRY_ASSERT(list != NULL && count == 0, "expected empty application window list");
+    ANGRY_ASSERT_ALL("expected empty application window list",
+                     list != NULL,
+                     count == 0);
 }
 
 ANGRY_TEST(postsTwoEventsToMakeWindowKey)
@@ -510,7 +528,7 @@ ANGRY_TEST(addressesKeyWindowEventsToWindow)
 {
     ProcessSerialNumber psn = { 0, kNoProcess };
     window_manager_make_key_window(&psn, 9340);
-    bool addressed = angry_posted_event_window_id(0) == 9340 && angry_posted_event_window_id(1) == 9340;
+    bool addressed = ANGRY_ALL(angry_posted_event_window_id(0) == 9340, angry_posted_event_window_id(1) == 9340);
     ANGRY_ASSERT(addressed, "expected both key-window events to carry the window id");
 }
 
@@ -527,7 +545,9 @@ ANGRY_TEST(addsApplicationWindowsSafely)
     struct application app = { .pid = getpid(), .ref = NULL };
     int count = 0;
     struct window **list = window_manager_add_application_windows(&g_space_manager, &g_window_manager, &app, &count);
-    ANGRY_ASSERT(list == NULL && count == 0, "expected null application window list when ref is null");
+    ANGRY_ASSERT_ALL("expected null application window list when ref is null",
+                     list == NULL,
+                     count == 0);
 }
 
 ANGRY_TEST(addsExistingApplicationWindowsSafely)
@@ -637,7 +657,9 @@ ANGRY_TEST(setsAndRemovesScratchpadForWindow)
     char *lbl = strdup("test_pad");
     bool set = window_manager_set_scratchpad_for_window(&g_window_manager, &win, lbl);
     bool removed = window_manager_remove_scratchpad_for_window(&g_window_manager, &win, false);
-    ANGRY_ASSERT(set && removed, "expected scratchpad to be set and removed successfully");
+    ANGRY_ASSERT_ALL("expected scratchpad to be set and removed successfully",
+                     set,
+                     removed);
 }
 
 ANGRY_TEST(findsScratchpadWindowByLabel)

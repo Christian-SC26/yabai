@@ -84,5 +84,7 @@ ANGRY_TEST(rejectsTruncatedFieldHeaderInEventData) {
 ANGRY_TEST(clampsExtremePositiveAndNegativeFixedPointValues) {
     int32_t hi = iss_double_to_fixed1616(70000.0);
     int32_t lo = iss_double_to_fixed1616(-70000.0);
-    ANGRY_ASSERT(hi == INT32_MAX && lo == INT32_MIN, "iss_double_to_fixed1616 failed to clamp out-of-range floats");
+    ANGRY_ASSERT_ALL("iss_double_to_fixed1616 failed to clamp out-of-range floats",
+                     hi == INT32_MAX,
+                     lo == INT32_MIN);
 }

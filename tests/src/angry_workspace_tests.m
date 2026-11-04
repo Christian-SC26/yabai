@@ -22,8 +22,9 @@ ANGRY_TEST(treatsProcessWithoutApplicationAsUnobservable)
 {
     struct process proc = { .pid = 99997, .ns_application = NULL };
     bool observable = workspace_application_is_observable(&proc);
-    ANGRY_ASSERT(!observable && proc.policy == NSApplicationActivationPolicyProhibited,
-                 "expected a process without an application to be unobservable with a prohibited policy");
+    ANGRY_ASSERT_ALL("expected a process without an application to be unobservable with a prohibited policy",
+                     !observable,
+                     proc.policy == NSApplicationActivationPolicyProhibited);
 }
 
 ANGRY_TEST(evaluatesApplicationFinishedLaunchingState)
@@ -34,7 +35,9 @@ ANGRY_TEST(evaluatesApplicationFinishedLaunchingState)
     proc_dock.ns_application = workspace_application_create_running_ns_application(&proc_dock);
     bool dock_finished = workspace_application_is_finished_launching(&proc_dock);
     if (proc_dock.ns_application) [(id)proc_dock.ns_application release];
-    ANGRY_ASSERT(!null_finished && dock_finished, "expected dock process to report finished launching");
+    ANGRY_ASSERT_ALL("expected dock process to report finished launching",
+                     !null_finished,
+                     dock_finished);
 }
 
 ANGRY_TEST(reportsNoNotchForUnknownDisplay)
@@ -56,8 +59,9 @@ ANGRY_TEST(processesActivationPolicyChangeObservation)
     [(workspace_context *)g_workspace_context observeValueForKeyPath:@"activationPolicy" ofObject:[NSRunningApplication currentApplication] change:change context:&proc];
     struct process term_proc = { .pid = 102, .policy = NSApplicationActivationPolicyProhibited, .terminated = true, .name = "term_proc" };
     [(workspace_context *)g_workspace_context observeValueForKeyPath:@"activationPolicy" ofObject:[NSRunningApplication currentApplication] change:change context:&term_proc];
-    ANGRY_ASSERT(proc.policy == NSApplicationActivationPolicyRegular && term_proc.policy == NSApplicationActivationPolicyProhibited,
-                 "expected activation policy change to update process policy");
+    ANGRY_ASSERT_ALL("expected activation policy change to update process policy",
+                     proc.policy == NSApplicationActivationPolicyRegular,
+                     term_proc.policy == NSApplicationActivationPolicyProhibited);
 }
 
 ANGRY_TEST(processesFinishedLaunchingChangeObservation)
@@ -111,7 +115,9 @@ ANGRY_TEST(postsApplicationHiddenEventCarryingPid)
     NSNotification *notif = [NSNotification notificationWithName:@"test_app" object:nil userInfo:@{NSWorkspaceApplicationKey: [NSRunningApplication currentApplication]}];
     [(workspace_context *)g_workspace_context didHideApplication:notif];
     struct event *e = angry_last_posted_event();
-    ANGRY_ASSERT(e->type == APPLICATION_HIDDEN && (pid_t)(intptr_t)e->context == getpid(), "expected an application hidden event for the application");
+    ANGRY_ASSERT_ALL("expected an application hidden event for the application",
+                     e->type == APPLICATION_HIDDEN,
+                     (pid_t)(intptr_t)e->context == getpid());
 }
 
 ANGRY_TEST(postsApplicationVisibleEventCarryingPid)
@@ -119,5 +125,7 @@ ANGRY_TEST(postsApplicationVisibleEventCarryingPid)
     NSNotification *notif = [NSNotification notificationWithName:@"test_app" object:nil userInfo:@{NSWorkspaceApplicationKey: [NSRunningApplication currentApplication]}];
     [(workspace_context *)g_workspace_context didUnhideApplication:notif];
     struct event *e = angry_last_posted_event();
-    ANGRY_ASSERT(e->type == APPLICATION_VISIBLE && (pid_t)(intptr_t)e->context == getpid(), "expected an application visible event for the application");
+    ANGRY_ASSERT_ALL("expected an application visible event for the application",
+                     e->type == APPLICATION_VISIBLE,
+                     (pid_t)(intptr_t)e->context == getpid());
 }

@@ -20,7 +20,9 @@ ANGRY_TEST(comparesViewsUsingKeyEquality) {
     uint64_t a = 100, b = 100, c = 200;
     bool eq = compare_view(&a, &b);
     bool neq = !compare_view(&a, &c);
-    ANGRY_ASSERT(eq && neq, "compare_view failed equality evaluation");
+    ANGRY_ASSERT_ALL("compare_view failed equality evaluation",
+                     eq,
+                     neq);
 }
 
 ANGRY_TEST(queriesSpaceToJsonStream) {
@@ -29,7 +31,9 @@ ANGRY_TEST(queriesSpaceToJsonStream) {
     FILE *f = fmemopen(buf, sizeof(buf), "w");
     bool ok = space_manager_query_space(f, sid, 0);
     fclose(f);
-    ANGRY_ASSERT(ok && strstr(buf, "\"id\":"), "space_manager_query_space failed to serialize JSON");
+    ANGRY_ASSERT_ALL("space_manager_query_space failed to serialize JSON",
+                     ok,
+                     strstr(buf, "\"id\":"));
 }
 
 ANGRY_TEST(queriesSpacesForWindowToJsonStream) {
@@ -39,7 +43,9 @@ ANGRY_TEST(queriesSpacesForWindowToJsonStream) {
     space_manager_query_spaces_for_window(f, &win, 0);
     fclose(f);
     snprintf(expected, sizeof(expected), "\"id\":%lld,", display_space_id(CGMainDisplayID()));
-    ANGRY_ASSERT(buf[0] == '[' && strstr(buf, expected), "expected the spaces of the test window to list its space");
+    ANGRY_ASSERT_ALL("expected the spaces of the test window to list its space",
+                     buf[0] == '[',
+                     strstr(buf, expected));
 }
 
 ANGRY_TEST(queriesSpacesForDisplayToJsonStream) {
@@ -48,7 +54,9 @@ ANGRY_TEST(queriesSpacesForDisplayToJsonStream) {
     FILE *f = fmemopen(buf, sizeof(buf), "w");
     bool ok = space_manager_query_spaces_for_display(f, did, 0);
     fclose(f);
-    ANGRY_ASSERT(ok && strstr(buf, "\"id\":"), "space_manager_query_spaces_for_display failed serialization");
+    ANGRY_ASSERT_ALL("space_manager_query_spaces_for_display failed serialization",
+                     ok,
+                     strstr(buf, "\"id\":"));
 }
 
 ANGRY_TEST(queriesSpacesForDisplaysToJsonStream) {
@@ -56,7 +64,9 @@ ANGRY_TEST(queriesSpacesForDisplaysToJsonStream) {
     FILE *f = fmemopen(buf, sizeof(buf), "w");
     bool ok = space_manager_query_spaces_for_displays(f, 0);
     fclose(f);
-    ANGRY_ASSERT(ok && strstr(buf, "\"id\":"), "space_manager_query_spaces_for_displays failed serialization");
+    ANGRY_ASSERT_ALL("space_manager_query_spaces_for_displays failed serialization",
+                     ok,
+                     strstr(buf, "\"id\":"));
 }
 
 ANGRY_TEST(returnsSameViewOnRepeatedLookupOfSpace) {
@@ -91,7 +101,11 @@ ANGRY_TEST(managesSpaceLabelsSettingAndQueryingAndRemoving) {
     struct space_label *by_sid = space_manager_get_label_for_space(&g_space_manager, sid);
     bool removed = space_manager_remove_label_for_space(&g_space_manager, sid);
     bool missing = !space_manager_get_space_for_label(&g_space_manager, "lbl_space_angry");
-    ANGRY_ASSERT(by_lbl && by_sid && removed && missing, "space label management failed");
+    ANGRY_ASSERT_ALL("space label management failed",
+                     by_lbl,
+                     by_sid,
+                     removed,
+                     missing);
 }
 
 ANGRY_TEST(configuresSpaceLayoutAndValidates) {
@@ -101,7 +115,9 @@ ANGRY_TEST(configuresSpaceLayoutAndValidates) {
     struct view *view = space_manager_find_view(&g_space_manager, sid);
     bool is_float = view->layout == VIEW_FLOAT;
     space_manager_set_layout_for_space(&g_space_manager, sid, VIEW_BSP);
-    ANGRY_ASSERT(is_float && view->layout == VIEW_BSP, "space_manager_set_layout_for_space failed");
+    ANGRY_ASSERT_ALL("space_manager_set_layout_for_space failed",
+                     is_float,
+                     view->layout == VIEW_BSP);
 }
 
 ANGRY_TEST(configuresGapForSpaceWithAbsAndRelTypes) {
@@ -110,7 +126,10 @@ ANGRY_TEST(configuresGapForSpaceWithAbsAndRelTypes) {
     bool ok_abs = space_manager_set_gap_for_space(&g_space_manager, sid, TYPE_ABS, 12);
     bool ok_rel = space_manager_set_gap_for_space(&g_space_manager, sid, TYPE_REL, 4);
     struct view *view = space_manager_find_view(&g_space_manager, sid);
-    ANGRY_ASSERT(ok_abs && ok_rel && view->window_gap == 16, "space_manager_set_gap_for_space failed");
+    ANGRY_ASSERT_ALL("space_manager_set_gap_for_space failed",
+                     ok_abs,
+                     ok_rel,
+                     view->window_gap == 16);
 }
 
 ANGRY_TEST(togglesGapForSpaceUpdatingState) {
@@ -118,7 +137,9 @@ ANGRY_TEST(togglesGapForSpaceUpdatingState) {
     angry_private_bsp_view(sid);
     bool toggled_on = space_manager_toggle_gap_for_space(&g_space_manager, sid);
     bool toggled_off = space_manager_toggle_gap_for_space(&g_space_manager, sid);
-    ANGRY_ASSERT(toggled_on && toggled_off, "space_manager_toggle_gap_for_space failed");
+    ANGRY_ASSERT_ALL("space_manager_toggle_gap_for_space failed",
+                     toggled_on,
+                     toggled_off);
 }
 
 ANGRY_TEST(asksDockToOpenMissionControl) {
@@ -146,15 +167,14 @@ ANGRY_TEST(configuresAllPaddingDimensionsForAllSpaces) {
     space_manager_set_bottom_padding_for_all_spaces(&g_space_manager, 20);
     space_manager_set_left_padding_for_all_spaces(&g_space_manager, 25);
     space_manager_set_right_padding_for_all_spaces(&g_space_manager, 30);
-    bool ok = g_space_manager.top_padding == 15 && g_space_manager.bottom_padding == 20 &&
-              g_space_manager.left_padding == 25 && g_space_manager.right_padding == 30;
+    bool ok = ANGRY_ALL(g_space_manager.top_padding == 15, g_space_manager.bottom_padding == 20, g_space_manager.left_padding == 25, g_space_manager.right_padding == 30);
     ANGRY_ASSERT(ok, "space_manager padding setters for all spaces failed");
 }
 
 ANGRY_TEST(configuresSplitTypeAndAutoBalanceForAllSpaces) {
     space_manager_set_split_type_for_all_spaces(&g_space_manager, SPLIT_X);
     space_manager_set_auto_balance_for_all_spaces(&g_space_manager, 1);
-    bool ok = g_space_manager.split_type == SPLIT_X && g_space_manager.auto_balance == 1;
+    bool ok = ANGRY_ALL(g_space_manager.split_type == SPLIT_X, g_space_manager.auto_balance == 1);
     ANGRY_ASSERT(ok, "space_manager_set_split_type or auto_balance failed");
 }
 
@@ -165,7 +185,10 @@ ANGRY_TEST(configuresPaddingForSpaceWithAbsAndRelTypes) {
     bool ok_rel = space_manager_set_padding_for_space(&g_space_manager, sid, TYPE_REL, 2, 2, 2, 2);
     struct view *view = space_manager_find_view(&g_space_manager, sid);
     bool match = view->top_padding == 7 && view->bottom_padding == 8;
-    ANGRY_ASSERT(ok_abs && ok_rel && match, "space_manager_set_padding_for_space failed");
+    ANGRY_ASSERT_ALL("space_manager_set_padding_for_space failed",
+                     ok_abs,
+                     ok_rel,
+                     match);
 }
 
 ANGRY_TEST(togglesPaddingForSpaceUpdatingState) {
@@ -173,7 +196,9 @@ ANGRY_TEST(togglesPaddingForSpaceUpdatingState) {
     angry_private_bsp_view(sid);
     bool ok1 = space_manager_toggle_padding_for_space(&g_space_manager, sid);
     bool ok2 = space_manager_toggle_padding_for_space(&g_space_manager, sid);
-    ANGRY_ASSERT(ok1 && ok2, "space_manager_toggle_padding_for_space failed");
+    ANGRY_ASSERT_ALL("space_manager_toggle_padding_for_space failed",
+                     ok1,
+                     ok2);
 }
 
 ANGRY_TEST(rotatesAndMirrorsSpaceSubtree) {
@@ -181,7 +206,9 @@ ANGRY_TEST(rotatesAndMirrorsSpaceSubtree) {
     angry_private_bsp_view(sid);
     bool rot = space_manager_rotate_space(&g_space_manager, sid, 90);
     bool mir = space_manager_mirror_space(&g_space_manager, sid, SPLIT_X);
-    ANGRY_ASSERT(rot && mir, "space_manager_rotate_space or mirror_space failed");
+    ANGRY_ASSERT_ALL("space_manager_rotate_space or mirror_space failed",
+                     rot,
+                     mir);
 }
 
 ANGRY_TEST(equalizesAndBalancesSpaceSubtree) {
@@ -189,7 +216,9 @@ ANGRY_TEST(equalizesAndBalancesSpaceSubtree) {
     angry_private_bsp_view(sid);
     bool eq = space_manager_equalize_space(&g_space_manager, sid, 0);
     bool bal = space_manager_balance_space(&g_space_manager, sid, 0);
-    ANGRY_ASSERT(eq && bal, "space_manager_equalize_space or balance_space failed");
+    ANGRY_ASSERT_ALL("space_manager_equalize_space or balance_space failed",
+                     eq,
+                     bal);
 }
 
 ANGRY_TEST(tilesWindowOnSpaceWithInsertionPoint) {
@@ -199,7 +228,9 @@ ANGRY_TEST(tilesWindowOnSpaceWithInsertionPoint) {
     struct view *v1 = space_manager_tile_window_on_space_with_insertion_point(&g_space_manager, &win, sid, 0);
     struct view *v2 = space_manager_tile_window_on_space(&g_space_manager, &win, sid);
     CFRelease(win.ref);
-    ANGRY_ASSERT(v1 && v2, "space_manager_tile_window_on_space failed");
+    ANGRY_ASSERT_ALL("space_manager_tile_window_on_space failed",
+                     v1,
+                     v2);
 }
 
 ANGRY_TEST(togglesWindowSplitDirectionInBspSubtree) {
@@ -223,7 +254,9 @@ ANGRY_TEST(togglesWindowSplitDirectionInBspSubtree) {
 ANGRY_TEST(resolvesMissionControlSpaceByDesktopIndex) {
     uint64_t sid1 = space_manager_mission_control_space(1);
     uint64_t sid0 = space_manager_mission_control_space(9999);
-    ANGRY_ASSERT(sid1 > 0 && sid0 == 0, "space_manager_mission_control_space returned invalid sid");
+    ANGRY_ASSERT_ALL("space_manager_mission_control_space returned invalid sid",
+                     sid1 > 0,
+                     sid0 == 0);
 }
 
 ANGRY_TEST(resolvesCursorSpaceMatchingCurrentCursor) {
@@ -235,13 +268,17 @@ ANGRY_TEST(resolvesPreviousAndNextSpaceOtherThanCurrent) {
     uint64_t sid = space_manager_active_space();
     uint64_t prev = space_manager_prev_space(sid);
     uint64_t next = space_manager_next_space(sid);
-    ANGRY_ASSERT(prev != sid && next != sid, "expected the previous and next space to differ from the current one");
+    ANGRY_ASSERT_ALL("expected the previous and next space to differ from the current one",
+                     prev != sid,
+                     next != sid);
 }
 
 ANGRY_TEST(resolvesFirstAndLastSpaceAcrossDisplays) {
     uint64_t first = space_manager_first_space();
     uint64_t last = space_manager_last_space();
-    ANGRY_ASSERT(first > 0 && last > 0, "space_manager_first_space or last_space returned zero");
+    ANGRY_ASSERT_ALL("space_manager_first_space or last_space returned zero",
+                     first > 0,
+                     last > 0);
 }
 
 ANGRY_TEST(reportsUnknownWindowAsNotOnActiveSpace) {
@@ -254,7 +291,9 @@ ANGRY_TEST(swapsSpaceWithSpaceOnSameAndCrossDisplay) {
     uint32_t did = display_manager_main_display_id();
     enum space_op_error err_same = space_manager_swap_space_with_space(sid, sid);
     enum space_op_error err_swap = space_manager_swap_space_with_space_on_display(did, sid, did, sid);
-    ANGRY_ASSERT(err_same == SPACE_OP_ERROR_SAME_SPACE && err_swap == SPACE_OP_ERROR_SUCCESS, "space swap operations failed");
+    ANGRY_ASSERT_ALL("space swap operations failed",
+                     err_same == SPACE_OP_ERROR_SAME_SPACE,
+                     err_swap == SPACE_OP_ERROR_SUCCESS);
 }
 
 ANGRY_TEST(movesSpaceToSpaceDetectingErrors) {
@@ -262,7 +301,9 @@ ANGRY_TEST(movesSpaceToSpaceDetectingErrors) {
     enum space_op_error err_same = space_manager_move_space_to_space(sid, sid);
     enum space_op_error err_diff = space_manager_move_space_to_space(sid, 0);
     bool ok_diff = err_diff == SPACE_OP_ERROR_SAME_DISPLAY || err_diff == SPACE_OP_ERROR_SCRIPTING_ADDITION;
-    ANGRY_ASSERT(err_same == SPACE_OP_ERROR_SAME_SPACE && ok_diff, "move_space_to_space failed error checks");
+    ANGRY_ASSERT_ALL("move_space_to_space failed error checks",
+                     err_same == SPACE_OP_ERROR_SAME_SPACE,
+                     ok_diff);
 }
 
 ANGRY_TEST(movesSpaceToDisplayDetectingErrors) {
@@ -270,7 +311,9 @@ ANGRY_TEST(movesSpaceToDisplayDetectingErrors) {
     uint32_t did = display_manager_main_display_id();
     enum space_op_error err_zero = space_manager_move_space_to_display(&g_space_manager, 0, did);
     enum space_op_error err_same = space_manager_move_space_to_display(&g_space_manager, sid, did);
-    ANGRY_ASSERT(err_zero == SPACE_OP_ERROR_MISSING_SRC && err_same == SPACE_OP_ERROR_INVALID_DST, "move_space_to_display failed error checks");
+    ANGRY_ASSERT_ALL("move_space_to_display failed error checks",
+                     err_zero == SPACE_OP_ERROR_MISSING_SRC,
+                     err_same == SPACE_OP_ERROR_INVALID_DST);
 }
 
 ANGRY_TEST(switchesSpaceDetectingSameSpace) {
@@ -284,7 +327,9 @@ ANGRY_TEST(destroysSpaceDetectingMissingAndInvalidSrc) {
     uint64_t sid = space_manager_active_space();
     enum space_op_error err_last = space_manager_destroy_space(sid);
     bool ok_last = err_last == SPACE_OP_ERROR_INVALID_SRC || err_last == SPACE_OP_ERROR_SCRIPTING_ADDITION || err_last == SPACE_OP_ERROR_INVALID_TYPE;
-    ANGRY_ASSERT(err_zero == SPACE_OP_ERROR_MISSING_SRC && ok_last, "destroy_space failed error checks");
+    ANGRY_ASSERT_ALL("destroy_space failed error checks",
+                     err_zero == SPACE_OP_ERROR_MISSING_SRC,
+                     ok_last);
 }
 
 ANGRY_TEST(addsSpaceDetectingMissingSrc) {

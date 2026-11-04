@@ -65,7 +65,9 @@ ANGRY_TEST(removesKeyAndCleansEntryFromTable)
     uint32_t key = 0xBEEFCAFE;
     table_add(&table, &key, (void *) 0x12345);
     table_remove(&table, &key);
-    ANGRY_ASSERT(table_find(&table, &key) == NULL && table.count == 0, "removed key must return NULL and decrement count to zero");
+    ANGRY_ASSERT_ALL("removed key must return NULL and decrement count to zero",
+                     table_find(&table, &key) == NULL,
+                     table.count == 0);
 }
 
 ANGRY_TEST(preservesUnremovedKeysAfterPartialDeletion)
@@ -82,7 +84,9 @@ ANGRY_TEST(preservesUnremovedKeysAfterPartialDeletion)
     }
     uint32_t probe_key = 88;
     void *val = table_find(&table, &probe_key);
-    ANGRY_ASSERT((intptr_t)val == 616 && table.count == 50, "unremoved key must remain accessible with its original value");
+    ANGRY_ASSERT_ALL("unremoved key must remain accessible with its original value",
+                     (intptr_t)val == 616,
+                     table.count == 50);
 }
 
 ANGRY_TEST(ignoresDuplicateAddWhenKeyAlreadyExists)
@@ -92,7 +96,9 @@ ANGRY_TEST(ignoresDuplicateAddWhenKeyAlreadyExists)
     uint32_t key = 42;
     table_add(&table, &key, (void *) 0xAAAA);
     table_add(&table, &key, (void *) 0xBBBB);
-    ANGRY_ASSERT((intptr_t)table_find(&table, &key) == 0xAAAA && table.count == 1, "duplicate add must retain initial value and prevent duplicate count");
+    ANGRY_ASSERT_ALL("duplicate add must retain initial value and prevent duplicate count",
+                     (intptr_t)table_find(&table, &key) == 0xAAAA,
+                     table.count == 1);
 }
 
 ANGRY_TEST(identifiesWestDisplayAcrossNegativeCoordinates)
@@ -156,7 +162,7 @@ ANGRY_TEST(splitsParentAreaEquallyWithSpecifiedGapOnVerticalAxis)
     struct area parent = { 0.0f, 0.0f, 1920.0f, 1080.0f };
     struct area left, right;
     area_make_pair(SPLIT_Y, 20, 0.5f, &parent, &left, &right);
-    bool valid = (left.w == 950) && (right.w == 950) && (right.x == 970);
+    bool valid = ANGRY_ALL((left.w == 950), (right.w == 950), (right.x == 970));
     ANGRY_ASSERT(valid, "vertical split at 0.5 with 20px gap must yield symmetric widths and correct right offset");
 }
 
@@ -165,7 +171,7 @@ ANGRY_TEST(splitsParentAreaAsymmetricallyOnHorizontalAxis)
     struct area parent = { 24.0f, 64.0f, 1200.0f, 900.0f };
     struct area top, bottom;
     area_make_pair(SPLIT_X, 10, 0.3f, &parent, &top, &bottom);
-    bool valid = (top.h == 267) && (bottom.h == 623) && (bottom.y == 341);
+    bool valid = ANGRY_ALL((top.h == 267), (bottom.h == 623), (bottom.y == 341));
     ANGRY_ASSERT(valid, "horizontal split with ratio 0.3 must distribute height proportionally and position bottom area");
 }
 
@@ -184,7 +190,7 @@ ANGRY_TEST(allocatesMinimumDimensionWhenSplitRatioIsExtremelySmall)
     struct area parent = { 0.0f, 0.0f, 1000.0f, 800.0f };
     struct area left, right;
     area_make_pair(SPLIT_Y, 10, 0.01f, &parent, &left, &right);
-    bool valid = (left.w == 9) && (right.w == 980);
+    bool valid = ANGRY_ALL((left.w == 9), (right.w == 980));
     ANGRY_ASSERT(valid, "extreme small ratio of 0.01 must not underflow or crash partition arithmetic");
 }
 
@@ -193,7 +199,7 @@ ANGRY_TEST(allocatesMinimumDimensionWhenSplitRatioIsExtremelyLarge)
     struct area parent = { 0.0f, 0.0f, 1000.0f, 800.0f };
     struct area left, right;
     area_make_pair(SPLIT_Y, 10, 0.99f, &parent, &left, &right);
-    bool valid = (left.w == 980) && (right.w == 9);
+    bool valid = ANGRY_ALL((left.w == 980), (right.w == 9));
     ANGRY_ASSERT(valid, "extreme large ratio of 0.99 must assign remainder cleanly to right partition");
 }
 
@@ -235,7 +241,7 @@ ANGRY_TEST(swapsWindowIdsBetweenTwoBspNodesPreservingTreeStructure)
     struct window_node node_a = { .window_count = 1, .window_list = { 101 }, .window_order = { 101 } };
     struct window_node node_b = { .window_count = 1, .window_list = { 202 }, .window_order = { 202 } };
     window_node_swap_window_list(&node_a, &node_b);
-    bool swapped = (node_a.window_list[0] == 202) && (node_b.window_list[0] == 101);
+    bool swapped = ANGRY_ALL((node_a.window_list[0] == 202), (node_b.window_list[0] == 101));
     ANGRY_ASSERT(swapped, "swapping window list must exchange window IDs between the two nodes");
 }
 
@@ -245,7 +251,7 @@ ANGRY_TEST(mirrorsBspTreeHorizontallyInvertingChildOrder)
     struct window_node right = { .window_count = 1, .window_list = { 202 } };
     struct window_node root = { .split = SPLIT_Y, .left = &left, .right = &right };
     window_node_mirror(&root, SPLIT_Y);
-    bool inverted = (root.left == &right) && (root.right == &left);
+    bool inverted = ANGRY_ALL((root.left == &right), (root.right == &left));
     ANGRY_ASSERT(inverted, "mirroring along horizontal axis must swap left and right subtrees");
 }
 
@@ -255,7 +261,7 @@ ANGRY_TEST(mirrorsBspTreeVerticallyInvertingChildOrder)
     struct window_node bottom = { .window_count = 1, .window_list = { 404 } };
     struct window_node root = { .split = SPLIT_X, .left = &top, .right = &bottom };
     window_node_mirror(&root, SPLIT_X);
-    bool inverted = (root.left == &bottom) && (root.right == &top);
+    bool inverted = ANGRY_ALL((root.left == &bottom), (root.right == &top));
     ANGRY_ASSERT(inverted, "mirroring along vertical axis must swap top and bottom subtrees");
 }
 
@@ -268,7 +274,7 @@ ANGRY_TEST(promotesSiblingToRootWhenRemovingLeafFromTwoNodeTree)
     view_add_window_node(view, &w1);
     view_add_window_node(view, &w2);
     view_remove_window_node(view, &w1);
-    bool valid = window_node_is_leaf(view->root) && (view->root->window_list[0] == 222);
+    bool valid = ANGRY_ALL(window_node_is_leaf(view->root), (view->root->window_list[0] == 222));
     view_destroy(view);
     ANGRY_ASSERT(valid, "removing leaf from two-node tree must promote surviving sibling directly to root");
 }
@@ -314,7 +320,9 @@ ANGRY_TEST(updatesLastGestureTimeOnVerticalGestureEnd)
     uint64_t now = read_os_timer();
     __atomic_store_n(&__last_gesture_time, now, __ATOMIC_RELEASE);
     uint64_t stored = __atomic_load_n(&__last_gesture_time, __ATOMIC_RELAXED);
-    ANGRY_ASSERT(stored == now && stored > 0, "ending a gesture must record non-zero completion timestamp");
+    ANGRY_ASSERT_ALL("ending a gesture must record non-zero completion timestamp",
+                     stored == now,
+                     stored > 0);
 }
 
 ANGRY_TEST(capturesFrontmostWindowAndSpaceStateOnMissionControlEnter)
@@ -328,7 +336,7 @@ ANGRY_TEST(capturesFrontmostWindowAndSpaceStateOnMissionControlEnter)
     g_window_manager.focused_window_id = 1234;
     g_process_manager.front_pid = 789;
     mission_control_record_state();
-    bool captured = (g_mission_control_prev_sid == 42) && (g_mission_control_prev_wid == 1234) && (g_mission_control_prev_pid == 789);
+    bool captured = ANGRY_ALL((g_mission_control_prev_sid == 42), (g_mission_control_prev_wid == 1234), (g_mission_control_prev_pid == 789));
     g_mission_control_prev_sid = 0;
     ANGRY_ASSERT(captured, "mission control entry must accurately record active window, space, and pid");
 }
@@ -343,7 +351,7 @@ ANGRY_TEST(maintainsIdempotencyWhenMissionControlStateAlreadyRecorded)
     g_space_manager.current_space_id = 99;
     g_window_manager.focused_window_id = 5678;
     mission_control_record_state();
-    bool unchanged = (g_mission_control_prev_sid == 42) && (g_mission_control_prev_wid == 1234);
+    bool unchanged = ANGRY_ALL((g_mission_control_prev_sid == 42), (g_mission_control_prev_wid == 1234));
     g_mission_control_prev_sid = 0;
     ANGRY_ASSERT(unchanged, "mission control state recorder must remain idempotent when state is already captured");
 }
@@ -454,7 +462,7 @@ ANGRY_TEST(rotatesBspNodeNinetyDegreesTogglingSplitAxis)
     struct window_node left = { .window_count = 1 }, right = { .window_count = 1 };
     struct window_node root = { .split = SPLIT_Y, .ratio = 0.6f, .left = &left, .right = &right };
     window_node_rotate(&root, 90);
-    bool valid = (root.split == SPLIT_X) && (fabs(root.ratio - 0.4f) < 0.001f);
+    bool valid = ANGRY_ALL((root.split == SPLIT_X), (fabs(root.ratio - 0.4f) < 0.001f));
     ANGRY_ASSERT(valid, "rotating 90 degrees must toggle split axis and invert ratio");
 }
 
@@ -463,7 +471,7 @@ ANGRY_TEST(rotatesBspNodeOneEightyDegreesInvertingRatioAndChildren)
     struct window_node left = { .window_count = 1 }, right = { .window_count = 1 };
     struct window_node root = { .split = SPLIT_Y, .ratio = 0.7f, .left = &left, .right = &right };
     window_node_rotate(&root, 180);
-    bool valid = (root.left == &right) && (root.right == &left) && (fabs(root.ratio - 0.3f) < 0.001f);
+    bool valid = ANGRY_ALL((root.left == &right), (root.right == &left), (fabs(root.ratio - 0.3f) < 0.001f));
     ANGRY_ASSERT(valid, "rotating 180 degrees must swap left/right children and invert ratio");
 }
 
@@ -472,7 +480,7 @@ ANGRY_TEST(rotatesBspNodeTwoSeventyDegreesTogglingSplitAxis)
     struct window_node top = { .window_count = 1 }, bottom = { .window_count = 1 };
     struct window_node root = { .split = SPLIT_X, .ratio = 0.25f, .left = &top, .right = &bottom };
     window_node_rotate(&root, 270);
-    bool valid = (root.split == SPLIT_Y) && (fabs(root.ratio - 0.75f) < 0.001f);
+    bool valid = ANGRY_ALL((root.split == SPLIT_Y), (fabs(root.ratio - 0.75f) < 0.001f));
     ANGRY_ASSERT(valid, "rotating 270 degrees must switch split from X to Y and invert ratio");
 }
 
@@ -497,7 +505,7 @@ ANGRY_TEST(stacksWindowOnLeafNodePlacingItAtFrontOfOrder)
     struct window_node leaf = { .window_count = 1, .window_list = { 101 }, .window_order = { 101 } };
     struct window w2 = { .id = 202 };
     view_stack_window_node(&leaf, &w2);
-    bool valid = (leaf.window_count == 2) && (leaf.window_order[0] == 202);
+    bool valid = ANGRY_ALL((leaf.window_count == 2), (leaf.window_order[0] == 202));
     ANGRY_ASSERT(valid, "stacking window must increment count and place new window at front of order");
 }
 
@@ -514,7 +522,7 @@ ANGRY_TEST(combinesRuleEffectsClampingOpacityToUnitInterval)
     struct rule_effects base = {0};
     struct rule_effects incoming = { .flags = RULE_OPACITY, .opacity = 0.85f };
     rule_combine_effects(&incoming, &base);
-    bool valid = rule_effects_check_flag(&base, RULE_OPACITY) && (fabs(base.opacity - 0.85f) < 0.001f);
+    bool valid = ANGRY_ALL(rule_effects_check_flag(&base, RULE_OPACITY), (fabs(base.opacity - 0.85f) < 0.001f));
     ANGRY_ASSERT(valid, "valid opacity within unit interval must be copied and flagged in combined result");
 }
 
@@ -523,7 +531,7 @@ ANGRY_TEST(combinesRuleEffectsPreservingScratchpadIdentifier)
     struct rule_effects base = {0};
     struct rule_effects incoming = { .scratchpad = "debug_term" };
     rule_combine_effects(&incoming, &base);
-    bool valid = base.scratchpad && string_equals(base.scratchpad, "debug_term");
+    bool valid = ANGRY_ALL(base.scratchpad, string_equals(base.scratchpad, "debug_term"));
     free(base.scratchpad);
     ANGRY_ASSERT(valid, "combining effects must duplicate incoming scratchpad string without leak");
 }
@@ -532,7 +540,7 @@ ANGRY_TEST(parsesRgbaColorFromHexWithAlphaChannel)
 {
     uint32_t hex = 0xFF804020;
     struct rgba_color c = rgba_color_from_hex(hex);
-    bool valid = (fabs(c.a - 1.0f) < 0.001f) && (fabs(c.r - (128.0f / 255.0f)) < 0.005f);
+    bool valid = ANGRY_ALL((fabs(c.a - 1.0f) < 0.001f), (fabs(c.r - (128.0f / 255.0f)) < 0.005f));
     ANGRY_ASSERT(valid, "hex color 0xFF804020 must parse alpha as 1.0 and red channel accurately");
 }
 
@@ -580,7 +588,7 @@ ANGRY_TEST(escapesSpecialCharactersForJsonSerialization)
 {
     char raw[] = "name=\"yabai\"\nstatus=ok";
     char *escaped = ts_string_escape(raw);
-    bool valid = escaped && string_equals(escaped, "name=\\\"yabai\\\"\\nstatus=ok");
+    bool valid = ANGRY_ALL(escaped, string_equals(escaped, "name=\\\"yabai\\\"\\nstatus=ok"));
     ANGRY_ASSERT(valid, "quotes and newlines must be escaped with preceding backslashes");
 }
 

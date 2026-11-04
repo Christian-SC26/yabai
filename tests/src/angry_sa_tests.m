@@ -14,8 +14,9 @@
 ANGRY_TEST(configuresOsaxFilesystemPathsProperly)
 {
     scripting_addition_set_path();
-    ANGRY_ASSERT(osax_base_dir[0] == '/' && strstr(osax_info_plist, "Info.plist") != NULL,
-                 "expected osax directory paths to be formatted with valid prefixes");
+    ANGRY_ASSERT_ALL("expected osax directory paths to be formatted with valid prefixes",
+                     osax_base_dir[0] == '/',
+                     strstr(osax_info_plist, "Info.plist") != NULL);
 }
 
 ANGRY_TEST(failsToCreateOsaxDirectoryWithoutRootPrivileges)
@@ -47,7 +48,9 @@ ANGRY_TEST(restartsDockApplicationSafelyWithSwizzledTerminate)
     method_exchangeImplementations(orig, mock);
     scripting_addition_restart_dock();
     method_exchangeImplementations(orig, mock);
-    ANGRY_ASSERT(orig != NULL && mock != NULL, "expected dock restart to execute cleanly with swizzling");
+    ANGRY_ASSERT_ALL("expected dock restart to execute cleanly with swizzling",
+                     orig != NULL,
+                     mock != NULL);
 }
 
 ANGRY_TEST(configuresSocketPathWhenRunningUnderSudo)
@@ -61,7 +64,9 @@ ANGRY_TEST(configuresSocketPathWhenRunningUnderSudo)
     bool set_nosudo = scripting_addition_set_socket_path();
     g_mock_uid = (uid_t)-1;
     memcpy(g_sa_socket_file, old_sock, sizeof(old_sock));
-    ANGRY_ASSERT(set_sudo && !set_nosudo, "expected socket path setup to succeed with SUDO_UID and fail without");
+    ANGRY_ASSERT_ALL("expected socket path setup to succeed with SUDO_UID and fail without",
+                     set_sudo,
+                     !set_nosudo);
 }
 
 ANGRY_TEST(removesOsaxInstallationReturningStatusCode)
@@ -113,7 +118,9 @@ ANGRY_TEST(evaluatesSystemIntegrityProtectionCompatibility)
     g_mock_csr_config = CSR_ALLOW_UNRESTRICTED_FS | CSR_ALLOW_TASK_FOR_PID;
     bool sip_allowed = scripting_addition_is_sip_friendly();
     g_mock_csr_config = -1;
-    ANGRY_ASSERT(!sip_denied && sip_allowed, "expected SIP check to reflect CSR flags accurately");
+    ANGRY_ASSERT_ALL("expected SIP check to reflect CSR flags accurately",
+                     !sip_denied,
+                     sip_allowed);
 }
 
 ANGRY_TEST(attemptsMachLoaderPayloadInjection)
@@ -135,7 +142,10 @@ ANGRY_TEST(uninstallsScriptingAdditionWithPermissionChecks)
     g_mock_uid = (uid_t)-1;
     g_mock_csr_config = -1;
     scripting_addition_set_path();
-    ANGRY_ASSERT(u1 == 1 && u2 == 1 && u3 == 0, "expected uninstall to enforce SIP and root checks");
+    ANGRY_ASSERT_ALL("expected uninstall to enforce SIP and root checks",
+                     u1 == 1,
+                     u2 == 1,
+                     u3 == 0);
 }
 
 ANGRY_TEST(loadsScriptingAdditionVerifyingRootAndSipEnforcement)
@@ -147,8 +157,9 @@ ANGRY_TEST(loadsScriptingAdditionVerifyingRootAndSipEnforcement)
     int load_sip_fail = scripting_addition_load();
     g_mock_uid = (uid_t)-1;
     g_mock_csr_config = -1;
-    ANGRY_ASSERT(load_nonroot == 1 && load_sip_fail == 1,
-                 "expected load to reject non-root execution and SIP-restricted systems");
+    ANGRY_ASSERT_ALL("expected load to reject non-root execution and SIP-restricted systems",
+                     load_nonroot == 1,
+                     load_sip_fail == 1);
 }
 
 ANGRY_TEST(failsSendingRawBytesWhenSocketUnavailable)
@@ -170,7 +181,9 @@ ANGRY_TEST(dispatchesSpaceFocusAndCreationCommandsSafely)
     bool focus_ok = scripting_addition_focus_space(1);
     bool create_ok = scripting_addition_create_space(1);
     memcpy(g_sa_socket_file, old_sock, sizeof(old_sock));
-    ANGRY_ASSERT(!focus_ok && !create_ok, "expected space focus and creation to dispatch cleanly without crashing");
+    ANGRY_ASSERT_ALL("expected space focus and creation to dispatch cleanly without crashing",
+                     !focus_ok,
+                     !create_ok);
 }
 
 ANGRY_TEST(dispatchesSpaceMoveToDisplayCommandSafely)
@@ -201,7 +214,9 @@ ANGRY_TEST(dispatchesWindowOpacityCommandsForInstantAndFade)
     bool instant_ok = scripting_addition_set_opacity(1234, 0.85f, 0.0f);
     bool fade_ok = scripting_addition_set_opacity(1234, 0.85f, 0.35f);
     memcpy(g_sa_socket_file, old_sock, sizeof(old_sock));
-    ANGRY_ASSERT(!instant_ok && !fade_ok, "expected opacity instant and fade commands to dispatch");
+    ANGRY_ASSERT_ALL("expected opacity instant and fade commands to dispatch",
+                     !instant_ok,
+                     !fade_ok);
 }
 
 ANGRY_TEST(dispatchesWindowStickyAndFocusAndScaleCommandsSafely)
@@ -213,7 +228,10 @@ ANGRY_TEST(dispatchesWindowStickyAndFocusAndScaleCommandsSafely)
     bool focus_ok = scripting_addition_focus_window(1234);
     bool scale_ok = scripting_addition_scale_window(1234, 10.0f, 10.0f, 800.0f, 600.0f);
     memcpy(g_sa_socket_file, old_sock, sizeof(old_sock));
-    ANGRY_ASSERT(!sticky_ok && !focus_ok && !scale_ok, "expected sticky, focus, and scale commands to dispatch");
+    ANGRY_ASSERT_ALL("expected sticky, focus, and scale commands to dispatch",
+                     !sticky_ok,
+                     !focus_ok,
+                     !scale_ok);
 }
 
 ANGRY_TEST(dispatchesWindowSwapProxyInAndOutCommandsSafely)
@@ -228,7 +246,9 @@ ANGRY_TEST(dispatchesWindowSwapProxyInAndOutCommandsSafely)
     bool in_ok = scripting_addition_swap_window_proxy_in(anims, 2);
     bool out_ok = scripting_addition_swap_window_proxy_out(anims, 2);
     memcpy(g_sa_socket_file, old_sock, sizeof(old_sock));
-    ANGRY_ASSERT(!in_ok && !out_ok, "expected swap window proxy in and out commands to dispatch");
+    ANGRY_ASSERT_ALL("expected swap window proxy in and out commands to dispatch",
+                     !in_ok,
+                     !out_ok);
 }
 
 ANGRY_TEST(dispatchesWindowOrderInCommandSafely)

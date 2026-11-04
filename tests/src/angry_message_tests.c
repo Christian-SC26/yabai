@@ -7,27 +7,35 @@ ANGRY_TEST(advancesTokenPointerAndExtractsTokenText) {
     char *p = msg;
     struct token t1 = get_token(&p);
     struct token t2 = get_token(&p);
-    ANGRY_ASSERT(string_equals(t1.text, "foo") && string_equals(t2.text, "bar"), "get_token failed extraction");
+    ANGRY_ASSERT_ALL("get_token failed extraction",
+                     string_equals(t1.text, "foo"),
+                     string_equals(t2.text, "bar"));
 }
 
 ANGRY_TEST(evaluatesTokenPrefixMatchingStartOfString) {
     struct token tok = { .text = "config", .length = 6 };
     bool pre = token_prefix(tok, "con");
     bool no_pre = !token_prefix(tok, "bar");
-    ANGRY_ASSERT(pre && no_pre, "token_prefix failed matching");
+    ANGRY_ASSERT_ALL("token_prefix failed matching",
+                     pre,
+                     no_pre);
 }
 
 ANGRY_TEST(evaluatesTokenEqualsAgainstExactStrings) {
     struct token tok = { .text = "window", .length = 6 };
     bool eq = token_equals(tok, "window");
     bool neq = !token_equals(tok, "space");
-    ANGRY_ASSERT(eq && neq, "token_equals failed exact comparison");
+    ANGRY_ASSERT_ALL("token_equals failed exact comparison",
+                     eq,
+                     neq);
 }
 
 ANGRY_TEST(evaluatesTokenIsValidCheckingLengthAndPointer) {
     struct token valid = { .text = "a", .length = 1 };
     struct token invalid = { .text = NULL, .length = 0 };
-    ANGRY_ASSERT(token_is_valid(valid) && !token_is_valid(invalid), "token_is_valid evaluation failed");
+    ANGRY_ASSERT_ALL("token_is_valid evaluation failed",
+                     token_is_valid(valid),
+                     !token_is_valid(invalid));
 }
 
 ANGRY_TEST(evaluatesTokenIsPositiveIntegerForValidAndInvalidStrings) {
@@ -36,7 +44,9 @@ ANGRY_TEST(evaluatesTokenIsPositiveIntegerForValidAndInvalidStrings) {
     struct token tok_bad = { .text = "-5", .length = 2 };
     bool ok_num = token_is_positive_integer(tok_num, &val) && val == 42;
     bool ok_bad = !token_is_positive_integer(tok_bad, &val);
-    ANGRY_ASSERT(ok_num && ok_bad, "token_is_positive_integer failed parsing");
+    ANGRY_ASSERT_ALL("token_is_positive_integer failed parsing",
+                     ok_num,
+                     ok_bad);
 }
 
 ANGRY_TEST(evaluatesTokenIsHexadecimalForPrefixedNumbers) {
@@ -45,7 +55,9 @@ ANGRY_TEST(evaluatesTokenIsHexadecimalForPrefixedNumbers) {
     struct token tok_bad = { .text = "2A", .length = 2 };
     bool ok_hex = token_is_hexadecimal(tok_hex, &val) && val == 42;
     bool ok_bad = !token_is_hexadecimal(tok_bad, &val);
-    ANGRY_ASSERT(ok_hex && ok_bad, "token_is_hexadecimal failed parsing");
+    ANGRY_ASSERT_ALL("token_is_hexadecimal failed parsing",
+                     ok_hex,
+                     ok_bad);
 }
 
 ANGRY_TEST(evaluatesTokenIsFloatForValidFloatingPointNumbers) {
@@ -54,7 +66,9 @@ ANGRY_TEST(evaluatesTokenIsFloatForValidFloatingPointNumbers) {
     struct token tok_bad = { .text = "abc", .length = 3 };
     bool ok_flt = token_is_float(tok_flt, &val) && val == 0.75f;
     bool ok_bad = !token_is_float(tok_bad, &val);
-    ANGRY_ASSERT(ok_flt && ok_bad, "token_is_float failed parsing");
+    ANGRY_ASSERT_ALL("token_is_float failed parsing",
+                     ok_flt,
+                     ok_bad);
 }
 
 ANGRY_TEST(convertsTokenToTypedTokenValue) {
@@ -62,7 +76,9 @@ ANGRY_TEST(convertsTokenToTypedTokenValue) {
     struct token tok_str = { .text = "bsp", .length = 3 };
     struct token_value val_int = token_to_value(tok_int);
     struct token_value val_str = token_to_value(tok_str);
-    ANGRY_ASSERT(val_int.type == TOKEN_TYPE_INT && val_str.type == TOKEN_TYPE_STRING, "token_to_value failed conversion");
+    ANGRY_ASSERT_ALL("token_to_value failed conversion",
+                     val_int.type == TOKEN_TYPE_INT,
+                     val_str.type == TOKEN_TYPE_STRING);
 }
 
 ANGRY_TEST(parsesKeyValuePairExtractingKeyAndValueAndExclusion) {
@@ -72,21 +88,31 @@ ANGRY_TEST(parsesKeyValuePairExtractingKeyAndValueAndExclusion) {
     bool e1 = false, e2 = false;
     parse_key_value_pair(s1, &k1, &v1, &e1);
     parse_key_value_pair(s2, &k2, &v2, &e2);
-    ANGRY_ASSERT(string_equals(k1, "app") && !e1 && string_equals(k2, "title") && e2, "parse_key_value_pair failed");
+    ANGRY_ASSERT_ALL("parse_key_value_pair failed",
+                     string_equals(k1, "app"),
+                     !e1,
+                     string_equals(k2, "title"),
+                     e2);
 }
 
 ANGRY_TEST(parsesValueTypeForAbsAndRelModifiers) {
     uint8_t t_abs = parse_value_type("abs");
     uint8_t t_rel = parse_value_type("rel");
     uint8_t t_inv = parse_value_type("inv");
-    ANGRY_ASSERT(t_abs == TYPE_ABS && t_rel == TYPE_REL && t_inv == 0, "parse_value_type returned mismatched types");
+    ANGRY_ASSERT_ALL("parse_value_type returned mismatched types",
+                     t_abs == TYPE_ABS,
+                     t_rel == TYPE_REL,
+                     t_inv == 0);
 }
 
 ANGRY_TEST(parsesResizeHandleForCardinalAndCornerDirections) {
     uint8_t top = parse_resize_handle("top");
     uint8_t tl = parse_resize_handle("top_left");
     uint8_t abs_h = parse_resize_handle("abs");
-    ANGRY_ASSERT(top == HANDLE_TOP && tl == (HANDLE_TOP | HANDLE_LEFT) && abs_h == HANDLE_ABS, "parse_resize_handle failed");
+    ANGRY_ASSERT_ALL("parse_resize_handle failed",
+                     top == HANDLE_TOP,
+                     tl == (HANDLE_TOP | HANDLE_LEFT),
+                     abs_h == HANDLE_ABS);
 }
 
 ANGRY_TEST(parsesLabelValidatingReservedIdentifiers) {
@@ -96,7 +122,9 @@ ANGRY_TEST(parsesLabelValidatingReservedIdentifiers) {
     struct token tok_valid = { .text = "my_space", .length = 8 };
     bool ok = parse_label(f, tok_valid, LABEL_SPACE, &lbl);
     fclose(f);
-    ANGRY_ASSERT(ok && string_equals(lbl, "my_space"), "parse_label failed extraction");
+    ANGRY_ASSERT_ALL("parse_label failed extraction",
+                     ok,
+                     string_equals(lbl, "my_space"));
 }
 
 ANGRY_TEST(parsesPropertiesFromCommaSeparatedToken) {
@@ -106,7 +134,9 @@ ANGRY_TEST(parsesPropertiesFromCommaSeparatedToken) {
     struct token tok = { .text = p_text, .length = (int)strlen(p_text) };
     struct properties props = parse_properties(f, tok, display_property_val, display_property_str, array_count(display_property_val));
     fclose(f);
-    ANGRY_ASSERT(props.did_parse && !props.did_error, "parse_properties failed parsing display property flags");
+    ANGRY_ASSERT_ALL("parse_properties failed parsing display property flags",
+                     props.did_parse,
+                     !props.did_error);
 }
 
 ANGRY_TEST(parsesDisplaySelectorForIndexAndDirections) {
@@ -116,7 +146,9 @@ ANGRY_TEST(parsesDisplaySelectorForIndexAndDirections) {
     char *p = msg;
     struct selector sel = parse_display_selector(f, &p, 1, false);
     fclose(f);
-    ANGRY_ASSERT(sel.did_parse && sel.did > 0, "parse_display_selector failed index selection");
+    ANGRY_ASSERT_ALL("parse_display_selector failed index selection",
+                     sel.did_parse,
+                     sel.did > 0);
 }
 
 ANGRY_TEST(parsesSpaceSelectorForIndexAndRelativeSelectors) {
@@ -126,7 +158,9 @@ ANGRY_TEST(parsesSpaceSelectorForIndexAndRelativeSelectors) {
     char *p = msg;
     struct selector sel = parse_space_selector(f, &p, space_manager_active_space(), false);
     fclose(f);
-    ANGRY_ASSERT(sel.did_parse && sel.sid > 0, "parse_space_selector failed index selection");
+    ANGRY_ASSERT_ALL("parse_space_selector failed index selection",
+                     sel.did_parse,
+                     sel.sid > 0);
 }
 
 ANGRY_TEST(parsesWindowSelectorForKeywordsAndWindowIds) {
@@ -146,7 +180,9 @@ ANGRY_TEST(parsesInsertSelectorForCardinalDirectionsAndStack) {
     char *p = msg;
     struct selector sel = parse_insert_selector(f, &p);
     fclose(f);
-    ANGRY_ASSERT(sel.did_parse && sel.dir == DIR_NORTH, "parse_insert_selector failed direction parsing");
+    ANGRY_ASSERT_ALL("parse_insert_selector failed direction parsing",
+                     sel.did_parse,
+                     sel.dir == DIR_NORTH);
 }
 
 ANGRY_TEST(parsesRuleSpecifyingAppFilterAndManageEffect) {

@@ -7,7 +7,9 @@ ANGRY_TEST(queriesAllActiveDisplaysToJsonStream) {
     FILE *f = fmemopen(buf, sizeof(buf), "w");
     bool ok = display_manager_query_displays(f, 0);
     fclose(f);
-    ANGRY_ASSERT(ok && strstr(buf, "\"id\":"), "display_manager_query_displays failed to serialize display array");
+    ANGRY_ASSERT_ALL("display_manager_query_displays failed to serialize display array",
+                     ok,
+                     strstr(buf, "\"id\":"));
 }
 
 ANGRY_TEST(managesDisplayLabelsSettingAndQueryingAndRemoving) {
@@ -17,7 +19,11 @@ ANGRY_TEST(managesDisplayLabelsSettingAndQueryingAndRemoving) {
     struct display_label *by_did = display_manager_get_label_for_display(&g_display_manager, did);
     bool removed = display_manager_remove_label_for_display(&g_display_manager, did);
     bool missing = !display_manager_get_display_for_label(&g_display_manager, "lbl_angry_test");
-    ANGRY_ASSERT(by_lbl && by_did && removed && missing, "display label management failed");
+    ANGRY_ASSERT_ALL("display label management failed",
+                     by_lbl,
+                     by_did,
+                     removed,
+                     missing);
 }
 
 ANGRY_TEST(resolvesMainDisplayUuidMatchingMainDisplayId) {
@@ -46,7 +52,9 @@ ANGRY_TEST(evaluatesDisplayCoordinateComparatorAcrossAxes) {
     CFComparisonResult res_x = display_manager_coordinate_comparator(uuid, uuid, (void *)(uintptr_t)DISPLAY_ARRANGEMENT_ORDER_X);
     CFComparisonResult res_y = display_manager_coordinate_comparator(uuid, uuid, (void *)(uintptr_t)DISPLAY_ARRANGEMENT_ORDER_Y);
     CFRelease(uuid);
-    ANGRY_ASSERT(res_x == kCFCompareEqualTo && res_y == kCFCompareEqualTo, "display_manager_coordinate_comparator failed equality");
+    ANGRY_ASSERT_ALL("display_manager_coordinate_comparator failed equality",
+                     res_x == kCFCompareEqualTo,
+                     res_y == kCFCompareEqualTo);
 }
 
 ANGRY_TEST(calculatesDisplayArrangementWithCustomSortOrders) {
@@ -57,7 +65,10 @@ ANGRY_TEST(calculatesDisplayArrangementWithCustomSortOrders) {
     int arr_y = display_manager_display_id_arrangement(did);
     g_display_manager.order = DISPLAY_ARRANGEMENT_ORDER_DEFAULT;
     int arr_def = display_manager_display_id_arrangement(did);
-    ANGRY_ASSERT(arr_x > 0 && arr_y > 0 && arr_def > 0, "display_manager_display_id_arrangement returned invalid index");
+    ANGRY_ASSERT_ALL("display_manager_display_id_arrangement returned invalid index",
+                     arr_x > 0,
+                     arr_y > 0,
+                     arr_def > 0);
 }
 
 ANGRY_TEST(resolvesArrangementDisplayUuidAndDisplayId) {
@@ -78,20 +89,26 @@ ANGRY_TEST(resolvesPreviousAndNextDisplayOtherThanCurrent) {
     uint32_t did = display_manager_main_display_id();
     uint32_t prev = display_manager_prev_display_id(did);
     uint32_t next = display_manager_next_display_id(did);
-    ANGRY_ASSERT(prev != did && next != did, "expected the previous and next display to differ from the current one");
+    ANGRY_ASSERT_ALL("expected the previous and next display to differ from the current one",
+                     prev != did,
+                     next != did);
 }
 
 ANGRY_TEST(resolvesFirstAndLastDisplayIdsAccurately) {
     uint32_t first = display_manager_first_display_id();
     uint32_t last = display_manager_last_display_id();
-    ANGRY_ASSERT(first > 0 && last > 0, "first and last display ids failed to resolve");
+    ANGRY_ASSERT_ALL("first and last display ids failed to resolve",
+                     first > 0,
+                     last > 0);
 }
 
 ANGRY_TEST(findsClosestDisplayOtherThanCurrentInCardinalDirections) {
     uint32_t did = display_manager_main_display_id();
     uint32_t east = display_manager_find_closest_display_in_direction(did, DIR_EAST);
     uint32_t west = display_manager_find_closest_display_in_direction(did, DIR_WEST);
-    ANGRY_ASSERT(east != did && west != did, "expected a display found in a direction to differ from the current one");
+    ANGRY_ASSERT_ALL("expected a display found in a direction to differ from the current one",
+                     east != did,
+                     west != did);
 }
 
 ANGRY_TEST(reportsKnownDockOrientation) {

@@ -37,7 +37,7 @@ ANGRY_TEST(replacesSignalWhenAddingWithDuplicateLabel) {
     struct signal s2 = { .label = string_copy("sig-dup"), .command = string_copy("cmd2") };
     event_signal_add(SIGNAL_WINDOW_CREATED, &s1);
     event_signal_add(SIGNAL_WINDOW_CREATED, &s2);
-    bool ok = buf_len(g_signal_event[SIGNAL_WINDOW_CREATED]) == 1 && strcmp(g_signal_event[SIGNAL_WINDOW_CREATED][0].command, "cmd2") == 0;
+    bool ok = ANGRY_ALL(buf_len(g_signal_event[SIGNAL_WINDOW_CREATED]) == 1, strcmp(g_signal_event[SIGNAL_WINDOW_CREATED][0].command, "cmd2") == 0);
     buf_free(g_signal_event[SIGNAL_WINDOW_CREATED]);
     g_signal_event[SIGNAL_WINDOW_CREATED] = NULL;
     ANGRY_ASSERT(ok, "event_signal_add failed to replace duplicate label signal");
@@ -51,7 +51,9 @@ ANGRY_TEST(removesSignalByIndexAcrossGlobalSignalTypes) {
     struct signal s = { .command = string_copy("echo remove") };
     event_signal_add(SIGNAL_APPLICATION_LAUNCHED, &s);
     bool ok = event_signal_remove_by_index(0);
-    ANGRY_ASSERT(ok && buf_len(g_signal_event[SIGNAL_APPLICATION_LAUNCHED]) == 0, "event_signal_remove_by_index failed to remove signal");
+    ANGRY_ASSERT_ALL("event_signal_remove_by_index failed to remove signal",
+                     ok,
+                     buf_len(g_signal_event[SIGNAL_APPLICATION_LAUNCHED]) == 0);
 }
 
 ANGRY_TEST(returnsFalseWhenRemovingSignalByInvalidIndex) {
@@ -71,7 +73,9 @@ ANGRY_TEST(removesSignalByLabelFromSignalEventBuffer) {
     struct signal s = { .label = string_copy("sig-lbl-target"), .command = string_copy("cmd") };
     event_signal_add(SIGNAL_SPACE_CHANGED, &s);
     bool ok = event_signal_remove("sig-lbl-target");
-    ANGRY_ASSERT(ok && buf_len(g_signal_event[SIGNAL_SPACE_CHANGED]) == 0, "event_signal_remove failed to remove by label");
+    ANGRY_ASSERT_ALL("event_signal_remove failed to remove by label",
+                     ok,
+                     buf_len(g_signal_event[SIGNAL_SPACE_CHANGED]) == 0);
 }
 
 ANGRY_TEST(returnsFalseWhenRemovingSignalByNonexistentLabel) {
@@ -95,7 +99,7 @@ ANGRY_TEST(serializesSignalListToJsonStream) {
     FILE *stream = open_memstream(&buf, &size);
     event_signal_list(stream);
     fclose(stream);
-    bool ok = buf && strstr(buf, "\"event\":\"window_created\"") && strstr(buf, "\"label\":\"json_sig\"");
+    bool ok = ANGRY_ALL(buf, strstr(buf, "\"event\":\"window_created\""), strstr(buf, "\"label\":\"json_sig\""));
     free(buf);
     for (int i = 0; i < SIGNAL_TYPE_COUNT; ++i) {
         buf_free(g_signal_event[i]);
@@ -114,7 +118,7 @@ ANGRY_TEST(serializesEmptySignalListAsEmptyJsonArray) {
     FILE *stream = open_memstream(&buf, &size);
     event_signal_list(stream);
     fclose(stream);
-    bool ok = buf && strcmp(buf, "[]\n") == 0;
+    bool ok = ANGRY_ALL(buf, strcmp(buf, "[]\n") == 0);
     free(buf);
     ANGRY_ASSERT(ok, "event_signal_list on empty table did not produce []\\n");
 }

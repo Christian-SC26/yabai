@@ -17,7 +17,9 @@ ANGRY_TEST(reportsNormalLevelOfTestWindow) {
 
 ANGRY_TEST(readsTitleOfTestWindow) {
     char *title = window_property_title_ts(angry_test_window());
-    ANGRY_ASSERT(title && strcmp(title, ANGRY_TEST_WINDOW_TITLE) == 0, "expected the title the test window was given");
+    ANGRY_ASSERT_ALL("expected the title the test window was given",
+                     title,
+                     strcmp(title, ANGRY_TEST_WINDOW_TITLE) == 0);
 }
 
 ANGRY_TEST(serializesIdAndPidOfTestWindow) {
@@ -28,7 +30,9 @@ ANGRY_TEST(serializesIdAndPidOfTestWindow) {
     fclose(f);
     snprintf(id, sizeof(id), "\"id\":%d,", wid);
     snprintf(pid, sizeof(pid), "\"pid\":%d,", getpid());
-    ANGRY_ASSERT(strstr(buf, id) && strstr(buf, pid), "expected the json to carry the id and pid of the test window");
+    ANGRY_ASSERT_ALL("expected the json to carry the id and pid of the test window",
+                     strstr(buf, id),
+                     strstr(buf, pid));
 }
 
 ANGRY_TEST(serializesWindowStructurePropertiesToJsonStream) {
@@ -38,7 +42,9 @@ ANGRY_TEST(serializesWindowStructurePropertiesToJsonStream) {
     FILE *f = fmemopen(buf, sizeof(buf), "w");
     window_serialize(f, &win, 0);
     fclose(f);
-    ANGRY_ASSERT(strstr(buf, "\"id\":100") && strstr(buf, "\"role\":\"AXWindow\""), "window_serialize failed to emit complete JSON");
+    ANGRY_ASSERT_ALL("window_serialize failed to emit complete JSON",
+                     strstr(buf, "\"id\":100"),
+                     strstr(buf, "\"role\":\"AXWindow\""));
 }
 
 ANGRY_TEST(serializesWindowSelectedPropertiesWithoutOptionalAttributes) {
@@ -48,7 +54,9 @@ ANGRY_TEST(serializesWindowSelectedPropertiesWithoutOptionalAttributes) {
     FILE *f = fmemopen(buf, sizeof(buf), "w");
     window_serialize(f, &win, WINDOW_PROPERTY_ID | WINDOW_PROPERTY_ROLE | WINDOW_PROPERTY_IS_GRABBED);
     fclose(f);
-    ANGRY_ASSERT(strstr(buf, "\"id\":200") && strstr(buf, "\"role\":\"AXWindow\""), "window_serialize failed to emit selected fields");
+    ANGRY_ASSERT_ALL("window_serialize failed to emit selected fields",
+                     strstr(buf, "\"id\":200"),
+                     strstr(buf, "\"role\":\"AXWindow\""));
 }
 
 ANGRY_TEST(formatsWindowTitleUsingTemporaryStorage) {
@@ -86,20 +94,21 @@ ANGRY_TEST(identifiesUnknownSubroleWindow) {
 
 ANGRY_TEST(evaluatesWindowCanMoveAndCanResizeFromFlags) {
     struct window win = { .flags = WINDOW_MOVABLE | WINDOW_RESIZABLE };
-    ANGRY_ASSERT(window_can_move(&win) && window_can_resize(&win), "window_can_move or can_resize failed on flags");
+    ANGRY_ASSERT_ALL("window_can_move or can_resize failed on flags",
+                     window_can_move(&win),
+                     window_can_resize(&win));
 }
 
 ANGRY_TEST(evaluatesWindowIsUndersizedBasedOnFrameDimensions) {
     struct window small = { .frame = {{0, 0}, {400, 400}} };
     struct window large = { .frame = {{0, 0}, {800, 600}} };
-    ANGRY_ASSERT(window_is_undersized(&small) && !window_is_undersized(&large), "window_is_undersized failed dimension evaluation");
+    ANGRY_ASSERT_ALL("window_is_undersized failed dimension evaluation",
+                     window_is_undersized(&small),
+                     !window_is_undersized(&large));
 }
 
 ANGRY_TEST(mapsWindowLevelsToLayerStrings) {
-    bool ok = string_equals(window_layer(g_layer_normal_window_level), "normal") &&
-              string_equals(window_layer(g_layer_below_window_level), "below") &&
-              string_equals(window_layer(g_layer_above_window_level), "above") &&
-              string_equals(window_layer(-9999), "unknown");
+    bool ok = ANGRY_ALL(string_equals(window_layer(g_layer_normal_window_level), "normal"), string_equals(window_layer(g_layer_below_window_level), "below"), string_equals(window_layer(g_layer_above_window_level), "above"), string_equals(window_layer(-9999), "unknown"));
     ANGRY_ASSERT(ok, "window_layer returned mismatched layer strings");
 }
 
@@ -120,6 +129,8 @@ ANGRY_TEST(manipulatesWindowFlagsAndRuleFlagsBitmasks) {
     bool set = window_check_rule_flag(&win, WINDOW_RULE_MANAGED);
     window_clear_rule_flag(&win, WINDOW_RULE_MANAGED);
     bool cleared = !window_check_rule_flag(&win, WINDOW_RULE_MANAGED);
-    ANGRY_ASSERT(set && cleared, "window flag and rule flag operations failed");
+    ANGRY_ASSERT_ALL("window flag and rule flag operations failed",
+                     set,
+                     cleared);
 }
 

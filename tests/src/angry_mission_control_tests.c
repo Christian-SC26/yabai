@@ -30,28 +30,36 @@ ANGRY_TEST(postsSpaceCreatedEventCarryingSpaceId) {
     uint64_t sid = 1001;
     connection_handler(1327, &sid, sizeof(sid), NULL, 0);
     struct event *e = angry_last_posted_event();
-    ANGRY_ASSERT(e->type == SLS_SPACE_CREATED && (uint64_t)(intptr_t)e->context == 1001, "expected a space created event for the space to be posted");
+    ANGRY_ASSERT_ALL("expected a space created event for the space to be posted",
+                     e->type == SLS_SPACE_CREATED,
+                     (uint64_t)(intptr_t)e->context == 1001);
 }
 
 ANGRY_TEST(postsSpaceDestroyedEventCarryingSpaceId) {
     uint64_t sid = 1002;
     connection_handler(1328, &sid, sizeof(sid), NULL, 0);
     struct event *e = angry_last_posted_event();
-    ANGRY_ASSERT(e->type == SLS_SPACE_DESTROYED && (uint64_t)(intptr_t)e->context == 1002, "expected a space destroyed event for the space to be posted");
+    ANGRY_ASSERT_ALL("expected a space destroyed event for the space to be posted",
+                     e->type == SLS_SPACE_DESTROYED,
+                     (uint64_t)(intptr_t)e->context == 1002);
 }
 
 ANGRY_TEST(postsWindowOrderedEventCarryingWindowId) {
     uint32_t wid = 2001;
     connection_handler(808, &wid, sizeof(wid), NULL, 0);
     struct event *e = angry_last_posted_event();
-    ANGRY_ASSERT(e->type == SLS_WINDOW_ORDERED && (uint32_t)(intptr_t)e->context == 2001, "expected a window ordered event for the window to be posted");
+    ANGRY_ASSERT_ALL("expected a window ordered event for the window to be posted",
+                     e->type == SLS_WINDOW_ORDERED,
+                     (uint32_t)(intptr_t)e->context == 2001);
 }
 
 ANGRY_TEST(postsWindowDestroyedEventCarryingWindowId) {
     uint32_t wid = 2002;
     connection_handler(804, &wid, sizeof(wid), NULL, 0);
     struct event *e = angry_last_posted_event();
-    ANGRY_ASSERT(e->type == SLS_WINDOW_DESTROYED && (uint32_t)(intptr_t)e->context == 2002, "expected a window destroyed event for the window to be posted");
+    ANGRY_ASSERT_ALL("expected a window destroyed event for the window to be posted",
+                     e->type == SLS_WINDOW_DESTROYED,
+                     (uint32_t)(intptr_t)e->context == 2002);
 }
 
 ANGRY_TEST(updatesLastCmdTabTimeOnConnectionHandlerType1202) {
@@ -101,10 +109,6 @@ ANGRY_TEST(returnsCachedMissionControlStateWhenCalledWithinFiftyMilliseconds) {
 }
 
 ANGRY_TEST(mapsMissionControlModesToExpectedStringRepresentations) {
-    bool match = string_equals(mission_control_mode_str[MISSION_CONTROL_MODE_INACTIVE], "inactive") &&
-                 string_equals(mission_control_mode_str[MISSION_CONTROL_MODE_SHOW], "show") &&
-                 string_equals(mission_control_mode_str[MISSION_CONTROL_MODE_SHOW_ALL_WINDOWS], "show-all-windows") &&
-                 string_equals(mission_control_mode_str[MISSION_CONTROL_MODE_SHOW_FRONT_WINDOWS], "show-front-windows") &&
-                 string_equals(mission_control_mode_str[MISSION_CONTROL_MODE_SHOW_DESKTOP], "show-desktop");
+    bool match = ANGRY_ALL(string_equals(mission_control_mode_str[MISSION_CONTROL_MODE_INACTIVE], "inactive"), string_equals(mission_control_mode_str[MISSION_CONTROL_MODE_SHOW], "show"), string_equals(mission_control_mode_str[MISSION_CONTROL_MODE_SHOW_ALL_WINDOWS], "show-all-windows"), string_equals(mission_control_mode_str[MISSION_CONTROL_MODE_SHOW_FRONT_WINDOWS], "show-front-windows"), string_equals(mission_control_mode_str[MISSION_CONTROL_MODE_SHOW_DESKTOP], "show-desktop"));
     ANGRY_ASSERT(match, "mission_control_mode_str contains incorrect string mappings");
 }

@@ -2,7 +2,7 @@ ANGRY_TEST(allocatesAndPushesElementsIntoStretchBuffer)
 {
     int *buf = NULL;
     for (int i = 0; i < 32; ++i) buf_push(buf, i * 17);
-    bool valid = (buf_len(buf) == 32) && (buf[31] == 31 * 17) && (buf_last(buf) == 31 * 17);
+    bool valid = ANGRY_ALL((buf_len(buf) == 32), (buf[31] == 31 * 17), (buf_last(buf) == 31 * 17));
     buf_free(buf);
     ANGRY_ASSERT(valid, "pushing into stretch buffer must maintain length, capacity and last element");
 }
@@ -12,7 +12,7 @@ ANGRY_TEST(deletesElementFromStretchBufferDecreasingLength)
     int *buf = NULL;
     buf_push(buf, 100); buf_push(buf, 200); buf_push(buf, 300);
     buf_del(buf, 0);
-    bool valid = (buf_len(buf) == 2) && (buf[0] == 300);
+    bool valid = ANGRY_ALL((buf_len(buf) == 2), (buf[0] == 300));
     buf_free(buf);
     ANGRY_ASSERT(valid, "deleting element must replace slot with last element and decrement length");
 }
@@ -23,7 +23,7 @@ ANGRY_TEST(allocatesAndPushesElementsIntoTemporaryStretchBuffer)
     ts_buf_push(tbuf, 77);
     ts_buf_push(tbuf, 88);
     ts_buf_push(tbuf, 99);
-    bool valid = (ts_buf_len(tbuf) == 3) && (ts_buf_last(tbuf) == 99);
+    bool valid = ANGRY_ALL((ts_buf_len(tbuf) == 3), (ts_buf_last(tbuf) == 99));
     ANGRY_ASSERT(valid, "temporary stretch buffer must allocate in scratch memory and record items");
 }
 
@@ -33,7 +33,7 @@ ANGRY_TEST(deletesElementFromTemporaryStretchBufferDecreasingLength)
     ts_buf_push(tbuf, 11);
     ts_buf_push(tbuf, 22);
     ts_buf_del(tbuf, 0);
-    bool valid = (ts_buf_len(tbuf) == 1) && (tbuf[0] == 22);
+    bool valid = ANGRY_ALL((ts_buf_len(tbuf) == 1), (tbuf[0] == 22));
     ANGRY_ASSERT(valid, "deleting from temporary stretch buffer must adjust length and promote last item");
 }
 
@@ -49,7 +49,7 @@ ANGRY_TEST(expandsTemporaryStorageBufferInPlace)
     uint64_t before = g_temp_storage.used;
     void *ptr = ts_alloc_unaligned(64);
     void *expanded = ts_expand(ptr, 64, 128);
-    bool valid = (expanded == ptr) && (g_temp_storage.used == before + 192);
+    bool valid = ANGRY_ALL((expanded == ptr), (g_temp_storage.used == before + 192));
     ANGRY_ASSERT(valid, "expanding most recent temporary buffer must preserve origin and increment usage");
 }
 
@@ -73,7 +73,9 @@ ANGRY_TEST(readsNonZeroMonotonicCpuTimerTicks)
 {
     uint64_t t1 = read_cpu_timer();
     uint64_t t2 = read_cpu_timer();
-    ANGRY_ASSERT(t2 >= t1 && t1 > 0, "reading cpu timer ticks must yield non-zero monotonic progress");
+    ANGRY_ASSERT_ALL("reading cpu timer ticks must yield non-zero monotonic progress",
+                     t2 >= t1,
+                     t1 > 0);
 }
 
 ANGRY_TEST(readsPositiveCpuFrequencyValue)
@@ -122,7 +124,7 @@ ANGRY_TEST(returnsNullWhenSearchingInNonexistentLibrary)
 ANGRY_TEST(populatesCurrentUserLaunchdPlistPath)
 {
     char *path = populate_plist_path();
-    bool valid = path && strstr(path, "Library/LaunchAgents/com.asmvik.yabai.plist") != NULL;
+    bool valid = ANGRY_ALL(path, strstr(path, "Library/LaunchAgents/com.asmvik.yabai.plist") != NULL);
     free(path);
     ANGRY_ASSERT(valid, "launchd plist path generator must target user LaunchAgents folder");
 }
@@ -134,7 +136,7 @@ ANGRY_TEST(populatesLegacyCurrentUserLaunchdPlistPath)
     int size = strlen(_PATH_LEGACY_YABAI_PLIST) - 2 + strlen(home) + 1;
     char *path = malloc(size);
     snprintf(path, size, _PATH_LEGACY_YABAI_PLIST, home);
-    bool valid = path && strstr(path, "com.koekeishiya.yabai.plist") != NULL;
+    bool valid = ANGRY_ALL(path, strstr(path, "com.koekeishiya.yabai.plist") != NULL);
     free(home);
     free(path);
     ANGRY_ASSERT(valid, "legacy launchd plist path generator must target koekeishiya plist");
@@ -150,7 +152,10 @@ ANGRY_TEST(executesSimpleBinaryViaSafeExecReturningZero)
 ANGRY_TEST(initializesNotificationCenterDelegateAndIcon)
 {
     bool ok = notify_init();
-    ANGRY_ASSERT(ok && g_notify_init && g_notify_img != nil, "notification subsystem initialization must register icon and delegate");
+    ANGRY_ASSERT_ALL("notification subsystem initialization must register icon and delegate",
+                     ok,
+                     g_notify_init,
+                     g_notify_img != nil);
 }
 
 ANGRY_TEST(computesEaseInSineBoundaryValues)
@@ -281,15 +286,13 @@ ANGRY_TEST(computesEaseInOutCircBoundaryValues)
 
 ANGRY_TEST(formatsOptionalBoolJsonValues)
 {
-    bool valid = string_equals(json_optional_bool(0), "null") &&
-                 string_equals(json_optional_bool(1), "true") &&
-                 string_equals(json_optional_bool(2), "false");
+    bool valid = ANGRY_ALL(string_equals(json_optional_bool(0), "null"), string_equals(json_optional_bool(1), "true"), string_equals(json_optional_bool(2), "false"));
     ANGRY_ASSERT(valid, "optional bool JSON serialization must map 0 to null, 1 to true, and 2 to false");
 }
 
 ANGRY_TEST(formatsBooleanJsonValues)
 {
-    bool valid = string_equals(json_bool(true), "true") && string_equals(json_bool(false), "false");
+    bool valid = ANGRY_ALL(string_equals(json_bool(true), "true"), string_equals(json_bool(false), "false"));
     ANGRY_ASSERT(valid, "bool JSON serialization must strictly format true and false literals");
 }
 
@@ -303,7 +306,7 @@ ANGRY_TEST(copiesCfStringToHeapAllocatedCString)
 {
     CFStringRef ref = CFSTR("yabai_test_string_2026");
     char *copied = cfstring_copy(ref);
-    bool valid = copied && string_equals(copied, "yabai_test_string_2026");
+    bool valid = ANGRY_ALL(copied, string_equals(copied, "yabai_test_string_2026"));
     free(copied);
     ANGRY_ASSERT(valid, "cfstring_copy must extract full UTF-8 C-string from CoreFoundation string");
 }
@@ -312,7 +315,7 @@ ANGRY_TEST(copiesHeapStringAccurately)
 {
     char *orig = "heap_allocated_yabai_token";
     char *dup = string_copy(orig);
-    bool valid = dup && string_equals(dup, orig);
+    bool valid = ANGRY_ALL(dup, string_equals(dup, orig));
     free(dup);
     ANGRY_ASSERT(valid, "string_copy must allocate and copy exact content with terminating null byte");
 }
@@ -322,25 +325,25 @@ ANGRY_TEST(clampsCornerRadiiToHalfDimensionBoundary)
     CGRect r = CGRectMake(0, 0, 100, 60);
     float rx = cgrect_clamp_x_radius(r, 80.0f);
     float ry = cgrect_clamp_y_radius(r, 50.0f);
-    bool valid = (rx == 50.0f) && (ry == 30.0f);
+    bool valid = ANGRY_ALL((rx == 50.0f), (ry == 30.0f));
     ANGRY_ASSERT(valid, "corner radii exceeding half dimensions must clamp to width/2 and height/2");
 }
 
 ANGRY_TEST(verifiesDirectoryExistenceAccurately)
 {
-    bool exists = directory_exists("/usr") && !directory_exists("/usr_bogus_dir_xyz");
+    bool exists = ANGRY_ALL(directory_exists("/usr"), !directory_exists("/usr_bogus_dir_xyz"));
     ANGRY_ASSERT(exists, "directory existence checker must identify valid directories and reject non-existent paths");
 }
 
 ANGRY_TEST(verifiesFileExistenceAccurately)
 {
-    bool exists = file_exists("/bin/sh") && !file_exists("/bin") && !file_exists("/nonexistent_file_xyz");
+    bool exists = ANGRY_ALL(file_exists("/bin/sh"), !file_exists("/bin"), !file_exists("/nonexistent_file_xyz"));
     ANGRY_ASSERT(exists, "file existence checker must validate regular files and reject directories or missing paths");
 }
 
 ANGRY_TEST(verifiesExecutablePermissionsAccurately)
 {
-    bool can_exec = file_can_execute("/bin/sh") && !file_can_execute("/dev/null");
+    bool can_exec = ANGRY_ALL(file_can_execute("/bin/sh"), !file_can_execute("/dev/null"));
     ANGRY_ASSERT(can_exec, "file executable checker must verify S_IXUSR permissions");
 }
 
@@ -372,7 +375,9 @@ ANGRY_TEST(resolvesConfigurationFileUnderXdgConfigHome)
     bool res = get_config_file("angryrc", found, sizeof(found));
     if (saved) { setenv("XDG_CONFIG_HOME", saved, 1); free(saved); } else unsetenv("XDG_CONFIG_HOME");
     unlink(file); rmdir(sub); rmdir(dir);
-    ANGRY_ASSERT(res && strcmp(found, file) == 0, "expected the config file to be found under XDG_CONFIG_HOME");
+    ANGRY_ASSERT_ALL("expected the config file to be found under XDG_CONFIG_HOME",
+                     res,
+                     strcmp(found, file) == 0);
 }
 
 ANGRY_TEST(executesConfigurationFileSafelyWhenMissing)
@@ -430,8 +435,9 @@ ANGRY_TEST(terminatesWithExitFailureOnError)
     }
     int status;
     waitpid(pid, &status, 0);
-    ANGRY_ASSERT(WIFEXITED(status) && WEXITSTATUS(status) == EXIT_FAILURE,
-                 "expected error() to exit with EXIT_FAILURE");
+    ANGRY_ASSERT_ALL("expected error() to exit with EXIT_FAILURE",
+                     WIFEXITED(status),
+                     WEXITSTATUS(status) == EXIT_FAILURE);
 }
 
 ANGRY_TEST(terminatesWithExitSuccessOnRequire)
@@ -444,8 +450,9 @@ ANGRY_TEST(terminatesWithExitSuccessOnRequire)
     }
     int status;
     waitpid(pid, &status, 0);
-    ANGRY_ASSERT(WIFEXITED(status) && WEXITSTATUS(status) == EXIT_SUCCESS,
-                 "expected require() to exit with EXIT_SUCCESS");
+    ANGRY_ASSERT_ALL("expected require() to exit with EXIT_SUCCESS",
+                     WIFEXITED(status),
+                     WEXITSTATUS(status) == EXIT_SUCCESS);
 }
 
 ANGRY_TEST(allowsUserNotificationPresentation)
@@ -467,7 +474,7 @@ ANGRY_TEST(populatesLaunchdServicePlist)
 {
     int len = 0;
     char *plist = populate_plist(&len);
-    bool ok = plist != NULL && len > 0 && strstr(plist, "Label") != NULL;
+    bool ok = ANGRY_ALL(plist != NULL, len > 0, strstr(plist, "Label") != NULL);
     free(plist);
     ANGRY_ASSERT(ok, "expected populate_plist to construct valid xml plist");
 }
@@ -487,7 +494,9 @@ ANGRY_TEST(installsServiceInternalToFile)
     int res = service_install_internal(path);
     bool ok = file_exists(path);
     unlink(path);
-    ANGRY_ASSERT(res == 0 && ok, "expected service_install_internal to write plist file");
+    ANGRY_ASSERT_ALL("expected service_install_internal to write plist file",
+                     res == 0,
+                     ok);
 }
 
 ANGRY_TEST(removesLegacyServicePlist)

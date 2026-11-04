@@ -56,7 +56,10 @@ ANGRY_TEST(allocatesAndPopulatesWindowListFromLeafNodes) {
     struct view v = { .root = &node };
     int count = 0;
     uint32_t *list = view_find_window_list(&v, &count);
-    ANGRY_ASSERT(count == 2 && list[0] == 401 && list[1] == 402, "view_find_window_list failed to populate window list");
+    ANGRY_ASSERT_ALL("view_find_window_list failed to populate window list",
+                     count == 2,
+                     list[0] == 401,
+                     list[1] == 402);
 }
 
 ANGRY_TEST(evaluatesViewIsInvalidWhenValidFlagIsUnset) {
@@ -78,7 +81,9 @@ ANGRY_TEST(serializesBspViewPropertiesToJsonStream) {
     FILE *f = fmemopen(buf, sizeof(buf), "w");
     view_serialize(f, &v, 0);
     fclose(f);
-    ANGRY_ASSERT(strstr(buf, "\"id\":501") && strstr(buf, "\"type\":\"bsp\""), "view_serialize failed to emit complete JSON");
+    ANGRY_ASSERT_ALL("view_serialize failed to emit complete JSON",
+                     strstr(buf, "\"id\":501"),
+                     strstr(buf, "\"type\":\"bsp\""));
 }
 
 ANGRY_TEST(clearsViewRootTreeAndResetsNodeDimensions) {
@@ -94,5 +99,7 @@ ANGRY_TEST(displaysAndDestroysInsertFeedbackWindow) {
     bool showed = node.feedback_window.id != 0;
     insert_feedback_destroy(&node);
     bool destroyed = node.feedback_window.id == 0;
-    ANGRY_ASSERT(showed && destroyed, "insert_feedback failed to create and destroy feedback window");
+    ANGRY_ASSERT_ALL("insert_feedback failed to create and destroy feedback window",
+                     showed,
+                     destroyed);
 }
