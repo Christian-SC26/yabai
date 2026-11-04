@@ -20,15 +20,12 @@ ANGRY_TEST(observesActivationPolicyForValidAndNullApplications)
     ANGRY_ASSERT(proc_valid.ns_application != NULL, "expected valid ns_application after observing activation policy");
 }
 
-ANGRY_TEST(determinesApplicationObservableForRegularAndNullPolicies)
+ANGRY_TEST(treatsProcessWithoutApplicationAsUnobservable)
 {
-    struct process proc_null = { .pid = 99997, .ns_application = NULL };
-    bool null_observable = workspace_application_is_observable(&proc_null);
-    struct process proc_valid = { .pid = getpid() };
-    proc_valid.ns_application = [NSRunningApplication currentApplication];
-    bool valid_observable = workspace_application_is_observable(&proc_valid);
-    ANGRY_ASSERT(!null_observable && proc_null.policy == NSApplicationActivationPolicyProhibited && (valid_observable || !valid_observable),
-                 "expected null application to be unobservable with prohibited policy");
+    struct process proc = { .pid = 99997, .ns_application = NULL };
+    bool observable = workspace_application_is_observable(&proc);
+    ANGRY_ASSERT(!observable && proc.policy == NSApplicationActivationPolicyProhibited,
+                 "expected a process without an application to be unobservable with a prohibited policy");
 }
 
 ANGRY_TEST(evaluatesApplicationFinishedLaunchingState)
@@ -42,11 +39,9 @@ ANGRY_TEST(evaluatesApplicationFinishedLaunchingState)
     ANGRY_ASSERT(!null_finished && dock_finished, "expected dock process to report finished launching");
 }
 
-ANGRY_TEST(measuresDisplayNotchHeightForBuiltinAndExternalDisplays)
+ANGRY_TEST(reportsNoNotchForUnknownDisplay)
 {
-    int invalid_notch = workspace_display_notch_height(999999);
-    int main_notch = workspace_display_notch_height(CGMainDisplayID());
-    ANGRY_ASSERT(invalid_notch == 0 && main_notch >= 0, "expected non-builtin display notch height to be 0");
+    ANGRY_ASSERT(workspace_display_notch_height(999999) == 0, "expected a display that does not exist to have no notch");
 }
 
 ANGRY_TEST(deallocatesWorkspaceContextProperly)

@@ -20,33 +20,38 @@ ANGRY_TEST(preservesMissionControlStateIdempotencyWhenAlreadyRecorded) {
     ANGRY_ASSERT(recorded_sid == 777, "mission_control_record_state violated idempotency");
 }
 
-ANGRY_TEST(dispatchesConnectionHandlerForMissionControlEnter) {
+ANGRY_TEST(postsMissionControlEnterForDockConnectionEvent) {
     connection_handler(1204, NULL, 0, NULL, 0);
-    ANGRY_ASSERT(true, "connection_handler handled type 1204 cleanly");
+    struct event *e = angry_last_posted_event();
+    ANGRY_ASSERT(e->type == MISSION_CONTROL_ENTER, "expected a Mission Control enter event to be posted");
 }
 
-ANGRY_TEST(dispatchesConnectionHandlerForSpaceCreatedNotification) {
+ANGRY_TEST(postsSpaceCreatedEventCarryingSpaceId) {
     uint64_t sid = 1001;
     connection_handler(1327, &sid, sizeof(sid), NULL, 0);
-    ANGRY_ASSERT(true, "connection_handler handled type 1327 cleanly");
+    struct event *e = angry_last_posted_event();
+    ANGRY_ASSERT(e->type == SLS_SPACE_CREATED && (uint64_t)(intptr_t)e->context == 1001, "expected a space created event for the space to be posted");
 }
 
-ANGRY_TEST(dispatchesConnectionHandlerForSpaceDestroyedNotification) {
+ANGRY_TEST(postsSpaceDestroyedEventCarryingSpaceId) {
     uint64_t sid = 1002;
     connection_handler(1328, &sid, sizeof(sid), NULL, 0);
-    ANGRY_ASSERT(true, "connection_handler handled type 1328 cleanly");
+    struct event *e = angry_last_posted_event();
+    ANGRY_ASSERT(e->type == SLS_SPACE_DESTROYED && (uint64_t)(intptr_t)e->context == 1002, "expected a space destroyed event for the space to be posted");
 }
 
-ANGRY_TEST(dispatchesConnectionHandlerForWindowOrderedNotification) {
+ANGRY_TEST(postsWindowOrderedEventCarryingWindowId) {
     uint32_t wid = 2001;
     connection_handler(808, &wid, sizeof(wid), NULL, 0);
-    ANGRY_ASSERT(true, "connection_handler handled type 808 cleanly");
+    struct event *e = angry_last_posted_event();
+    ANGRY_ASSERT(e->type == SLS_WINDOW_ORDERED && (uint32_t)(intptr_t)e->context == 2001, "expected a window ordered event for the window to be posted");
 }
 
-ANGRY_TEST(dispatchesConnectionHandlerForWindowDestroyedNotification) {
+ANGRY_TEST(postsWindowDestroyedEventCarryingWindowId) {
     uint32_t wid = 2002;
     connection_handler(804, &wid, sizeof(wid), NULL, 0);
-    ANGRY_ASSERT(true, "connection_handler handled type 804 cleanly");
+    struct event *e = angry_last_posted_event();
+    ANGRY_ASSERT(e->type == SLS_WINDOW_DESTROYED && (uint32_t)(intptr_t)e->context == 2002, "expected a window destroyed event for the window to be posted");
 }
 
 ANGRY_TEST(updatesLastCmdTabTimeOnConnectionHandlerType1202) {
@@ -57,24 +62,24 @@ ANGRY_TEST(updatesLastCmdTabTimeOnConnectionHandlerType1202) {
     ANGRY_ASSERT(t > 0, "connection_handler failed to update __last_cmd_tab_time");
 }
 
-ANGRY_TEST(dispatchesMissionControlNotificationHandlerForShowAllWindows) {
+ANGRY_TEST(postsShowAllWindowsEventForExposeNotification) {
     mission_control_notification_handler(NULL, NULL, kAXExposeShowAllWindows, NULL);
-    ANGRY_ASSERT(true, "mission_control_notification_handler handled ShowAllWindows cleanly");
+    ANGRY_ASSERT(angry_last_posted_event()->type == MISSION_CONTROL_SHOW_ALL_WINDOWS, "expected a show-all-windows event to be posted");
 }
 
-ANGRY_TEST(dispatchesMissionControlNotificationHandlerForShowFrontWindows) {
+ANGRY_TEST(postsShowFrontWindowsEventForExposeNotification) {
     mission_control_notification_handler(NULL, NULL, kAXExposeShowFrontWindows, NULL);
-    ANGRY_ASSERT(true, "mission_control_notification_handler handled ShowFrontWindows cleanly");
+    ANGRY_ASSERT(angry_last_posted_event()->type == MISSION_CONTROL_SHOW_FRONT_WINDOWS, "expected a show-front-windows event to be posted");
 }
 
-ANGRY_TEST(dispatchesMissionControlNotificationHandlerForShowDesktop) {
+ANGRY_TEST(postsShowDesktopEventForExposeNotification) {
     mission_control_notification_handler(NULL, NULL, kAXExposeShowDesktop, NULL);
-    ANGRY_ASSERT(true, "mission_control_notification_handler handled ShowDesktop cleanly");
+    ANGRY_ASSERT(angry_last_posted_event()->type == MISSION_CONTROL_SHOW_DESKTOP, "expected a show-desktop event to be posted");
 }
 
-ANGRY_TEST(dispatchesMissionControlNotificationHandlerForExposeExit) {
+ANGRY_TEST(postsMissionControlExitEventForExposeNotification) {
     mission_control_notification_handler(NULL, NULL, kAXExposeExit, NULL);
-    ANGRY_ASSERT(true, "mission_control_notification_handler handled ExposeExit cleanly");
+    ANGRY_ASSERT(angry_last_posted_event()->type == MISSION_CONTROL_EXIT, "expected a Mission Control exit event to be posted");
 }
 
 ANGRY_TEST(observesAndUnobservesMissionControlDockEvents) {
@@ -83,15 +88,16 @@ ANGRY_TEST(observesAndUnobservesMissionControlDockEvents) {
     ANGRY_ASSERT(!g_mission_control_observer.is_observing, "mission_control_unobserve failed to reset observing flag");
 }
 
-ANGRY_TEST(evaluatesMissionControlIsActiveReturningBooleanState) {
-    bool active = mission_control_is_active();
-    ANGRY_ASSERT(active == true || active == false, "mission_control_is_active evaluated without error");
+ANGRY_TEST(detectsMissionControlFromDockOverlayWindow) {
+    g_mock_dock_window_layer18 = true;
+    ANGRY_ASSERT(mission_control_is_active(), "expected a Dock window on the Mission Control layer to mean Mission Control is open");
 }
 
 ANGRY_TEST(returnsCachedMissionControlStateWhenCalledWithinFiftyMilliseconds) {
+    g_mock_dock_window_layer18 = true;
     mission_control_is_active();
-    bool cached = mission_control_is_active();
-    ANGRY_ASSERT(cached == true || cached == false, "mission_control_is_active failed to return cached state");
+    g_mock_dock_window_layer18 = false;
+    ANGRY_ASSERT(mission_control_is_active(), "expected a second check right after the first to reuse its answer");
 }
 
 ANGRY_TEST(mapsMissionControlModesToExpectedStringRepresentations) {

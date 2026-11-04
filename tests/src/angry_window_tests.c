@@ -26,19 +26,9 @@ ANGRY_TEST(resolvesWindowDisplayUuidAndDisplayId) {
     ANGRY_ASSERT(did > 0, "window_display_id failed to resolve display for active window");
 }
 
-ANGRY_TEST(resolvesWindowSpaceAndSpaceList) {
-    uint32_t wid = get_active_test_window_id();
-    int count = 0;
-    uint64_t sid = window_space(wid);
-    uint64_t *list = window_space_list(wid, &count);
-    ANGRY_ASSERT(sid > 0 && count >= 0, "window_space failed to resolve space for active window");
-}
-
-ANGRY_TEST(queriesWindowShadowAndOpacity) {
-    uint32_t wid = get_active_test_window_id();
-    bool shadow = window_shadow(wid);
-    float opacity = window_opacity(wid);
-    ANGRY_ASSERT((shadow == true || shadow == false) && opacity >= 0.0f, "window_shadow or opacity returned invalid values");
+ANGRY_TEST(resolvesSpaceOfOnScreenWindow) {
+    uint64_t sid = window_space(get_active_test_window_id());
+    ANGRY_ASSERT(sid > 0, "expected an on-screen window to be on a space");
 }
 
 ANGRY_TEST(queriesWindowLevelAndSubLevel) {
@@ -46,19 +36,6 @@ ANGRY_TEST(queriesWindowLevelAndSubLevel) {
     int level = window_level(wid);
     int sub_level = window_sub_level(wid);
     ANGRY_ASSERT(level != -99999 && sub_level != -99999, "window_level or sub_level returned invalid levels");
-}
-
-ANGRY_TEST(queriesWindowParentAndTags) {
-    uint32_t wid = get_active_test_window_id();
-    uint32_t parent = window_parent(wid);
-    uint64_t tags = window_tags(wid);
-    ANGRY_ASSERT(parent >= 0 && tags >= 0, "window_parent or tags query failed");
-}
-
-ANGRY_TEST(evaluatesWindowIsStickyAccurately) {
-    uint32_t wid = get_active_test_window_id();
-    bool sticky = window_is_sticky(wid);
-    ANGRY_ASSERT(sticky == true || sticky == false, "window_is_sticky evaluated without error");
 }
 
 ANGRY_TEST(queriesWindowPropertyTitleViaTextStorage) {
@@ -148,20 +125,13 @@ ANGRY_TEST(mapsWindowLevelsToLayerStrings) {
     ANGRY_ASSERT(ok, "window_layer returned mismatched layer strings");
 }
 
-ANGRY_TEST(evaluatesWindowLevelIsStandardMatchingNormalLayer) {
-    uint32_t wid = get_active_test_window_id();
-    struct window win = { .id = wid };
-    bool std = window_level_is_standard(&win);
-    ANGRY_ASSERT(std == true || std == false, "window_level_is_standard evaluated without error");
-}
-
-ANGRY_TEST(evaluatesWindowIsRootWithValidOrDummyElement) {
+ANGRY_TEST(rejectsSystemWideElementAsRootWindow) {
     AXUIElementRef sys = AXUIElementCreateSystemWide();
     struct application app = { .ref = sys };
     struct window win = { .application = &app, .ref = sys };
     bool root = window_is_root(&win);
     CFRelease(sys);
-    ANGRY_ASSERT(root == false || root == true, "window_is_root evaluated without crash");
+    ANGRY_ASSERT(!root, "expected the system-wide element not to be a root window");
 }
 
 ANGRY_TEST(manipulatesWindowFlagsAndRuleFlagsBitmasks) {
@@ -173,17 +143,6 @@ ANGRY_TEST(manipulatesWindowFlagsAndRuleFlagsBitmasks) {
     window_clear_rule_flag(&win, WINDOW_RULE_MANAGED);
     bool cleared = !window_check_rule_flag(&win, WINDOW_RULE_MANAGED);
     ANGRY_ASSERT(set && cleared, "window flag and rule flag operations failed");
-}
-
-ANGRY_TEST(destroysWindowFreeingAllocatedStringsAndReferences) {
-    struct window *win = malloc(sizeof(struct window));
-    memset(win, 0, sizeof(*win));
-    win->ref = (AXUIElementRef)CFRetain(CFSTR("dummy_ref"));
-    win->role = (CFStringRef)CFRetain(CFSTR("AXWindow"));
-    win->subrole = (CFStringRef)CFRetain(CFSTR("AXStandardWindow"));
-    win->title = (CFStringRef)CFRetain(CFSTR("dummy_title"));
-    window_destroy(win);
-    ANGRY_ASSERT(true, "window_destroy executed cleanly without error");
 }
 
 static bool test_observe_first_window(void) {

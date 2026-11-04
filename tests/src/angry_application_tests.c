@@ -13,7 +13,7 @@ ANGRY_TEST(createsApplicationInstanceFromCurrentProcess) {
     ANGRY_ASSERT(ok, "application_create failed to instantiate application from current process");
 }
 
-ANGRY_TEST(evaluatesApplicationFrontmostState) {
+ANGRY_TEST(reportsTestProcessAsNotFrontmost) {
     pid_t pid = getpid();
     ProcessSerialNumber psn = {0};
     GetProcessForPID(pid, &psn);
@@ -21,10 +21,10 @@ ANGRY_TEST(evaluatesApplicationFrontmostState) {
     struct application *app = application_create(&proc);
     bool is_front = application_is_frontmost(app);
     application_destroy(app);
-    ANGRY_ASSERT(is_front == true || is_front == false, "application_is_frontmost returned invalid boolean");
+    ANGRY_ASSERT(!is_front, "expected the test process, which never activates, not to be frontmost");
 }
 
-ANGRY_TEST(evaluatesApplicationVisibilityState) {
+ANGRY_TEST(reportsTestProcessAsNotHidden) {
     pid_t pid = getpid();
     ProcessSerialNumber psn = {0};
     GetProcessForPID(pid, &psn);
@@ -32,22 +32,23 @@ ANGRY_TEST(evaluatesApplicationVisibilityState) {
     struct application *app = application_create(&proc);
     bool hidden = application_is_hidden(app);
     application_destroy(app);
-    ANGRY_ASSERT(hidden == true || hidden == false, "application_is_hidden returned invalid boolean");
+    ANGRY_ASSERT(!hidden, "expected the test process not to be hidden");
 }
 
-ANGRY_TEST(queriesApplicationWindowList) {
+ANGRY_TEST(listsNoWindowsForApplicationWithoutWindows) {
     pid_t pid = getpid();
     ProcessSerialNumber psn = {0};
     GetProcessForPID(pid, &psn);
     struct process proc = { .pid = pid, .psn = psn, .name = "yabai_tests" };
     struct application *app = application_create(&proc);
     CFArrayRef list = application_window_list(app);
+    int count = list ? CFArrayGetCount(list) : 0;
     if (list) CFRelease(list);
     application_destroy(app);
-    ANGRY_ASSERT(true, "application_window_list returned without error");
+    ANGRY_ASSERT(count == 0, "expected no windows for the test process");
 }
 
-ANGRY_TEST(queriesApplicationMainWindow) {
+ANGRY_TEST(reportsNoMainWindowForApplicationWithoutWindows) {
     pid_t pid = getpid();
     ProcessSerialNumber psn = {0};
     GetProcessForPID(pid, &psn);
@@ -55,10 +56,10 @@ ANGRY_TEST(queriesApplicationMainWindow) {
     struct application *app = application_create(&proc);
     uint32_t wid = application_main_window(app);
     application_destroy(app);
-    ANGRY_ASSERT(wid >= 0, "application_main_window returned invalid ID");
+    ANGRY_ASSERT(wid == 0, "expected no main window for the test process");
 }
 
-ANGRY_TEST(queriesApplicationFocusedWindow) {
+ANGRY_TEST(reportsNoFocusedWindowForApplicationWithoutWindows) {
     pid_t pid = getpid();
     ProcessSerialNumber psn = {0};
     GetProcessForPID(pid, &psn);
@@ -66,7 +67,7 @@ ANGRY_TEST(queriesApplicationFocusedWindow) {
     struct application *app = application_create(&proc);
     uint32_t wid = application_focused_window(app);
     application_destroy(app);
-    ANGRY_ASSERT(wid >= 0, "application_focused_window returned invalid ID");
+    ANGRY_ASSERT(wid == 0, "expected no focused window for the test process");
 }
 
 ANGRY_TEST(observesAndUnobservesApplicationNotifications) {
@@ -83,43 +84,94 @@ ANGRY_TEST(observesAndUnobservesApplicationNotifications) {
     ANGRY_ASSERT(unobserved, "application_unobserve failed to clear observing flag");
 }
 
-ANGRY_TEST(dispatchesNotificationHandlerForCreatedAndFocusedNotifications) {
-    pid_t pid = getpid();
-    ProcessSerialNumber psn = {0};
-    GetProcessForPID(pid, &psn);
-    struct process proc = { .pid = pid, .psn = psn, .name = "yabai_tests" };
-    struct application *app = application_create(&proc);
-    application_notification_handler(NULL, app->ref, kAXCreatedNotification, app);
-    application_notification_handler(NULL, app->ref, kAXFocusedWindowChangedNotification, app);
-    application_destroy(app);
-    ANGRY_ASSERT(true, "application_notification_handler failed on created and focused notifications");
+ANGRY_TEST(postsWindowCreatedEventForCreatedNotification) {
+    struct application app = { .pid = 4321 };
+    AXUIElementRef ref = AXUIElementCreateApplication(app.pid);
+    application_notification_handler(NULL, ref, kAXCreatedNotification, &app);
+    struct event *e = angry_last_posted_event();
+    bool posted = e->type == WINDOW_CREATED;
+    CFRelease(ref);
+    ANGRY_ASSERT(posted, "expected a window created event to be posted");
 }
 
-ANGRY_TEST(dispatchesNotificationHandlerForWindowGeometryChanges) {
-    pid_t pid = getpid();
-    ProcessSerialNumber psn = {0};
-    GetProcessForPID(pid, &psn);
-    struct process proc = { .pid = pid, .psn = psn, .name = "yabai_tests" };
-    struct application *app = application_create(&proc);
-    application_notification_handler(NULL, app->ref, kAXWindowMovedNotification, app);
-    application_notification_handler(NULL, app->ref, kAXWindowResizedNotification, app);
-    application_notification_handler(NULL, app->ref, kAXTitleChangedNotification, app);
-    application_destroy(app);
-    ANGRY_ASSERT(true, "application_notification_handler failed on window geometry notifications");
+ANGRY_TEST(postsWindowFocusedEventForFocusedWindowChange) {
+    struct application app = { .pid = 4321 };
+    AXUIElementRef ref = AXUIElementCreateApplication(app.pid);
+    application_notification_handler(NULL, ref, kAXFocusedWindowChangedNotification, &app);
+    struct event *e = angry_last_posted_event();
+    bool posted = e->type == WINDOW_FOCUSED;
+    CFRelease(ref);
+    ANGRY_ASSERT(posted, "expected a window focused event to be posted");
 }
 
-ANGRY_TEST(dispatchesNotificationHandlerForMenuAndStateChanges) {
-    pid_t pid = getpid();
-    ProcessSerialNumber psn = {0};
-    GetProcessForPID(pid, &psn);
-    struct process proc = { .pid = pid, .psn = psn, .name = "yabai_tests" };
-    struct application *app = application_create(&proc);
-    application_notification_handler(NULL, app->ref, kAXMenuOpenedNotification, app);
-    application_notification_handler(NULL, app->ref, kAXMenuClosedNotification, app);
-    application_notification_handler(NULL, app->ref, kAXWindowMiniaturizedNotification, app);
-    application_notification_handler(NULL, app->ref, kAXWindowDeminiaturizedNotification, app);
-    application_destroy(app);
-    ANGRY_ASSERT(true, "application_notification_handler failed on menu and state notifications");
+ANGRY_TEST(postsWindowMovedEventForMovedNotification) {
+    struct application app = { .pid = 4321 };
+    AXUIElementRef ref = AXUIElementCreateApplication(app.pid);
+    application_notification_handler(NULL, ref, kAXWindowMovedNotification, &app);
+    struct event *e = angry_last_posted_event();
+    bool posted = e->type == WINDOW_MOVED;
+    CFRelease(ref);
+    ANGRY_ASSERT(posted, "expected a window moved event to be posted");
+}
+
+ANGRY_TEST(postsWindowResizedEventForResizedNotification) {
+    struct application app = { .pid = 4321 };
+    AXUIElementRef ref = AXUIElementCreateApplication(app.pid);
+    application_notification_handler(NULL, ref, kAXWindowResizedNotification, &app);
+    struct event *e = angry_last_posted_event();
+    bool posted = e->type == WINDOW_RESIZED;
+    CFRelease(ref);
+    ANGRY_ASSERT(posted, "expected a window resized event to be posted");
+}
+
+ANGRY_TEST(postsWindowTitleChangedEventForTitleNotification) {
+    struct application app = { .pid = 4321 };
+    AXUIElementRef ref = AXUIElementCreateApplication(app.pid);
+    application_notification_handler(NULL, ref, kAXTitleChangedNotification, &app);
+    struct event *e = angry_last_posted_event();
+    bool posted = e->type == WINDOW_TITLE_CHANGED;
+    CFRelease(ref);
+    ANGRY_ASSERT(posted, "expected a window title changed event to be posted");
+}
+
+ANGRY_TEST(postsMenuOpenedEventCarryingApplicationPid) {
+    struct application app = { .pid = 4321 };
+    AXUIElementRef ref = AXUIElementCreateApplication(app.pid);
+    application_notification_handler(NULL, ref, kAXMenuOpenedNotification, &app);
+    struct event *e = angry_last_posted_event();
+    bool posted = e->type == MENU_OPENED && (pid_t)(intptr_t)e->context == app.pid;
+    CFRelease(ref);
+    ANGRY_ASSERT(posted, "expected a menu opened event for the application to be posted");
+}
+
+ANGRY_TEST(postsMenuClosedEventCarryingApplicationPid) {
+    struct application app = { .pid = 4321 };
+    AXUIElementRef ref = AXUIElementCreateApplication(app.pid);
+    application_notification_handler(NULL, ref, kAXMenuClosedNotification, &app);
+    struct event *e = angry_last_posted_event();
+    bool posted = e->type == MENU_CLOSED && (pid_t)(intptr_t)e->context == app.pid;
+    CFRelease(ref);
+    ANGRY_ASSERT(posted, "expected a menu closed event for the application to be posted");
+}
+
+ANGRY_TEST(postsWindowMinimizedEventCarryingContext) {
+    struct application app = { .pid = 4321 };
+    AXUIElementRef ref = AXUIElementCreateApplication(app.pid);
+    application_notification_handler(NULL, ref, kAXWindowMiniaturizedNotification, &app);
+    struct event *e = angry_last_posted_event();
+    bool posted = e->type == WINDOW_MINIMIZED && e->context == &app;
+    CFRelease(ref);
+    ANGRY_ASSERT(posted, "expected a window minimized event to be posted");
+}
+
+ANGRY_TEST(postsWindowDeminimizedEventCarryingContext) {
+    struct application app = { .pid = 4321 };
+    AXUIElementRef ref = AXUIElementCreateApplication(app.pid);
+    application_notification_handler(NULL, ref, kAXWindowDeminiaturizedNotification, &app);
+    struct event *e = angry_last_posted_event();
+    bool posted = e->type == WINDOW_DEMINIMIZED && e->context == &app;
+    CFRelease(ref);
+    ANGRY_ASSERT(posted, "expected a window deminimized event to be posted");
 }
 
 ANGRY_TEST(dispatchesNotificationHandlerForWindowDestroyedNotification) {

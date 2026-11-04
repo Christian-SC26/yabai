@@ -64,14 +64,6 @@ ANGRY_TEST(configuresSocketPathWhenRunningUnderSudo)
     ANGRY_ASSERT(set_sudo && !set_nosudo, "expected socket path setup to succeed with SUDO_UID and fail without");
 }
 
-ANGRY_TEST(evaluatesOsaxInstallationAndVersionStatus)
-{
-    bool installed = scripting_addition_is_installed();
-    int check_result = scripting_addition_check();
-    ANGRY_ASSERT((installed || !installed) && (check_result == 0 || check_result == 1),
-                 "expected installation and version checks to return valid boolean/status codes");
-}
-
 ANGRY_TEST(removesOsaxInstallationReturningStatusCode)
 {
     g_mock_system = true;
@@ -126,16 +118,6 @@ ANGRY_TEST(evaluatesSystemIntegrityProtectionCompatibility)
     bool sip_allowed = scripting_addition_is_sip_friendly();
     g_mock_csr_config = -1;
     ANGRY_ASSERT(!sip_denied && sip_allowed, "expected SIP check to reflect CSR flags accurately");
-}
-
-ANGRY_TEST(evaluatesArm64ePreviewAbiStatus)
-{
-#ifdef __arm64__
-    bool arm64e = scripting_addition_is_arm64e_enabled();
-    ANGRY_ASSERT(arm64e || !arm64e, "expected arm64e check to query boot arguments");
-#else
-    ANGRY_ASSERT(true, "not running on arm64 architecture");
-#endif
 }
 
 ANGRY_TEST(attemptsMachLoaderPayloadInjection)

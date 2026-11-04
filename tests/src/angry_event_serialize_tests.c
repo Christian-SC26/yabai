@@ -60,11 +60,6 @@ ANGRY_TEST(augmentsBareEventDefaultingMissingFieldsToZero) {
     ANGRY_ASSERT(ok, "iss_augment_dock_swipe_event failed on bare CGEvent");
 }
 
-ANGRY_TEST(evaluatesRequiresEventAugmentationWithoutCrashing) {
-    bool req = iss_requires_event_augmentation();
-    ANGRY_ASSERT(req == true || req == false, "iss_requires_event_augmentation returned invalid boolean state");
-}
-
 ANGRY_TEST(rejectsTruncatedEventDataUnderFourBytes) {
     uint8_t short_bytes[3] = {0x00, 0x00, 0x02};
     ISSCGEventParsedData parsed = {0};
@@ -90,11 +85,4 @@ ANGRY_TEST(clampsExtremePositiveAndNegativeFixedPointValues) {
     int32_t hi = iss_double_to_fixed1616(70000.0);
     int32_t lo = iss_double_to_fixed1616(-70000.0);
     ANGRY_ASSERT(hi == INT32_MAX && lo == INT32_MIN, "iss_double_to_fixed1616 failed to clamp out-of-range floats");
-}
-
-ANGRY_TEST(handlesNullParsedEventDataFreeSafely) {
-    iss_parsed_event_data_free(NULL);
-    ISSCGEventParsedData empty = {0};
-    iss_parsed_event_data_free(&empty);
-    ANGRY_ASSERT(true, "iss_parsed_event_data_free crashed on NULL or empty pointer");
 }

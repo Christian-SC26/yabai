@@ -83,20 +83,6 @@ ANGRY_TEST(returnsFalseWhenRemovingSignalByNonexistentLabel) {
     ANGRY_ASSERT(ok == false, "event_signal_remove succeeded on nonexistent label");
 }
 
-ANGRY_TEST(destroysSignalFreeingRegexesAndStrings) {
-    struct signal s = {0};
-    s.app_regex_valid = true;
-    regcomp(&s.app_regex, "^Slack$", REG_EXTENDED);
-    s.title_regex_valid = true;
-    regcomp(&s.title_regex, ".*", REG_EXTENDED);
-    s.label = string_copy("lbl");
-    s.app = string_copy("Slack");
-    s.title = string_copy("General");
-    s.command = string_copy("notify");
-    event_signal_destroy(&s);
-    ANGRY_ASSERT(true, "event_signal_destroy failed to clean up signal");
-}
-
 ANGRY_TEST(serializesSignalListToJsonStream) {
     for (int i = 0; i < SIGNAL_TYPE_COUNT; ++i) {
         buf_free(g_signal_event[i]);

@@ -350,12 +350,6 @@ ANGRY_TEST(readsOperatingSystemFrequency)
     ANGRY_ASSERT(freq > 0, "expected positive OS frequency");
 }
 
-ANGRY_TEST(sendsMachMessageSafely)
-{
-    mach_send(MACH_PORT_NULL, NULL, 0);
-    ANGRY_ASSERT(true, "expected mach_send to handle null port gracefully");
-}
-
 ANGRY_TEST(convertsInt32ToCfString)
 {
     CFStringRef str = CFSTRINGNUM32(12345);
@@ -364,11 +358,21 @@ ANGRY_TEST(convertsInt32ToCfString)
     ANGRY_ASSERT(match, "expected CFSTRINGNUM32 to format int32 into CFStringRef");
 }
 
-ANGRY_TEST(resolvesConfigurationFilePath)
+ANGRY_TEST(resolvesConfigurationFileUnderXdgConfigHome)
 {
-    char buf[MAXLEN];
-    bool res = get_config_file("yabairc", buf, sizeof(buf));
-    ANGRY_ASSERT(res || !res, "expected get_config_file to execute path search");
+    char dir[] = "/tmp/yabai_xdg_XXXXXX";
+    mkdtemp(dir);
+    char sub[MAXLEN], file[MAXLEN], found[MAXLEN] = {0};
+    snprintf(sub, sizeof(sub), "%s/yabai", dir);
+    snprintf(file, sizeof(file), "%s/angryrc", sub);
+    mkdir(sub, 0755);
+    fclose(fopen(file, "w"));
+    char *saved = getenv("XDG_CONFIG_HOME") ? strdup(getenv("XDG_CONFIG_HOME")) : NULL;
+    setenv("XDG_CONFIG_HOME", dir, 1);
+    bool res = get_config_file("angryrc", found, sizeof(found));
+    if (saved) { setenv("XDG_CONFIG_HOME", saved, 1); free(saved); } else unsetenv("XDG_CONFIG_HOME");
+    unlink(file); rmdir(sub); rmdir(dir);
+    ANGRY_ASSERT(res && strcmp(found, file) == 0, "expected the config file to be found under XDG_CONFIG_HOME");
 }
 
 ANGRY_TEST(executesConfigurationFileSafelyWhenMissing)
@@ -376,12 +380,6 @@ ANGRY_TEST(executesConfigurationFileSafelyWhenMissing)
     char missing[MAXLEN] = "/nonexistent/path/yabairc";
     exec_config_file(missing, sizeof(missing));
     ANGRY_ASSERT(file_exists(missing) == false, "expected missing config execution to return cleanly");
-}
-
-ANGRY_TEST(queriesAccessibilityPrivileges)
-{
-    bool priv = ax_privilege();
-    ANGRY_ASSERT(priv || !priv, "expected accessibility privilege check to query system");
 }
 
 ANGRY_TEST(resolvesWindowPidFromAccessibilityElement)
@@ -392,12 +390,12 @@ ANGRY_TEST(resolvesWindowPidFromAccessibilityElement)
     ANGRY_ASSERT(pid == 0 || pid == getpid(), "expected ax_window_pid to return process id or 0");
 }
 
-ANGRY_TEST(checksEnhancedUserInterfaceAccessibilityAttribute)
+ANGRY_TEST(reportsNoEnhancedUserInterfaceForTestProcess)
 {
     AXUIElementRef app = AXUIElementCreateApplication(getpid());
     bool enhanced = ax_enhanced_userinterface(app);
     CFRelease(app);
-    ANGRY_ASSERT(enhanced || !enhanced, "expected enhanced UI query to complete");
+    ANGRY_ASSERT(!enhanced, "expected the test process not to turn on AXEnhancedUserInterface");
 }
 
 ANGRY_TEST(restoresAlphaChannelInQuartzImage)
@@ -492,17 +490,27 @@ ANGRY_TEST(installsServiceInternalToFile)
     ANGRY_ASSERT(res == 0 && ok, "expected service_install_internal to write plist file");
 }
 
-ANGRY_TEST(cleansUpLegacyServiceRegistrationSafely)
+ANGRY_TEST(removesLegacyServicePlist)
 {
-    mkdir("/tmp/yabai_mock_home", 0755);
-    mkdir("/tmp/yabai_mock_home/Library", 0755);
-    mkdir("/tmp/yabai_mock_home/Library/LaunchAgents", 0755);
-    g_mock_home = "/tmp/yabai_mock_home";
+    char home[] = "/tmp/yabai_mock_home_XXXXXX";
+    mkdtemp(home);
+    char dir[MAXLEN], plist[MAXLEN];
+    snprintf(dir, sizeof(dir), "%s/Library", home);
+    mkdir(dir, 0755);
+    snprintf(dir, sizeof(dir), "%s/Library/LaunchAgents", home);
+    mkdir(dir, 0755);
+    snprintf(plist, sizeof(plist), _PATH_LEGACY_YABAI_PLIST, home);
+    fclose(fopen(plist, "w"));
+    g_mock_home = home;
     g_mock_posix_spawn = true;
     service_cleanup_legacy();
-    g_mock_posix_spawn = false;
-    g_mock_home = NULL;
-    ANGRY_ASSERT(true, "expected legacy service cleanup to execute cleanly");
+    bool removed = !file_exists(plist);
+    unlink(plist);
+    rmdir(dir);
+    snprintf(dir, sizeof(dir), "%s/Library", home);
+    rmdir(dir);
+    rmdir(home);
+    ANGRY_ASSERT(removed, "expected the legacy service plist to be removed");
 }
 
 ANGRY_TEST(installsLaunchdServiceToMockHomeDirectory)

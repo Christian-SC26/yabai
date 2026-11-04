@@ -25,11 +25,3 @@ ANGRY_TEST(printsVersionAndExitsInParseArguments)
     waitpid(pid, &status, 0);
     ANGRY_ASSERT(WIFEXITED(status) && WEXITSTATUS(status) == 0, "expected --version to exit cleanly with 0");
 }
-
-ANGRY_TEST(initializesSettingsAndAttemptsLockAcquisition)
-{
-    bool locked = configure_settings_and_acquire_lock();
-    tests_isolate_scripting_addition();
-    signal(SIGCHLD, SIG_DFL);
-    ANGRY_ASSERT(locked || !locked, "expected configure_settings_and_acquire_lock to initialize environment");
-}

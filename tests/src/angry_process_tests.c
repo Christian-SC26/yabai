@@ -41,9 +41,8 @@ ANGRY_TEST(rejectsInvalidProcessInProcessCreateReturningNull) {
     ANGRY_ASSERT(proc == NULL, "process_create must return NULL for invalid PSN");
 }
 
-ANGRY_TEST(evaluatesProcessIsBeingDebuggedViaSysctl) {
-    bool debugged = process_is_being_debugged(getpid());
-    ANGRY_ASSERT(debugged == false || debugged == true, "process_is_being_debugged executed sysctl cleanly");
+ANGRY_TEST(reportsTestProcessAsNotBeingDebugged) {
+    ANGRY_ASSERT(!process_is_being_debugged(getpid()), "expected the test process to run without a debugger attached");
 }
 
 ANGRY_TEST(findsProcessInProcessManagerTable) {
@@ -64,14 +63,6 @@ ANGRY_TEST(returnsNullWhenProcessNotFoundInProcessManager) {
     struct process *found = process_manager_find_process(&pm, &missing);
     table_free(&pm.process);
     ANGRY_ASSERT(found == NULL, "process_manager_find_process returned non-NULL for missing process");
-}
-
-ANGRY_TEST(destroysProcessReleasingResources) {
-    struct process *proc = malloc(sizeof(struct process));
-    proc->name = strdup("angry_test_proc");
-    proc->ns_application = NULL;
-    process_destroy(proc);
-    ANGRY_ASSERT(true, "process_destroy executed cleanly without error");
 }
 
 ANGRY_TEST(handlesProcessLaunchEventInProcessHandler) {

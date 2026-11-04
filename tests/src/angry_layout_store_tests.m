@@ -50,20 +50,22 @@ ANGRY_TEST(buildsSessionDictionaryCapturingDisplaysAndSpaces) {
     ANGRY_ASSERT(dict != nil && [dict[@"type"] isEqualToString:@"session"], "build_session_dict failed");
 }
 
-ANGRY_TEST(savesSpaceLayoutToFileHandlingErrors) {
+ANGRY_TEST(refusesToSaveLayoutOfFloatingSpace) {
     char out_p[256] = {0}, err[256] = {0};
-    uint64_t sid = space_manager_active_space();
-    bool res = layout_store_save(sid, "/tmp/yabai_layout_test.json", out_p, sizeof(out_p), err, sizeof(err));
-    ANGRY_ASSERT(res == true || res == false, "layout_store_save executed safely");
+    uint64_t sid = 0x7E573001ULL;
+    space_manager_find_view(&g_space_manager, sid)->layout = VIEW_FLOAT;
+    bool saved = layout_store_save(sid, "/tmp/yabai_layout_test.json", out_p, sizeof(out_p), err, sizeof(err));
+    ANGRY_ASSERT(!saved && strstr(err, "BSP") != NULL, "expected saving a floating space to be refused");
 }
 
-ANGRY_TEST(dumpsSpaceLayoutToJsonStreamHandlingErrors) {
+ANGRY_TEST(refusesToDumpLayoutOfFloatingSpace) {
     char buf[1024] = {0}, err[256] = {0};
     FILE *f = fmemopen(buf, sizeof(buf), "w");
-    uint64_t sid = space_manager_active_space();
-    bool res = layout_store_dump(sid, f, err, sizeof(err));
+    uint64_t sid = 0x7E573002ULL;
+    space_manager_find_view(&g_space_manager, sid)->layout = VIEW_FLOAT;
+    bool dumped = layout_store_dump(sid, f, err, sizeof(err));
     fclose(f);
-    ANGRY_ASSERT(res == true || res == false, "layout_store_dump executed safely");
+    ANGRY_ASSERT(!dumped && strcmp(err, "can only dump layout for BSP spaces") == 0, "expected dumping a floating space to be refused");
 }
 
 ANGRY_TEST(restoresSpaceLayoutFromFileHandlingMissingFile) {

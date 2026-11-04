@@ -182,34 +182,34 @@ ANGRY_TEST(configuresSpaceGestureNaturalScrollingMode) {
     ANGRY_ASSERT(g_space_manager.gesture_natural_scrolling == SPACE_GESTURE_NATURAL_SCROLL_OFF, "handle_domain_config failed setting natural scrolling");
 }
 
-ANGRY_TEST(dispatchesDisplayDomainExecutingDisplayCommands) {
+ANGRY_TEST(rejectsFocusOfMissingDisplay) {
     char buf[512] = {0};
     FILE *f = fmemopen(buf, sizeof(buf), "w");
-    char msg[] = "--focus\01\0\0";
+    char msg[] = "--focus\099\0\0";
     struct token dom = { .text = "display", .length = 7 };
     handle_domain_display(f, dom, msg);
     fclose(f);
-    ANGRY_ASSERT(true, "handle_domain_display executed cleanly");
+    ANGRY_ASSERT(strstr(buf, "could not locate display with arrangement index '99'") != NULL, "expected focusing a display that does not exist to be refused");
 }
 
-ANGRY_TEST(dispatchesSpaceDomainExecutingSpaceCommands) {
+ANGRY_TEST(rejectsLayoutChangeOfMissingSpace) {
     char buf[512] = {0};
     FILE *f = fmemopen(buf, sizeof(buf), "w");
-    char msg[] = "--layout\0bsp\0\0";
+    char msg[] = "99\0--layout\0bsp\0\0";
     struct token dom = { .text = "space", .length = 5 };
     handle_domain_space(f, dom, msg);
     fclose(f);
-    ANGRY_ASSERT(true, "handle_domain_space executed cleanly");
+    ANGRY_ASSERT(strstr(buf, "could not locate the space to act on") != NULL, "expected changing the layout of a space that does not exist to be refused");
 }
 
-ANGRY_TEST(dispatchesWindowDomainExecutingWindowCommands) {
+ANGRY_TEST(rejectsToggleOfMissingWindow) {
     char buf[512] = {0};
     FILE *f = fmemopen(buf, sizeof(buf), "w");
-    char msg[] = "--toggle\0float\0\0";
+    char msg[] = "2147483000\0--toggle\0float\0\0";
     struct token dom = { .text = "window", .length = 6 };
     handle_domain_window(f, dom, msg);
     fclose(f);
-    ANGRY_ASSERT(true, "handle_domain_window executed cleanly");
+    ANGRY_ASSERT(strstr(buf, "could not locate the window to act on") != NULL, "expected toggling a window that does not exist to be refused");
 }
 
 ANGRY_TEST(dispatchesQueryDomainEmittingFormattedJson) {

@@ -181,23 +181,6 @@ ANGRY_TEST(combinesStickyMffAndFullscreenProperties) {
     ANGRY_ASSERT(dst.sticky == RULE_PROP_ON && dst.mff == RULE_PROP_OFF && dst.fullscreen == RULE_PROP_ON, "Combine effects failed to set sticky mff or fullscreen properties");
 }
 
-ANGRY_TEST(freesRuleResourcesAndCompiledRegularExpressions) {
-    struct rule r = {0};
-    r.label = string_copy("label-77");
-    r.app = string_copy("Slack");
-    r.title = string_copy("Title");
-    r.role = string_copy("AXWindow");
-    r.subrole = string_copy("AXStandardWindow");
-    r.flags = RULE_APP_VALID | RULE_TITLE_VALID | RULE_ROLE_VALID | RULE_SUBROLE_VALID;
-    regcomp(&r.app_regex, "^Slack$", REG_EXTENDED);
-    regcomp(&r.title_regex, ".*", REG_EXTENDED);
-    regcomp(&r.role_regex, ".*", REG_EXTENDED);
-    regcomp(&r.subrole_regex, ".*", REG_EXTENDED);
-    r.effects.scratchpad = string_copy("sp-1");
-    rule_destroy(&r);
-    ANGRY_ASSERT(true, "rule_destroy failed to free allocated regexes and strings");
-}
-
 ANGRY_TEST(reappliesRuleByIndexIteratingActiveWindows) {
     buf_free(g_window_manager.rules);
     g_window_manager.rules = NULL;
@@ -272,12 +255,4 @@ ANGRY_TEST(clearsRuleEffectsFlagFromEffectsBitmask) {
     struct rule_effects e = { .flags = RULE_FOLLOW_SPACE | RULE_OPACITY };
     rule_effects_clear_flag(&e, RULE_FOLLOW_SPACE);
     ANGRY_ASSERT(!rule_effects_check_flag(&e, RULE_FOLLOW_SPACE) && rule_effects_check_flag(&e, RULE_OPACITY), "rule_effects_clear_flag failed to clear specified flag");
-}
-
-ANGRY_TEST(traversesEmptyWindowTableWithoutErrorDuringRuleReapplyAll) {
-    struct window w = { .id = 991, .is_root = false };
-    table_add(&g_window_manager.window, &w.id, &w);
-    rule_reapply_all();
-    table_remove(&g_window_manager.window, &w.id);
-    ANGRY_ASSERT(true, "rule_reapply_all crashed on window manager traversal");
 }

@@ -96,22 +96,6 @@ ANGRY_TEST(returnsDropActionNoneWhenCursorIsOutsideWindowBounds) {
     ANGRY_ASSERT(act == MOUSE_DROP_ACTION_NONE, "mouse_determine_drop_action should return NONE for point outside bounds");
 }
 
-ANGRY_TEST(handlesMouseDropNoTargetOnSameSpaceByFlushingNode) {
-    struct view v = { .sid = 101 };
-    struct window_node node = {0};
-    struct window win = { .id = 1 };
-    mouse_drop_no_target(&g_space_manager, &g_window_manager, &v, &v, &win, &node);
-    ANGRY_ASSERT(true, "mouse_drop_no_target on same space flushed cleanly");
-}
-
-ANGRY_TEST(bypassesBspGridAdjustmentWhenViewLayoutIsNotBsp) {
-    struct view v = { .layout = VIEW_FLOAT };
-    struct window win = { .id = 99 };
-    struct mouse_window_info info = { .changed_position = true };
-    mouse_drop_try_adjust_bsp_grid(&g_window_manager, &v, &win, &info);
-    ANGRY_ASSERT(true, "mouse_drop_try_adjust_bsp_grid cleanly rejected non-BSP view");
-}
-
 ANGRY_TEST(swapsWindowsBetweenNodesUpdatingInsertionPoints) {
     struct view src_v = { .sid = 1, .insertion_point = 10 };
     struct view dst_v = { .sid = 1, .insertion_point = 20 };
@@ -203,12 +187,6 @@ ANGRY_TEST(handlesDockSwipeGestureBeganAndEndedEvents) {
     bool ended = __pending_gesture == false;
     CFRelease(ev);
     ANGRY_ASSERT(began && ended, "mouse_handler failed to track dock swipe gesture began and ended");
-}
-
-ANGRY_TEST(handlesEventTapDisabledTimeoutReenablingHandleSafely) {
-    struct mouse_state ms = {0};
-    mouse_handler(NULL, kCGEventTapDisabledByTimeout, NULL, &ms);
-    ANGRY_ASSERT(true, "mouse_handler handled kCGEventTapDisabledByTimeout cleanly");
 }
 
 ANGRY_TEST(swapsWindowsAcrossDifferentSpacesUpdatingManagedTable) {

@@ -2,24 +2,28 @@
 #include "../../src/display.h"
 #include "../../src/space.h"
 
-ANGRY_TEST(dispatchesDisplayHandlerForDisplayAddedEvent) {
-    display_handler(1, kCGDisplayAddFlag, NULL);
-    ANGRY_ASSERT(true, "display_handler handled kCGDisplayAddFlag cleanly");
+ANGRY_TEST(postsDisplayAddedEventCarryingDisplayId) {
+    display_handler(7001, kCGDisplayAddFlag, NULL);
+    struct event *e = angry_last_posted_event();
+    ANGRY_ASSERT(e->type == DISPLAY_ADDED && (uint32_t)(intptr_t)e->context == 7001, "expected a DISPLAY_ADDED event for the display to be posted");
 }
 
-ANGRY_TEST(dispatchesDisplayHandlerForDisplayRemovedEvent) {
-    display_handler(1, kCGDisplayRemoveFlag, NULL);
-    ANGRY_ASSERT(true, "display_handler handled kCGDisplayRemoveFlag cleanly");
+ANGRY_TEST(postsDisplayRemovedEventCarryingDisplayId) {
+    display_handler(7002, kCGDisplayRemoveFlag, NULL);
+    struct event *e = angry_last_posted_event();
+    ANGRY_ASSERT(e->type == DISPLAY_REMOVED && (uint32_t)(intptr_t)e->context == 7002, "expected a DISPLAY_REMOVED event for the display to be posted");
 }
 
-ANGRY_TEST(dispatchesDisplayHandlerForDisplayMovedEvent) {
-    display_handler(1, kCGDisplayMovedFlag, NULL);
-    ANGRY_ASSERT(true, "display_handler handled kCGDisplayMovedFlag cleanly");
+ANGRY_TEST(postsDisplayMovedEventCarryingDisplayId) {
+    display_handler(7003, kCGDisplayMovedFlag, NULL);
+    struct event *e = angry_last_posted_event();
+    ANGRY_ASSERT(e->type == DISPLAY_MOVED && (uint32_t)(intptr_t)e->context == 7003, "expected a DISPLAY_MOVED event for the display to be posted");
 }
 
-ANGRY_TEST(dispatchesDisplayHandlerForDisplayResizedEvent) {
-    display_handler(1, kCGDisplayDesktopShapeChangedFlag, NULL);
-    ANGRY_ASSERT(true, "display_handler handled kCGDisplayDesktopShapeChangedFlag cleanly");
+ANGRY_TEST(postsDisplayResizedEventCarryingDisplayId) {
+    display_handler(7004, kCGDisplayDesktopShapeChangedFlag, NULL);
+    struct event *e = angry_last_posted_event();
+    ANGRY_ASSERT(e->type == DISPLAY_RESIZED && (uint32_t)(intptr_t)e->context == 7004, "expected a DISPLAY_RESIZED event for the display to be posted");
 }
 
 ANGRY_TEST(serializesDisplayPropertiesToJsonStream) {
@@ -76,27 +80,8 @@ ANGRY_TEST(identifiesSystemSpaceAccurately) {
     ANGRY_ASSERT(sys == false, "space_is_system returned true for space 0");
 }
 
-ANGRY_TEST(queriesSpaceWindowListIncludingMinimizedWindows) {
-    uint64_t sid = space_manager_active_space();
-    int count = 0;
-    uint32_t *list = space_window_list(sid, &count, true);
-    ANGRY_ASSERT(count >= 0, "space_window_list including minimized returned negative count");
-}
-
 ANGRY_TEST(evaluatesSpaceVisibilityForActiveSpace) {
     uint64_t sid = space_manager_active_space();
     bool vis = space_is_visible(sid);
     ANGRY_ASSERT(vis == true, "active space must be reported as visible");
-}
-
-ANGRY_TEST(evaluatesSpaceFullscreenStateForActiveSpace) {
-    uint64_t sid = space_manager_active_space();
-    bool fs = space_is_fullscreen(sid);
-    ANGRY_ASSERT(fs == false || fs == true, "space_is_fullscreen evaluated cleanly");
-}
-
-ANGRY_TEST(evaluatesSpaceUserTypeForActiveSpace) {
-    uint64_t sid = space_manager_active_space();
-    bool user = space_is_user(sid);
-    ANGRY_ASSERT(user == true || user == false, "space_is_user evaluated cleanly");
 }

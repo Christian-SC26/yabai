@@ -27,11 +27,9 @@ ANGRY_TEST(resolvesMainDisplayUuidMatchingMainDisplayId) {
     ANGRY_ASSERT(did > 0, "display_manager_main_display_uuid or id returned zero");
 }
 
-ANGRY_TEST(resolvesDockDisplayUuidAndDockDisplayId) {
-    CFStringRef uuid = display_manager_dock_display_uuid();
+ANGRY_TEST(findsDisplayHoldingTheDock) {
     uint32_t did = display_manager_dock_display_id();
-    if (uuid) CFRelease(uuid);
-    ANGRY_ASSERT(did >= 0, "display_manager_dock_display query returned invalid id");
+    ANGRY_ASSERT(did != 0, "expected the Dock to be on one of the displays");
 }
 
 ANGRY_TEST(resolvesPointDisplayUuidAndPointDisplayId) {
@@ -76,11 +74,11 @@ ANGRY_TEST(resolvesCursorDisplayIdFromCurrentCursorLocation) {
     ANGRY_ASSERT(did > 0, "display_manager_cursor_display_id returned invalid display id");
 }
 
-ANGRY_TEST(evaluatesPrevAndNextDisplayIdNavigation) {
+ANGRY_TEST(resolvesPreviousAndNextDisplayOtherThanCurrent) {
     uint32_t did = display_manager_main_display_id();
     uint32_t prev = display_manager_prev_display_id(did);
     uint32_t next = display_manager_next_display_id(did);
-    ANGRY_ASSERT(prev >= 0 && next >= 0, "display navigation returned invalid display ids");
+    ANGRY_ASSERT(prev != did && next != did, "expected the previous and next display to differ from the current one");
 }
 
 ANGRY_TEST(resolvesFirstAndLastDisplayIdsAccurately) {
@@ -89,31 +87,21 @@ ANGRY_TEST(resolvesFirstAndLastDisplayIdsAccurately) {
     ANGRY_ASSERT(first > 0 && last > 0, "first and last display ids failed to resolve");
 }
 
-ANGRY_TEST(findsClosestDisplayInCardinalDirections) {
+ANGRY_TEST(findsClosestDisplayOtherThanCurrentInCardinalDirections) {
     uint32_t did = display_manager_main_display_id();
     uint32_t east = display_manager_find_closest_display_in_direction(did, DIR_EAST);
     uint32_t west = display_manager_find_closest_display_in_direction(did, DIR_WEST);
-    ANGRY_ASSERT(east >= 0 && west >= 0, "display directional lookup failed");
+    ANGRY_ASSERT(east != did && west != did, "expected a display found in a direction to differ from the current one");
 }
 
-ANGRY_TEST(queriesDockOrientationAndDockBoundingRect) {
+ANGRY_TEST(reportsKnownDockOrientation) {
     int orient = display_manager_dock_orientation();
-    CGRect rect = display_manager_dock_rect();
-    ANGRY_ASSERT(orient >= 0 && rect.size.width >= 0.0 && rect.size.height >= 0.0, "dock orientation or rect query failed");
+    ANGRY_ASSERT(orient == DOCK_ORIENTATION_BOTTOM || orient == DOCK_ORIENTATION_LEFT || orient == DOCK_ORIENTATION_RIGHT,
+                 "expected the Dock to sit at the bottom, left or right");
 }
 
-ANGRY_TEST(evaluatesDisplayIsAnimatingStatus) {
-    uint32_t did = display_manager_main_display_id();
-    bool active_anim = display_manager_active_display_is_animating();
-    bool disp_anim = display_manager_display_is_animating(did);
-    ANGRY_ASSERT(active_anim == false || active_anim == true, "display is animating check returned invalid boolean");
-}
-
-ANGRY_TEST(locatesElementAtSpecifiedScreenCoordinates) {
-    CGPoint pt = { .x = 100.0, .y = 100.0 };
-    AXUIElementRef elem = display_manager_find_element_at_point(pt);
-    if (elem) CFRelease(elem);
-    ANGRY_ASSERT(true, "display_manager_find_element_at_point executed safely");
+ANGRY_TEST(reportsMainDisplayAsNotAnimating) {
+    ANGRY_ASSERT(!display_manager_display_is_animating(display_manager_main_display_id()), "expected no space animation on the main display during the tests");
 }
 
 ANGRY_TEST(focusesDisplayWithWindowAtSpecifiedCoordinates) {

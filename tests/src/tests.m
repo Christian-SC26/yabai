@@ -312,6 +312,15 @@ CFArrayRef CGWindowListCopyWindowInfo(CGWindowListOption option, CGWindowID rela
 // running the rest of the suite. SIGCHLD is set back to the default because
 // configure_settings_and_acquire_lock ignores it, which makes waitpid fail.
 //
+//
+// NOTE: the event loop thread never runs during the tests, so whatever a
+// handler posts stays at the tail of the queue for the test to look at.
+//
+static struct event *angry_last_posted_event(void)
+{
+    return g_event_loop.tail;
+}
+
 static pid_t angry_fork(void)
 {
     signal(SIGCHLD, SIG_DFL);
@@ -466,13 +475,11 @@ static void tests_isolate_scripting_addition(void)
     ANGRY_ENTRY(verifiesFileExistenceAccurately)                                \
     ANGRY_ENTRY(verifiesExecutablePermissionsAccurately)                       \
     ANGRY_ENTRY(readsOperatingSystemFrequency)                                  \
-    ANGRY_ENTRY(sendsMachMessageSafely)                                         \
     ANGRY_ENTRY(convertsInt32ToCfString)                                        \
-    ANGRY_ENTRY(resolvesConfigurationFilePath)                                  \
+    ANGRY_ENTRY(resolvesConfigurationFileUnderXdgConfigHome)                    \
     ANGRY_ENTRY(executesConfigurationFileSafelyWhenMissing)                      \
-    ANGRY_ENTRY(queriesAccessibilityPrivileges)                                 \
     ANGRY_ENTRY(resolvesWindowPidFromAccessibilityElement)                      \
-    ANGRY_ENTRY(checksEnhancedUserInterfaceAccessibilityAttribute)             \
+    ANGRY_ENTRY(reportsNoEnhancedUserInterfaceForTestProcess)                   \
     ANGRY_ENTRY(restoresAlphaChannelInQuartzImage)                              \
     ANGRY_ENTRY(formatsDebugMessageIteratingTokens)                             \
     ANGRY_ENTRY(terminatesWithExitFailureOnError)                               \
@@ -482,7 +489,7 @@ static void tests_isolate_scripting_addition(void)
     ANGRY_ENTRY(populatesLaunchdServicePlist)                                   \
     ANGRY_ENTRY(ensuresDirectoryPathExistsBeforeWriting)                        \
     ANGRY_ENTRY(installsServiceInternalToFile)                                  \
-    ANGRY_ENTRY(cleansUpLegacyServiceRegistrationSafely)                        \
+    ANGRY_ENTRY(removesLegacyServicePlist)                                      \
     ANGRY_ENTRY(installsLaunchdServiceToMockHomeDirectory)                      \
     ANGRY_ENTRY(uninstallsLaunchdServiceFromMockHomeDirectory)                    \
     ANGRY_ENTRY(startsLaunchdServiceInMockEnvironment)                          \
@@ -506,7 +513,6 @@ static void tests_isolate_scripting_addition(void)
     ANGRY_ENTRY(returnsFalseWhenRemovingRuleByInvalidIndex)                     \
     ANGRY_ENTRY(removesRuleByLabelFromWindowManagerBuffer)                      \
     ANGRY_ENTRY(returnsFalseWhenRemovingRuleByNonexistentLabel)                 \
-    ANGRY_ENTRY(freesRuleResourcesAndCompiledRegularExpressions)                \
     ANGRY_ENTRY(skipsOneShotRuleWhenReapplyingByIndex)                          \
     ANGRY_ENTRY(returnsFalseWhenReapplyingByNonexistentIndex)                    \
     ANGRY_ENTRY(skipsOneShotRuleWhenReapplyingByLabel)                          \
@@ -522,12 +528,10 @@ static void tests_isolate_scripting_addition(void)
     ANGRY_ENTRY(replacesPreexistingPayloadWhenAugmentingAlreadyAugmentedEvent)  \
     ANGRY_ENTRY(returnsNullWhenAugmentingNullEvent)                             \
     ANGRY_ENTRY(augmentsBareEventDefaultingMissingFieldsToZero)                 \
-    ANGRY_ENTRY(evaluatesRequiresEventAugmentationWithoutCrashing)              \
     ANGRY_ENTRY(rejectsTruncatedEventDataUnderFourBytes)                        \
     ANGRY_ENTRY(rejectsUnsupportedEventDataVersionNumber)                       \
     ANGRY_ENTRY(rejectsTruncatedFieldHeaderInEventData)                         \
     ANGRY_ENTRY(clampsExtremePositiveAndNegativeFixedPointValues)               \
-    ANGRY_ENTRY(handlesNullParsedEventDataFreeSafely)                           \
     ANGRY_ENTRY(resolvesSignalTypeFromStringAccurately)                         \
     ANGRY_ENTRY(resolvesSignalTypeForDockDidChangePref)                         \
     ANGRY_ENTRY(returnsUnknownSignalTypeForInvalidString)                       \
@@ -537,7 +541,6 @@ static void tests_isolate_scripting_addition(void)
     ANGRY_ENTRY(returnsFalseWhenRemovingSignalByInvalidIndex)                   \
     ANGRY_ENTRY(removesSignalByLabelFromSignalEventBuffer)                      \
     ANGRY_ENTRY(returnsFalseWhenRemovingSignalByNonexistentLabel)               \
-    ANGRY_ENTRY(destroysSignalFreeingRegexesAndStrings)                         \
     ANGRY_ENTRY(serializesSignalListToJsonStream)                               \
     ANGRY_ENTRY(serializesEmptySignalListAsEmptyJsonArray)                      \
     ANGRY_ENTRY(filtersSignalWhenApplicationRegexDoesNotMatch)                  \
@@ -558,17 +561,22 @@ static void tests_isolate_scripting_addition(void)
     ANGRY_ENTRY(pushesMissionControlExitSignalIntoStorage)                      \
     ANGRY_ENTRY(flushesSignalStorageImmediatelyWhenEmpty)                       \
     ANGRY_ENTRY(createsApplicationInstanceFromCurrentProcess)                   \
-    ANGRY_ENTRY(evaluatesApplicationFrontmostState)                             \
-    ANGRY_ENTRY(evaluatesApplicationVisibilityState)                            \
-    ANGRY_ENTRY(queriesApplicationWindowList)                                   \
-    ANGRY_ENTRY(queriesApplicationMainWindow)                                  \
-    ANGRY_ENTRY(queriesApplicationFocusedWindow)                               \
+    ANGRY_ENTRY(reportsTestProcessAsNotFrontmost)                               \
+    ANGRY_ENTRY(reportsTestProcessAsNotHidden)                                  \
+    ANGRY_ENTRY(listsNoWindowsForApplicationWithoutWindows)                     \
+    ANGRY_ENTRY(reportsNoMainWindowForApplicationWithoutWindows)                \
+    ANGRY_ENTRY(reportsNoFocusedWindowForApplicationWithoutWindows)             \
     ANGRY_ENTRY(observesAndUnobservesApplicationNotifications)                  \
-    ANGRY_ENTRY(dispatchesNotificationHandlerForCreatedAndFocusedNotifications) \
-    ANGRY_ENTRY(dispatchesNotificationHandlerForWindowGeometryChanges)          \
-    ANGRY_ENTRY(dispatchesNotificationHandlerForMenuAndStateChanges)           \
+    ANGRY_ENTRY(postsWindowCreatedEventForCreatedNotification)                  \
+    ANGRY_ENTRY(postsWindowFocusedEventForFocusedWindowChange)                  \
+    ANGRY_ENTRY(postsWindowMovedEventForMovedNotification)                      \
+    ANGRY_ENTRY(postsWindowResizedEventForResizedNotification)                  \
+    ANGRY_ENTRY(postsWindowTitleChangedEventForTitleNotification)               \
+    ANGRY_ENTRY(postsMenuOpenedEventCarryingApplicationPid)                     \
+    ANGRY_ENTRY(postsMenuClosedEventCarryingApplicationPid)                     \
+    ANGRY_ENTRY(postsWindowMinimizedEventCarryingContext)                       \
+    ANGRY_ENTRY(postsWindowDeminimizedEventCarryingContext)                     \
     ANGRY_ENTRY(dispatchesNotificationHandlerForWindowDestroyedNotification)    \
-    ANGRY_ENTRY(traversesEmptyWindowTableWithoutErrorDuringRuleReapplyAll)      \
     ANGRY_ENTRY(initializesMouseStateWithDefaultParameters)                     \
     ANGRY_ENTRY(parsesMouseModifierFromCommandAndAltFlags)                      \
     ANGRY_ENTRY(parsesMouseModifierFromShiftAndControlFlags)                    \
@@ -583,8 +591,6 @@ static void tests_isolate_scripting_addition(void)
     ANGRY_ENTRY(determinesWarpBottomDropActionWhenCursorInBottomTriangle)       \
     ANGRY_ENTRY(determinesWarpLeftDropActionWhenCursorInLeftTriangle)           \
     ANGRY_ENTRY(returnsDropActionNoneWhenCursorIsOutsideWindowBounds)           \
-    ANGRY_ENTRY(handlesMouseDropNoTargetOnSameSpaceByFlushingNode)              \
-    ANGRY_ENTRY(bypassesBspGridAdjustmentWhenViewLayoutIsNotBsp)                \
     ANGRY_ENTRY(swapsWindowsBetweenNodesUpdatingInsertionPoints)                \
     ANGRY_ENTRY(consumesMouseClickWhenModifiersMatchAndFreesOnRelease)          \
     ANGRY_ENTRY(stacksWindowIntoDestinationNodeOnMouseDropActionStack)          \
@@ -593,7 +599,6 @@ static void tests_isolate_scripting_addition(void)
     ANGRY_ENTRY(handlesMouseDraggedEventSettingDragDetectedFlag)                \
     ANGRY_ENTRY(handlesMouseMovedEventPassingThroughWhenModifierMatches)        \
     ANGRY_ENTRY(handlesDockSwipeGestureBeganAndEndedEvents)                     \
-    ANGRY_ENTRY(handlesEventTapDisabledTimeoutReenablingHandleSafely)           \
     ANGRY_ENTRY(swapsWindowsAcrossDifferentSpacesUpdatingManagedTable)          \
     ANGRY_ENTRY(warpsWindowBetweenSiblingsWithDifferentSplitModifyingParent)    \
     ANGRY_ENTRY(handlesMouseMovedEventPostingEventWhenModifierDiffers)          \
@@ -604,10 +609,9 @@ static void tests_isolate_scripting_addition(void)
     ANGRY_ENTRY(retrievesPidForCurrentProcessSerialNumber)                      \
     ANGRY_ENTRY(createsProcessInstanceForCurrentProcess)                       \
     ANGRY_ENTRY(rejectsInvalidProcessInProcessCreateReturningNull)              \
-    ANGRY_ENTRY(evaluatesProcessIsBeingDebuggedViaSysctl)                       \
+    ANGRY_ENTRY(reportsTestProcessAsNotBeingDebugged)                           \
     ANGRY_ENTRY(findsProcessInProcessManagerTable)                              \
     ANGRY_ENTRY(returnsNullWhenProcessNotFoundInProcessManager)                 \
-    ANGRY_ENTRY(destroysProcessReleasingResources)                             \
     ANGRY_ENTRY(handlesProcessLaunchEventInProcessHandler)                      \
     ANGRY_ENTRY(handlesDuplicateProcessLaunchEventDiscardingDupe)               \
     ANGRY_ENTRY(handlesProcessFrontSwitchedEventInProcessHandler)               \
@@ -618,24 +622,24 @@ static void tests_isolate_scripting_addition(void)
     ANGRY_ENTRY(initializesProcessManagerInstallingCarbonEventHandler)          \
     ANGRY_ENTRY(recordsMissionControlStateCapturingFrontApplicationAndSpace)    \
     ANGRY_ENTRY(preservesMissionControlStateIdempotencyWhenAlreadyRecorded)     \
-    ANGRY_ENTRY(dispatchesConnectionHandlerForMissionControlEnter)              \
-    ANGRY_ENTRY(dispatchesConnectionHandlerForSpaceCreatedNotification)         \
-    ANGRY_ENTRY(dispatchesConnectionHandlerForSpaceDestroyedNotification)       \
-    ANGRY_ENTRY(dispatchesConnectionHandlerForWindowOrderedNotification)        \
-    ANGRY_ENTRY(dispatchesConnectionHandlerForWindowDestroyedNotification)      \
+    ANGRY_ENTRY(postsMissionControlEnterForDockConnectionEvent)                 \
+    ANGRY_ENTRY(postsSpaceCreatedEventCarryingSpaceId)                          \
+    ANGRY_ENTRY(postsSpaceDestroyedEventCarryingSpaceId)                        \
+    ANGRY_ENTRY(postsWindowOrderedEventCarryingWindowId)                        \
+    ANGRY_ENTRY(postsWindowDestroyedEventCarryingWindowId)                      \
     ANGRY_ENTRY(updatesLastCmdTabTimeOnConnectionHandlerType1202)               \
-    ANGRY_ENTRY(dispatchesMissionControlNotificationHandlerForShowAllWindows)   \
-    ANGRY_ENTRY(dispatchesMissionControlNotificationHandlerForShowFrontWindows) \
-    ANGRY_ENTRY(dispatchesMissionControlNotificationHandlerForShowDesktop)      \
-    ANGRY_ENTRY(dispatchesMissionControlNotificationHandlerForExposeExit)       \
+    ANGRY_ENTRY(postsShowAllWindowsEventForExposeNotification)                  \
+    ANGRY_ENTRY(postsShowFrontWindowsEventForExposeNotification)                \
+    ANGRY_ENTRY(postsShowDesktopEventForExposeNotification)                     \
+    ANGRY_ENTRY(postsMissionControlExitEventForExposeNotification)              \
     ANGRY_ENTRY(observesAndUnobservesMissionControlDockEvents)                  \
-    ANGRY_ENTRY(evaluatesMissionControlIsActiveReturningBooleanState)           \
-    ANGRY_ENTRY(returnsCachedMissionControlStateWhenCalledWithinFiftyMilliseconds) \
+    ANGRY_ENTRY(detectsMissionControlFromDockOverlayWindow)                     \
+    ANGRY_ENTRY(returnsCachedMissionControlStateWhenCalledWithinFiftyMilliseconds)\
     ANGRY_ENTRY(mapsMissionControlModesToExpectedStringRepresentations)         \
-    ANGRY_ENTRY(dispatchesDisplayHandlerForDisplayAddedEvent)                    \
-    ANGRY_ENTRY(dispatchesDisplayHandlerForDisplayRemovedEvent)                  \
-    ANGRY_ENTRY(dispatchesDisplayHandlerForDisplayMovedEvent)                    \
-    ANGRY_ENTRY(dispatchesDisplayHandlerForDisplayResizedEvent)                  \
+    ANGRY_ENTRY(postsDisplayAddedEventCarryingDisplayId)                        \
+    ANGRY_ENTRY(postsDisplayRemovedEventCarryingDisplayId)                      \
+    ANGRY_ENTRY(postsDisplayMovedEventCarryingDisplayId)                        \
+    ANGRY_ENTRY(postsDisplayResizedEventCarryingDisplayId)                      \
     ANGRY_ENTRY(serializesDisplayPropertiesToJsonStream)                        \
     ANGRY_ENTRY(serializesIndividualDisplayPropertyFields)                      \
     ANGRY_ENTRY(countsSpacesForActiveDisplay)                                   \
@@ -643,10 +647,7 @@ static void tests_isolate_scripting_addition(void)
     ANGRY_ENTRY(resolvesDisplayBoundsConstrainedWithExternalBarPadding)          \
     ANGRY_ENTRY(convertsDisplayIdToUuidAndBack)                                 \
     ANGRY_ENTRY(identifiesSystemSpaceAccurately)                                 \
-    ANGRY_ENTRY(queriesSpaceWindowListIncludingMinimizedWindows)                \
     ANGRY_ENTRY(evaluatesSpaceVisibilityForActiveSpace)                          \
-    ANGRY_ENTRY(evaluatesSpaceFullscreenStateForActiveSpace)                      \
-    ANGRY_ENTRY(evaluatesSpaceUserTypeForActiveSpace)                           \
     ANGRY_ENTRY(identifiesLeftChildInBinaryTreeHierarchy)                       \
     ANGRY_ENTRY(equalizesBspNodeRatioAcrossSpecifiedSplitAxis)                  \
     ANGRY_ENTRY(locatesIndexOfWindowInWindowNodeList)                           \
@@ -661,11 +662,8 @@ static void tests_isolate_scripting_addition(void)
     ANGRY_ENTRY(clearsViewRootTreeAndResetsNodeDimensions)                     \
     ANGRY_ENTRY(displaysAndDestroysInsertFeedbackWindow)                        \
     ANGRY_ENTRY(resolvesWindowDisplayUuidAndDisplayId)                           \
-    ANGRY_ENTRY(resolvesWindowSpaceAndSpaceList)                                \
-    ANGRY_ENTRY(queriesWindowShadowAndOpacity)                                  \
+    ANGRY_ENTRY(resolvesSpaceOfOnScreenWindow)                                  \
     ANGRY_ENTRY(queriesWindowLevelAndSubLevel)                                  \
-    ANGRY_ENTRY(queriesWindowParentAndTags)                                     \
-    ANGRY_ENTRY(evaluatesWindowIsStickyAccurately)                              \
     ANGRY_ENTRY(queriesWindowPropertyTitleViaTextStorage)                       \
     ANGRY_ENTRY(serializesNonAxWindowPropertiesToJsonStream)                    \
     ANGRY_ENTRY(serializesWindowStructurePropertiesToJsonStream)                \
@@ -679,26 +677,23 @@ static void tests_isolate_scripting_addition(void)
     ANGRY_ENTRY(evaluatesWindowCanMoveAndCanResizeFromFlags)                     \
     ANGRY_ENTRY(evaluatesWindowIsUndersizedBasedOnFrameDimensions)              \
     ANGRY_ENTRY(mapsWindowLevelsToLayerStrings)                                 \
-    ANGRY_ENTRY(evaluatesWindowLevelIsStandardMatchingNormalLayer)              \
-    ANGRY_ENTRY(evaluatesWindowIsRootWithValidOrDummyElement)                   \
+    ANGRY_ENTRY(rejectsSystemWideElementAsRootWindow)                           \
     ANGRY_ENTRY(manipulatesWindowFlagsAndRuleFlagsBitmasks)                     \
-    ANGRY_ENTRY(destroysWindowFreeingAllocatedStringsAndReferences)             \
     ANGRY_ENTRY(createsAndObservesWindowWhenAccessibilityWindowExists)          \
     ANGRY_ENTRY(queriesAllActiveDisplaysToJsonStream)                           \
     ANGRY_ENTRY(managesDisplayLabelsSettingAndQueryingAndRemoving)              \
     ANGRY_ENTRY(resolvesMainDisplayUuidMatchingMainDisplayId)                   \
-    ANGRY_ENTRY(resolvesDockDisplayUuidAndDockDisplayId)                        \
+    ANGRY_ENTRY(findsDisplayHoldingTheDock)                                     \
     ANGRY_ENTRY(resolvesPointDisplayUuidAndPointDisplayId)                      \
     ANGRY_ENTRY(evaluatesDisplayCoordinateComparatorAcrossAxes)                 \
     ANGRY_ENTRY(calculatesDisplayArrangementWithCustomSortOrders)               \
     ANGRY_ENTRY(resolvesArrangementDisplayUuidAndDisplayId)                     \
     ANGRY_ENTRY(resolvesCursorDisplayIdFromCurrentCursorLocation)               \
-    ANGRY_ENTRY(evaluatesPrevAndNextDisplayIdNavigation)                        \
+    ANGRY_ENTRY(resolvesPreviousAndNextDisplayOtherThanCurrent)                 \
     ANGRY_ENTRY(resolvesFirstAndLastDisplayIdsAccurately)                       \
-    ANGRY_ENTRY(findsClosestDisplayInCardinalDirections)                        \
-    ANGRY_ENTRY(queriesDockOrientationAndDockBoundingRect)                      \
-    ANGRY_ENTRY(evaluatesDisplayIsAnimatingStatus)                              \
-    ANGRY_ENTRY(locatesElementAtSpecifiedScreenCoordinates)                    \
+    ANGRY_ENTRY(findsClosestDisplayOtherThanCurrentInCardinalDirections)        \
+    ANGRY_ENTRY(reportsKnownDockOrientation)                                    \
+    ANGRY_ENTRY(reportsMainDisplayAsNotAnimating)                               \
     ANGRY_ENTRY(focusesDisplayWithWindowAtSpecifiedCoordinates)                \
     ANGRY_ENTRY(returnsSameDisplayErrorWhenSpaceDoesNotBelongToDisplay)         \
     ANGRY_ENTRY(comparesViewsUsingKeyEquality)                                  \
@@ -760,9 +755,9 @@ static void tests_isolate_scripting_addition(void)
     ANGRY_ENTRY(parsesRuleSpecifyingAppFilterAndManageEffect)                   \
     ANGRY_ENTRY(dispatchesConfigDomainModifyingRuntimeSettings)                 \
     ANGRY_ENTRY(configuresSpaceGestureNaturalScrollingMode)                     \
-    ANGRY_ENTRY(dispatchesDisplayDomainExecutingDisplayCommands)                \
-    ANGRY_ENTRY(dispatchesSpaceDomainExecutingSpaceCommands)                    \
-    ANGRY_ENTRY(dispatchesWindowDomainExecutingWindowCommands)                  \
+    ANGRY_ENTRY(rejectsFocusOfMissingDisplay)                                   \
+    ANGRY_ENTRY(rejectsLayoutChangeOfMissingSpace)                              \
+    ANGRY_ENTRY(rejectsToggleOfMissingWindow)                                   \
     ANGRY_ENTRY(dispatchesQueryDomainEmittingFormattedJson)                     \
     ANGRY_ENTRY(dispatchesRuleDomainListingActiveRules)                         \
     ANGRY_ENTRY(dispatchesSignalDomainListingRegisteredSignals)                 \
@@ -778,17 +773,17 @@ static void tests_isolate_scripting_addition(void)
     ANGRY_ENTRY(collectsAppNamesRecursivelyFromSerializedNodeDictionary)        \
     ANGRY_ENTRY(reconstructsWindowNodeHierarchyFromSerializedDictionary)        \
     ANGRY_ENTRY(buildsSessionDictionaryCapturingDisplaysAndSpaces)              \
-    ANGRY_ENTRY(savesSpaceLayoutToFileHandlingErrors)                           \
-    ANGRY_ENTRY(dumpsSpaceLayoutToJsonStreamHandlingErrors)                     \
+    ANGRY_ENTRY(refusesToSaveLayoutOfFloatingSpace)                             \
+    ANGRY_ENTRY(refusesToDumpLayoutOfFloatingSpace)                             \
     ANGRY_ENTRY(restoresSpaceLayoutFromFileHandlingMissingFile)                 \
     ANGRY_ENTRY(savesSessionStateToFileHandlingErrors)                          \
     ANGRY_ENTRY(dumpsSessionStateToJsonStreamHandlingErrors)                    \
     ANGRY_ENTRY(restoresSessionStateFromFileHandlingMissingFile)                \
     ANGRY_ENTRY(observesFinishedLaunchingForValidAndNullApplications)           \
     ANGRY_ENTRY(observesActivationPolicyForValidAndNullApplications)            \
-    ANGRY_ENTRY(determinesApplicationObservableForRegularAndNullPolicies)       \
+    ANGRY_ENTRY(treatsProcessWithoutApplicationAsUnobservable)                  \
     ANGRY_ENTRY(evaluatesApplicationFinishedLaunchingState)                     \
-    ANGRY_ENTRY(measuresDisplayNotchHeightForBuiltinAndExternalDisplays)        \
+    ANGRY_ENTRY(reportsNoNotchForUnknownDisplay)                                \
     ANGRY_ENTRY(deallocatesWorkspaceContextProperly)                            \
     ANGRY_ENTRY(processesActivationPolicyChangeObservation)                     \
     ANGRY_ENTRY(processesFinishedLaunchingChangeObservation)                    \
@@ -805,14 +800,12 @@ static void tests_isolate_scripting_addition(void)
     ANGRY_ENTRY(preparesOsaxBinariesPermissionsAndSignatures)                   \
     ANGRY_ENTRY(restartsDockApplicationSafelyWithSwizzledTerminate)             \
     ANGRY_ENTRY(configuresSocketPathWhenRunningUnderSudo)                       \
-    ANGRY_ENTRY(evaluatesOsaxInstallationAndVersionStatus)                      \
     ANGRY_ENTRY(removesOsaxInstallationReturningStatusCode)                     \
     ANGRY_ENTRY(handlesOsaxInstallationFailureGracefully)                       \
     ANGRY_ENTRY(failsHandshakeRequestWhenSocketServerIsAbsent)                  \
     ANGRY_ENTRY(returnsExpectedAttributesForOperatingSystemVersion)             \
     ANGRY_ENTRY(performsValidationFailingWhenSocketIsAbsent)                    \
     ANGRY_ENTRY(evaluatesSystemIntegrityProtectionCompatibility)                \
-    ANGRY_ENTRY(evaluatesArm64ePreviewAbiStatus)                                \
     ANGRY_ENTRY(attemptsMachLoaderPayloadInjection)                             \
     ANGRY_ENTRY(uninstallsScriptingAdditionWithPermissionChecks)                \
     ANGRY_ENTRY(loadsScriptingAdditionVerifyingRootAndSipEnforcement)             \
@@ -843,7 +836,6 @@ static void tests_isolate_scripting_addition(void)
     ANGRY_ENTRY(answersConfigQueryReceivedOnDaemonSocket)                       \
     ANGRY_ENTRY(abortsWhenClientSendMessageReceivesNoArguments)                 \
     ANGRY_ENTRY(printsVersionAndExitsInParseArguments)                          \
-    ANGRY_ENTRY(initializesSettingsAndAttemptsLockAcquisition)                  \
     ANGRY_ENTRY(keepsNativeTabsAfterMissionControl)                             \
     ANGRY_ENTRY(keepsInsertionPointOnTabSwap)                                   \
     ANGRY_ENTRY(releasesTabMembersWhenDisabled)                                 \
