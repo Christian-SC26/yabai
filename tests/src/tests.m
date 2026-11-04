@@ -16,7 +16,15 @@ typedef bool (test_function)(void);
 #define TEST_ENTRY(name) { #name, test_##name },
 
 // Angry Tests infrastructure (Yegor Bugayenko rules: verb-named, one assertion, short, explicit message)
-#define ANGRY_TEST(name) static bool name(void)
+//
+// NOTE: the body runs in its own function so that ANGRY_ASSERT can stop the
+// test on a failure while letting the next assertion run on a success. A test
+// passes when its body reaches the end without a failed assertion.
+//
+#define ANGRY_TEST(name) \
+    static void name##_body(bool *angry_ok, const char *angry_name); \
+    static bool name(void) { bool ok = true; name##_body(&ok, #name); return ok; } \
+    static void name##_body(bool *angry_ok, const char *angry_name)
 
 #define ANGRY_ASSERT(cond, msg) \
     do { \
@@ -24,10 +32,10 @@ typedef bool (test_function)(void);
             printf("\n    \e[1;31m✖ [ASSERTION FAILED]\e[m %s\n" \
                    "      \e[1;33mCondition:\e[m %s\n" \
                    "      \e[1;33mLocation:\e[m  %s:%d (%s)\n", \
-                   (msg), #cond, __FILE__, __LINE__, __func__); \
-            return false; \
+                   (msg), #cond, __FILE__, __LINE__, angry_name); \
+            *angry_ok = false; \
+            return; \
         } \
-        return true; \
     } while (0)
 
 #define ANGRY_ENTRY(func_name) { #func_name, func_name },
