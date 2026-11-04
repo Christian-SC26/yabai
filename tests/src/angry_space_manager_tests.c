@@ -33,13 +33,13 @@ ANGRY_TEST(queriesSpaceToJsonStream) {
 }
 
 ANGRY_TEST(queriesSpacesForWindowToJsonStream) {
-    uint32_t wid = get_active_test_window_id();
-    struct window win = { .id = wid };
-    char buf[2048] = {0};
+    struct window win = { .id = angry_test_window() };
+    char buf[2048] = {0}, expected[64];
     FILE *f = fmemopen(buf, sizeof(buf), "w");
     space_manager_query_spaces_for_window(f, &win, 0);
     fclose(f);
-    ANGRY_ASSERT(buf[0] == '[', "expected the spaces of a window to be written as a json array");
+    snprintf(expected, sizeof(expected), "\"id\":%lld,", display_space_id(CGMainDisplayID()));
+    ANGRY_ASSERT(buf[0] == '[' && strstr(buf, expected), "expected the spaces of the test window to list its space");
 }
 
 ANGRY_TEST(queriesSpacesForDisplayToJsonStream) {

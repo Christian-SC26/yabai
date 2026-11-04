@@ -2,55 +2,33 @@
 #include <Cocoa/Cocoa.h>
 #include "../../src/window.h"
 
-static uint32_t get_active_test_window_id(void) {
-    uint32_t wid = 0;
-    CFArrayRef list = CGWindowListCopyWindowInfo(kCGWindowListOptionOnScreenOnly, kCGNullWindowID);
-    if (!list) return 0;
-    for (int i = 0; i < CFArrayGetCount(list); ++i) {
-        CFDictionaryRef dict = CFArrayGetValueAtIndex(list, i);
-        CFNumberRef wid_ref = CFDictionaryGetValue(dict, kCGWindowNumber);
-        if (wid_ref) {
-            CFNumberGetValue(wid_ref, kCFNumberIntType, &wid);
-            break;
-        }
-    }
-    CFRelease(list);
-    return wid;
+ANGRY_TEST(resolvesDisplayOfTestWindow) {
+    ANGRY_ASSERT(window_display_id(angry_test_window()) == CGMainDisplayID(), "expected the test window to be on the main display");
 }
 
-ANGRY_TEST(resolvesWindowDisplayUuidAndDisplayId) {
-    uint32_t wid = get_active_test_window_id();
-    CFStringRef uuid = window_display_uuid(wid);
-    uint32_t did = window_display_id(wid);
-    if (uuid) CFRelease(uuid);
-    ANGRY_ASSERT(did > 0, "window_display_id failed to resolve display for active window");
+ANGRY_TEST(resolvesSpaceOfTestWindow) {
+    uint64_t sid = window_space(angry_test_window());
+    ANGRY_ASSERT(sid == display_space_id(CGMainDisplayID()), "expected the test window to be on the current space of the main display");
 }
 
-ANGRY_TEST(resolvesSpaceOfOnScreenWindow) {
-    uint64_t sid = window_space(get_active_test_window_id());
-    ANGRY_ASSERT(sid > 0, "expected an on-screen window to be on a space");
+ANGRY_TEST(reportsNormalLevelOfTestWindow) {
+    ANGRY_ASSERT(window_level(angry_test_window()) == kCGNormalWindowLevel, "expected the test window to be at the normal window level");
 }
 
-ANGRY_TEST(queriesWindowLevelAndSubLevel) {
-    uint32_t wid = get_active_test_window_id();
-    int level = window_level(wid);
-    int sub_level = window_sub_level(wid);
-    ANGRY_ASSERT(level != -99999 && sub_level != -99999, "window_level or sub_level returned invalid levels");
+ANGRY_TEST(readsTitleOfTestWindow) {
+    char *title = window_property_title_ts(angry_test_window());
+    ANGRY_ASSERT(title && strcmp(title, ANGRY_TEST_WINDOW_TITLE) == 0, "expected the title the test window was given");
 }
 
-ANGRY_TEST(queriesWindowPropertyTitleViaTextStorage) {
-    uint32_t wid = get_active_test_window_id();
-    char *title = window_property_title_ts(wid);
-    ANGRY_ASSERT(title != NULL, "window_property_title_ts returned NULL string");
-}
-
-ANGRY_TEST(serializesNonAxWindowPropertiesToJsonStream) {
-    uint32_t wid = get_active_test_window_id();
-    char buf[4096] = {0};
+ANGRY_TEST(serializesIdAndPidOfTestWindow) {
+    uint32_t wid = angry_test_window();
+    char buf[4096] = {0}, id[32], pid[32];
     FILE *f = fmemopen(buf, sizeof(buf), "w");
     window_nonax_serialize(f, wid, 0);
     fclose(f);
-    ANGRY_ASSERT(strstr(buf, "\"id\":") && strstr(buf, "\"pid\":"), "window_nonax_serialize failed to serialize window JSON");
+    snprintf(id, sizeof(id), "\"id\":%d,", wid);
+    snprintf(pid, sizeof(pid), "\"pid\":%d,", getpid());
+    ANGRY_ASSERT(strstr(buf, id) && strstr(buf, pid), "expected the json to carry the id and pid of the test window");
 }
 
 ANGRY_TEST(serializesWindowStructurePropertiesToJsonStream) {

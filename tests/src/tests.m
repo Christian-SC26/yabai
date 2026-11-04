@@ -78,7 +78,6 @@ int csr_get_active_config(uint32_t *config)
 // NOTE: system() never runs a command during the tests; it only keeps a log
 // of what it was asked to run, which tests can check.
 //
-static bool g_mock_system = false;
 static char g_mock_system_log[4096];
 int system(const char *command)
 {
@@ -191,20 +190,99 @@ NSString *NSHomeDirectoryForUser(NSString *userName)
     return real_fn ? real_fn(userName) : @"/tmp";
 }
 
-static bool g_mock_posix_spawn = false;
+//
+// NOTE: no process is ever spawned during the tests, so that a test of the
+// service commands can not reach the real launchd; the fake keeps the
+// command lines it was given in the same log as system().
+//
 int posix_spawn(pid_t *restrict pid, const char *restrict path,
                 const posix_spawn_file_actions_t *file_actions,
                 const posix_spawnattr_t *restrict attrp,
                 char *const argv[restrict], char *const envp[restrict])
 {
-    if (g_mock_posix_spawn) {
-        if (pid) *pid = 0;
-        return 0;
+    size_t used = strlen(g_mock_system_log);
+    for (int i = 0; argv && argv[i] && used < sizeof(g_mock_system_log) - 1; ++i) {
+        used += snprintf(g_mock_system_log + used, sizeof(g_mock_system_log) - used, i ? " %s" : "%s", argv[i]);
     }
-    typedef int (*real_spawn_fn)(pid_t *, const char *, const posix_spawn_file_actions_t *, const posix_spawnattr_t *, char *const [], char *const []);
-    static real_spawn_fn real_fn = NULL;
-    if (!real_fn) real_fn = (real_spawn_fn)dlsym(RTLD_NEXT, "posix_spawn");
-    return real_fn ? real_fn(pid, path, file_actions, attrp, argv, envp) : 1;
+    if (used < sizeof(g_mock_system_log) - 1) g_mock_system_log[used++] = '\n', g_mock_system_log[used] = '\0';
+    if (pid) *pid = 0;
+    return 0;
+}
+
+//
+// NOTE: the calls through which yabai changes the session (focus, spaces,
+// window order, alpha, level, transforms, the cursor, synthesized events,
+// accessibility writes) never reach the system during the tests. The fakes
+// succeed, and keep what a test may want to check.
+//
+static int g_mock_front_process_count;
+static uint32_t g_mock_front_process_wid;
+CGError _SLPSSetFrontProcessWithOptions(ProcessSerialNumber *psn, uint32_t wid, uint32_t mode)
+{
+    ++g_mock_front_process_count;
+    g_mock_front_process_wid = wid;
+    return kCGErrorSuccess;
+}
+
+static int g_mock_cursor_warp_count;
+static CGPoint g_mock_cursor_warp_point;
+CGError CGWarpMouseCursorPosition(CGPoint point)
+{
+    ++g_mock_cursor_warp_count;
+    g_mock_cursor_warp_point = point;
+    return kCGErrorSuccess;
+}
+
+static int g_mock_event_post_count;
+void CGEventPost(CGEventTapLocation tap, CGEventRef event)
+{
+    ++g_mock_event_post_count;
+}
+
+static uint64_t g_mock_current_space_set;
+CGError SLSManagedDisplaySetCurrentSpace(int cid, CFStringRef uuid, uint64_t sid)
+{
+    g_mock_current_space_set = sid;
+    return kCGErrorSuccess;
+}
+
+static uint64_t g_mock_windows_moved_to_space;
+void SLSMoveWindowsToManagedSpace(int cid, CFArrayRef window_list, uint64_t sid)
+{
+    g_mock_windows_moved_to_space = sid;
+}
+
+static int g_mock_bridged_operation_count;
+static int64_t tests_bridged_window_management_operation(void *operation)
+{
+    ++g_mock_bridged_operation_count;
+    return 0;
+}
+
+CGError SLSSetWindowAlpha(int cid, uint32_t wid, float alpha) { return kCGErrorSuccess; }
+CGError SLSOrderWindow(int cid, uint32_t wid, int mode, uint32_t rel_wid) { return kCGErrorSuccess; }
+CGError SLSSetWindowLevel(int cid, uint32_t wid, int level) { return kCGErrorSuccess; }
+CGError SLSSetMenuBarInsetAndAlpha(int cid, double unused1, double unused2, float alpha) { return kCGErrorSuccess; }
+CGError SLSSpaceSetFrontPSN(int cid, uint64_t sid, ProcessSerialNumber psn) { return kCGErrorSuccess; }
+CGError SLSWindowSetShadowProperties(uint32_t wid, CFDictionaryRef options) { return kCGErrorSuccess; }
+CGError SLSSetWindowTransform(int cid, uint32_t wid, CGAffineTransform t) { return kCGErrorSuccess; }
+CGError SLSDisableUpdate(int cid) { return kCGErrorSuccess; }
+CGError SLSReenableUpdate(int cid) { return kCGErrorSuccess; }
+CGError SLSTransactionCommit(CFTypeRef transaction, int synchronous) { return kCGErrorSuccess; }
+
+static int g_mock_ax_write_count;
+AXError AXUIElementSetAttributeValue(AXUIElementRef element, CFStringRef attribute, CFTypeRef value)
+{
+    if (!element || CFGetTypeID(element) != AXUIElementGetTypeID()) return kAXErrorIllegalArgument;
+    ++g_mock_ax_write_count;
+    return kAXErrorSuccess;
+}
+
+AXError AXUIElementPerformAction(AXUIElementRef element, CFStringRef action)
+{
+    if (!element || CFGetTypeID(element) != AXUIElementGetTypeID()) return kAXErrorIllegalArgument;
+    ++g_mock_ax_write_count;
+    return kAXErrorSuccess;
 }
 
 static bool g_mock_fast_usleep = false;
@@ -319,6 +397,31 @@ CFArrayRef CGWindowListCopyWindowInfo(CGWindowListOption option, CGWindowID rela
 static struct event *angry_last_posted_event(void)
 {
     return g_event_loop.tail;
+}
+
+//
+// NOTE: a window the test process owns, so that window queries have a known
+// answer instead of reading whatever window the user has on screen. It sits
+// in the corner of the main display, fully transparent and ignoring the mouse,
+// and the fakes above keep every test from moving or changing it.
+//
+#define ANGRY_TEST_WINDOW_TITLE "angry-test-window"
+
+static uint32_t angry_test_window(void)
+{
+    static NSWindow *window;
+    if (!window) {
+        [NSApplication sharedApplication];
+        NSRect frame = NSMakeRect(NSMinX([[NSScreen mainScreen] frame]), NSMinY([[NSScreen mainScreen] frame]), 4, 4);
+        window = [[NSWindow alloc] initWithContentRect:frame styleMask:NSWindowStyleMaskBorderless backing:NSBackingStoreBuffered defer:NO];
+        [window setTitle:@ANGRY_TEST_WINDOW_TITLE];
+        [window setAlphaValue:0.0];
+        [window setIgnoresMouseEvents:YES];
+        [window setReleasedWhenClosed:NO];
+        [window orderFrontRegardless];
+        CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.05, false);
+    }
+    return (uint32_t)[window windowNumber];
 }
 
 static pid_t angry_fork(void)
@@ -661,11 +764,11 @@ static void tests_isolate_scripting_addition(void)
     ANGRY_ENTRY(serializesBspViewPropertiesToJsonStream)                        \
     ANGRY_ENTRY(clearsViewRootTreeAndResetsNodeDimensions)                     \
     ANGRY_ENTRY(displaysAndDestroysInsertFeedbackWindow)                        \
-    ANGRY_ENTRY(resolvesWindowDisplayUuidAndDisplayId)                           \
-    ANGRY_ENTRY(resolvesSpaceOfOnScreenWindow)                                  \
-    ANGRY_ENTRY(queriesWindowLevelAndSubLevel)                                  \
-    ANGRY_ENTRY(queriesWindowPropertyTitleViaTextStorage)                       \
-    ANGRY_ENTRY(serializesNonAxWindowPropertiesToJsonStream)                    \
+    ANGRY_ENTRY(resolvesDisplayOfTestWindow)                                    \
+    ANGRY_ENTRY(resolvesSpaceOfTestWindow)                                      \
+    ANGRY_ENTRY(reportsNormalLevelOfTestWindow)                                 \
+    ANGRY_ENTRY(readsTitleOfTestWindow)                                         \
+    ANGRY_ENTRY(serializesIdAndPidOfTestWindow)                                 \
     ANGRY_ENTRY(serializesWindowStructurePropertiesToJsonStream)                \
     ANGRY_ENTRY(serializesWindowSelectedPropertiesWithoutOptionalAttributes)    \
     ANGRY_ENTRY(formatsWindowTitleUsingTemporaryStorage)                       \
@@ -951,10 +1054,16 @@ static void tests_reset_shared_state(void)
 {
     g_mock_uid = (uid_t)-1;
     g_mock_csr_config = -1;
-    g_mock_system = false;
     g_mock_system_log[0] = '\0';
     g_mock_home = NULL;
-    g_mock_posix_spawn = false;
+    g_mock_front_process_count = 0;
+    g_mock_front_process_wid = 0;
+    g_mock_cursor_warp_count = 0;
+    g_mock_event_post_count = 0;
+    g_mock_current_space_set = 0;
+    g_mock_windows_moved_to_space = 0;
+    g_mock_bridged_operation_count = 0;
+    g_mock_ax_write_count = 0;
     g_mock_fast_usleep = false;
     g_mock_active_space = 0;
     g_mock_dispatch_after = false;
@@ -1016,7 +1125,7 @@ int main(int argc, char **argv)
     g_pid = getpid();
     g_event_bytes = calloc(1, 0x100);
     g_cv_host_clock_frequency = CVGetHostClockFrequency();
-    SLSPerformAsynchronousBridgedWindowManagementOperation = macho_find_symbol("/System/Library/PrivateFrameworks/SkyLight.framework/Versions/A/SkyLight", "__ZL54SLSPerformAsynchronousBridgedWindowManagementOperationP47SLSAsynchronousBridgedWindowManagementOperation");
+    SLSPerformAsynchronousBridgedWindowManagementOperation = tests_bridged_window_management_operation;
     task_get_special_port(mach_task_self(), TASK_BOOTSTRAP_PORT, &g_bs_port);
     table_init(&g_process_manager.process, 125, hash_psn, compare_psn);
     signal(SIGPIPE, SIG_IGN);

@@ -66,17 +66,13 @@ ANGRY_TEST(configuresSocketPathWhenRunningUnderSudo)
 
 ANGRY_TEST(removesOsaxInstallationReturningStatusCode)
 {
-    g_mock_system = true;
     bool removed = scripting_addition_remove();
-    g_mock_system = false;
     ANGRY_ASSERT(removed, "expected scripting addition remove call to exit cleanly");
 }
 
 ANGRY_TEST(handlesOsaxInstallationFailureGracefully)
 {
-    g_mock_system = true;
     int install_code = scripting_addition_install();
-    g_mock_system = false;
     scripting_addition_set_path();
     ANGRY_ASSERT(install_code == 2 || install_code == 1, "expected install attempt to return failure code without root");
 }

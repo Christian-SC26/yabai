@@ -502,7 +502,6 @@ ANGRY_TEST(removesLegacyServicePlist)
     snprintf(plist, sizeof(plist), _PATH_LEGACY_YABAI_PLIST, home);
     fclose(fopen(plist, "w"));
     g_mock_home = home;
-    g_mock_posix_spawn = true;
     service_cleanup_legacy();
     bool removed = !file_exists(plist);
     unlink(plist);
@@ -516,12 +515,10 @@ ANGRY_TEST(removesLegacyServicePlist)
 ANGRY_TEST(installsLaunchdServiceToMockHomeDirectory)
 {
     g_mock_home = "/tmp/yabai_mock_home";
-    g_mock_posix_spawn = true;
     int res = service_install();
     char *p = populate_plist_path();
     unlink(p);
     free(p);
-    g_mock_posix_spawn = false;
     g_mock_home = NULL;
     ANGRY_ASSERT(res == 0, "expected service_install to write service plist to mock home");
 }
@@ -540,12 +537,10 @@ ANGRY_TEST(uninstallsLaunchdServiceFromMockHomeDirectory)
 ANGRY_TEST(startsLaunchdServiceInMockEnvironment)
 {
     g_mock_home = "/tmp/yabai_mock_home";
-    g_mock_posix_spawn = true;
     int res = service_start();
     char *p = populate_plist_path();
     unlink(p);
     free(p);
-    g_mock_posix_spawn = false;
     g_mock_home = NULL;
     ANGRY_ASSERT(res == 0, "expected service_start to bootstrap service");
 }
@@ -553,13 +548,11 @@ ANGRY_TEST(startsLaunchdServiceInMockEnvironment)
 ANGRY_TEST(restartsLaunchdServiceInMockEnvironment)
 {
     g_mock_home = "/tmp/yabai_mock_home";
-    g_mock_posix_spawn = true;
     char *p = populate_plist_path();
     FILE *f = fopen(p, "w"); if (f) fclose(f);
     int res = service_restart();
     unlink(p);
     free(p);
-    g_mock_posix_spawn = false;
     g_mock_home = NULL;
     ANGRY_ASSERT(res == 0, "expected service_restart to kickstart service");
 }
@@ -567,13 +560,11 @@ ANGRY_TEST(restartsLaunchdServiceInMockEnvironment)
 ANGRY_TEST(stopsLaunchdServiceInMockEnvironment)
 {
     g_mock_home = "/tmp/yabai_mock_home";
-    g_mock_posix_spawn = true;
     char *p = populate_plist_path();
     FILE *f = fopen(p, "w"); if (f) fclose(f);
     int res = service_stop();
     unlink(p);
     free(p);
-    g_mock_posix_spawn = false;
     g_mock_home = NULL;
     ANGRY_ASSERT(res == 0, "expected service_stop to unload and disable service");
 }
