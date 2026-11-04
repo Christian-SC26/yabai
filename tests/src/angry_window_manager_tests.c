@@ -112,20 +112,29 @@ ANGRY_TEST(appliesGeneralRuleEffectsToWindow)
     ANGRY_ASSERT(window_check_rule_flag(&win, WINDOW_RULE_FFM) && window_check_rule_flag(&win, WINDOW_RULE_MFF), "expected rule effects to set FFM and MFF flags");
 }
 
-ANGRY_TEST(evaluatesManageRulesAcrossWindowManagers)
+ANGRY_TEST(clearsManagedFlagWhenMatchingRuleTurnsManagementOff)
 {
+    struct window_manager wm = {0};
+    struct rule rule = { .effects = { .manage = RULE_PROP_OFF } };
+    buf_push(wm.rules, rule);
     struct application app = { .name = "Finder" };
     struct window win = { .id = 9303, .application = &app };
-    window_manager_apply_manage_rules_to_window(&g_space_manager, &g_window_manager, &win, "t", "AXWindow", "AXStandardWindow", false);
-    ANGRY_ASSERT(true, "expected apply_manage_rules_to_window to execute cleanly");
+    window_set_rule_flag(&win, WINDOW_RULE_MANAGED);
+    window_manager_apply_manage_rules_to_window(&g_space_manager, &wm, &win, "t", "AXWindow", "AXStandardWindow", false);
+    buf_free(wm.rules);
+    ANGRY_ASSERT(!window_check_rule_flag(&win, WINDOW_RULE_MANAGED), "expected a matching manage=off rule to clear the managed flag");
 }
 
-ANGRY_TEST(evaluatesGeneralRulesAcrossWindowManagers)
+ANGRY_TEST(setsFocusFollowsMouseFlagWhenMatchingRuleEnablesIt)
 {
+    struct window_manager wm = {0};
+    struct rule rule = { .effects = { .ffm = RULE_PROP_ON } };
+    buf_push(wm.rules, rule);
     struct application app = { .name = "Finder" };
     struct window win = { .id = 9304, .application = &app };
-    window_manager_apply_rules_to_window(&g_space_manager, &g_window_manager, &win, "t", "AXWindow", "AXStandardWindow", false);
-    ANGRY_ASSERT(true, "expected apply_rules_to_window to execute cleanly");
+    window_manager_apply_rules_to_window(&g_space_manager, &wm, &win, "t", "AXWindow", "AXStandardWindow", false);
+    buf_free(wm.rules);
+    ANGRY_ASSERT(window_check_rule_flag(&win, WINDOW_RULE_FFM), "expected a matching rule to turn on focus follows mouse for the window");
 }
 
 ANGRY_TEST(togglesGlobalWindowOpacityState)
@@ -157,38 +166,11 @@ ANGRY_TEST(movesWindowRelativelyForUnmanagedWindow)
     ANGRY_ASSERT(err == WINDOW_OP_ERROR_SUCCESS, "expected relative move on floating window to succeed");
 }
 
-ANGRY_TEST(resizesWindowRelativeInternalWithAnimation)
-{
-    struct window win = { .id = 9307 };
-    window_manager_resize_window_relative_internal(&win, CGRectMake(0,0,100,100), HANDLE_RIGHT, 10, 0, true);
-    ANGRY_ASSERT(true, "expected internal relative resize with animate to execute cleanly");
-}
-
 ANGRY_TEST(resizesWindowRelativeHandlingUnmanagedWindow)
 {
     struct window win = { .id = 9308, .frame = {{0,0},{100,100}} };
     enum window_op_error err = window_manager_resize_window_relative(&g_window_manager, &win, HANDLE_ABS, 150, 150, true);
     ANGRY_ASSERT(err == WINDOW_OP_ERROR_SUCCESS, "expected relative resize on floating window to succeed");
-}
-
-ANGRY_TEST(movesWindowDirectlyWithNullReference)
-{
-    struct window win = { .id = 9309, .ref = NULL };
-    window_manager_move_window(&win, 50, 50);
-    ANGRY_ASSERT(true, "expected move_window to handle null reference safely");
-}
-
-ANGRY_TEST(resizesWindowDirectlyWithNullReference)
-{
-    struct window win = { .id = 9310, .ref = NULL };
-    window_manager_resize_window(&win, 300, 200);
-    ANGRY_ASSERT(true, "expected resize_window to handle null reference safely");
-}
-
-ANGRY_TEST(animatesWindowListAsynchronouslyWithEmptyList)
-{
-    window_manager_animate_window_list_async(NULL, 0);
-    ANGRY_ASSERT(true, "expected animate_window_list_async with 0 windows to execute cleanly");
 }
 
 ANGRY_TEST(setsWindowPurifyModeAndIteratesWindows)
@@ -199,11 +181,11 @@ ANGRY_TEST(setsWindowPurifyModeAndIteratesWindows)
     ANGRY_ASSERT(is_always && g_window_manager.purify_mode == PURIFY_DISABLED, "expected purify mode update");
 }
 
-ANGRY_TEST(setsWindowOpacityDirectly)
+ANGRY_TEST(reportsFailedOpacityChangeWithoutScriptingAddition)
 {
     struct window win = { .id = 9311 };
-    bool op = window_manager_set_opacity(&g_window_manager, &win, 0.8f);
-    ANGRY_ASSERT(op || !op, "expected set_opacity to return boolean result");
+    bool changed = window_manager_set_opacity(&g_window_manager, &win, 0.8f);
+    ANGRY_ASSERT(!changed, "expected the opacity change to fail while the scripting addition is unreachable");
 }
 
 ANGRY_TEST(setsMenubarOpacityDirectly)
@@ -224,11 +206,11 @@ ANGRY_TEST(setsNormalWindowOpacityDirectly)
     ANGRY_ASSERT(g_window_manager.normal_window_opacity == 0.85f, "expected normal window opacity to be 0.85");
 }
 
-ANGRY_TEST(setsWindowLayerAndAssociatedSublayers)
+ANGRY_TEST(remembersRequestedWindowLayer)
 {
-    struct window win = { .id = 9312 };
-    bool res = window_manager_set_window_layer(&win, LAYER_NORMAL);
-    ANGRY_ASSERT(res || !res, "expected set_window_layer to return boolean result");
+    struct window win = { .id = 9312, .layer = LAYER_NORMAL };
+    window_manager_set_window_layer(&win, LAYER_ABOVE);
+    ANGRY_ASSERT(win.layer == LAYER_ABOVE, "expected the window to remember the requested layer");
 }
 
 ANGRY_TEST(findsRankOfWindowInWindowList)
@@ -236,19 +218,6 @@ ANGRY_TEST(findsRankOfWindowInWindowList)
     uint32_t list[] = { 101, 102, 103 };
     int rank = window_manager_find_rank_of_window_in_list(102, list, 3);
     ANGRY_ASSERT(rank == 1, "expected window 102 to have rank 1");
-}
-
-ANGRY_TEST(findsWindowAtPointFilteringSpecifiedWindow)
-{
-    struct window *win = window_manager_find_window_at_point_filtering_window(&g_window_manager, CGPointMake(0,0), 9999);
-    ANGRY_ASSERT(win == NULL || win != NULL, "expected find_window_at_point_filtering_window to execute");
-}
-
-ANGRY_TEST(notifiesJankyBordersSafely)
-{
-    struct window_animation anim = {0};
-    window_manager_notify_jankyborders(&anim, 1, 1325, false, false);
-    ANGRY_ASSERT(true, "expected notify_jankyborders to execute cleanly");
 }
 
 ANGRY_TEST(createsWindowProxySkippingNullImage)
@@ -263,13 +232,6 @@ ANGRY_TEST(destroysWindowProxyCleaningUpResources)
     struct window_proxy proxy = { .image = NULL, .context = NULL, .id = 0 };
     window_manager_destroy_window_proxy(0, &proxy);
     ANGRY_ASSERT(proxy.id == 0, "expected destroy_window_proxy to clear proxy id");
-}
-
-ANGRY_TEST(buildsWindowProxyInThreadProcSafely)
-{
-    struct window_animation anim = { .cid = 0, .wid = 0 };
-    window_manager_build_window_proxy_thread_proc(&anim);
-    ANGRY_ASSERT(true, "expected build_window_proxy_thread_proc to execute for dummy animation");
 }
 
 ANGRY_TEST(processesWindowAnimationListStepInThreadProc)
@@ -302,16 +264,60 @@ ANGRY_TEST(findsNextManagedWindowOnActiveSpace)
     ANGRY_ASSERT(res == NULL, "expected unmanaged window to return null next window");
 }
 
+//
+// NOTE: a fake active space whose view tiles two windows side by side, the left
+// one smaller, so that the find_*_managed_window queries have a known answer.
+//
+struct angry_tiled_pair
+{
+    struct window_node root, left, right;
+    struct window small, large;
+    struct view *view;
+    struct window_node *saved_root;
+};
+
+static void angry_tiled_pair_begin(struct angry_tiled_pair *pair)
+{
+    g_mock_active_space = 0x7E571000ULL;
+    pair->view = space_manager_find_view(&g_space_manager, g_mock_active_space);
+    pair->saved_root = pair->view->root;
+    pair->small = (struct window) { .id = 9361 };
+    pair->large = (struct window) { .id = 9362 };
+    pair->left  = (struct window_node) { .parent = &pair->root, .area = { 0, 0, 100, 100 }, .window_count = 1 };
+    pair->right = (struct window_node) { .parent = &pair->root, .area = { 100, 0, 300, 300 }, .window_count = 1 };
+    pair->left.window_list[0]  = pair->left.window_order[0]  = pair->small.id;
+    pair->right.window_list[0] = pair->right.window_order[0] = pair->large.id;
+    pair->root = (struct window_node) { .left = &pair->left, .right = &pair->right, .split = SPLIT_Y };
+    pair->view->root = &pair->root;
+    table_add(&g_window_manager.window, &pair->small.id, &pair->small);
+    table_add(&g_window_manager.window, &pair->large.id, &pair->large);
+}
+
+static void angry_tiled_pair_end(struct angry_tiled_pair *pair)
+{
+    table_remove(&g_window_manager.window, &pair->small.id);
+    table_remove(&g_window_manager.window, &pair->large.id);
+    pair->view->root = pair->saved_root;
+}
+
 ANGRY_TEST(findsFirstManagedWindowOnActiveSpace)
 {
-    struct window *res = window_manager_find_first_managed_window(&g_space_manager, &g_window_manager);
-    ANGRY_ASSERT(res == NULL || res != NULL, "expected find_first_managed_window to execute");
+    struct angry_tiled_pair pair;
+    angry_tiled_pair_begin(&pair);
+    struct window *found = window_manager_find_first_managed_window(&g_space_manager, &g_window_manager);
+    uint32_t wid = found ? found->id : 0;
+    angry_tiled_pair_end(&pair);
+    ANGRY_ASSERT(wid == 9361, "expected the first tiled window of the active space");
 }
 
 ANGRY_TEST(findsLastManagedWindowOnActiveSpace)
 {
-    struct window *res = window_manager_find_last_managed_window(&g_space_manager, &g_window_manager);
-    ANGRY_ASSERT(res == NULL || res != NULL, "expected find_last_managed_window to execute");
+    struct angry_tiled_pair pair;
+    angry_tiled_pair_begin(&pair);
+    struct window *found = window_manager_find_last_managed_window(&g_space_manager, &g_window_manager);
+    uint32_t wid = found ? found->id : 0;
+    angry_tiled_pair_end(&pair);
+    ANGRY_ASSERT(wid == 9362, "expected the last tiled window of the active space");
 }
 
 ANGRY_TEST(findsRecentManagedWindowUsingLastWindowId)
@@ -365,14 +371,22 @@ ANGRY_TEST(findsWindowInStackByIndexReturningNull)
 
 ANGRY_TEST(findsLargestManagedWindowOnActiveSpace)
 {
-    struct window *res = window_manager_find_largest_managed_window(&g_space_manager, &g_window_manager);
-    ANGRY_ASSERT(res == NULL || res != NULL, "expected find_largest_managed_window to execute");
+    struct angry_tiled_pair pair;
+    angry_tiled_pair_begin(&pair);
+    struct window *found = window_manager_find_largest_managed_window(&g_space_manager, &g_window_manager);
+    uint32_t wid = found ? found->id : 0;
+    angry_tiled_pair_end(&pair);
+    ANGRY_ASSERT(wid == 9362, "expected the largest window of the active space");
 }
 
 ANGRY_TEST(findsSmallestManagedWindowOnActiveSpace)
 {
-    struct window *res = window_manager_find_smallest_managed_window(&g_space_manager, &g_window_manager);
-    ANGRY_ASSERT(res == NULL || res != NULL, "expected find_smallest_managed_window to execute");
+    struct angry_tiled_pair pair;
+    angry_tiled_pair_begin(&pair);
+    struct window *found = window_manager_find_smallest_managed_window(&g_space_manager, &g_window_manager);
+    uint32_t wid = found ? found->id : 0;
+    angry_tiled_pair_end(&pair);
+    ANGRY_ASSERT(wid == 9361, "expected the smallest window of the active space");
 }
 
 ANGRY_TEST(findsSiblingForManagedWindowReturningNull)
@@ -417,18 +431,30 @@ ANGRY_TEST(findsSecondCousinForManagedWindowReturningNull)
     ANGRY_ASSERT(res == NULL, "expected unmanaged window to have no second cousin");
 }
 
-ANGRY_TEST(focusesWindowWithoutRaiseSynthesizingEvents)
+ANGRY_TEST(focusesWindowOfAnotherProcessWithoutRaiseByMakingItKey)
 {
+    ProcessSerialNumber saved = g_window_manager.focused_window_psn;
+    g_window_manager.focused_window_psn = (ProcessSerialNumber) { 0, 4242 };
     ProcessSerialNumber psn = { 0, kNoProcess };
-    window_manager_focus_window_without_raise(&psn, 0);
-    ANGRY_ASSERT(true, "expected focus_window_without_raise to post synthesized events");
+    window_manager_focus_window_without_raise(&psn, 9341);
+    g_window_manager.focused_window_psn = saved;
+    bool made_key = g_mock_posted_event_count == 2 && angry_posted_event_window_id(1) == 9341;
+    ANGRY_ASSERT(made_key, "expected only the key-window events for a window of another process");
 }
 
-ANGRY_TEST(focusesWindowWithRaiseActivatingProcess)
+ANGRY_TEST(deactivatesFocusedWindowBeforeFocusingSiblingWithoutRaise)
 {
-    ProcessSerialNumber psn = { 0, kNoProcess };
-    window_manager_focus_window_with_raise(&psn, 0, NULL);
-    ANGRY_ASSERT(true, "expected focus_window_with_raise to execute cleanly");
+    g_mock_fast_usleep = true;
+    ProcessSerialNumber saved_psn = g_window_manager.focused_window_psn;
+    uint32_t saved_wid = g_window_manager.focused_window_id;
+    ProcessSerialNumber psn = { 0, 4243 };
+    g_window_manager.focused_window_psn = psn;
+    g_window_manager.focused_window_id = 9342;
+    window_manager_focus_window_without_raise(&psn, 9343);
+    g_window_manager.focused_window_psn = saved_psn;
+    g_window_manager.focused_window_id = saved_wid;
+    bool ordered = angry_posted_event_window_id(0) == 9342 && angry_posted_event_window_id(1) == 9343;
+    ANGRY_ASSERT(ordered, "expected the focused window to be deactivated before its sibling is activated");
 }
 
 ANGRY_TEST(tracksLostFrontSwitchedEventInTable)
@@ -473,18 +499,19 @@ ANGRY_TEST(findsWindowsBelongingToApplication)
     ANGRY_ASSERT(list != NULL && count == 0, "expected empty application window list");
 }
 
-ANGRY_TEST(makesKeyWindowPostingEventRecords)
+ANGRY_TEST(postsTwoEventsToMakeWindowKey)
 {
     ProcessSerialNumber psn = { 0, kNoProcess };
     window_manager_make_key_window(&psn, 9340);
-    ANGRY_ASSERT(true, "expected make_key_window to post event records");
+    ANGRY_ASSERT(g_mock_posted_event_count == 2, "expected a key-window change to post a pair of events");
 }
 
-ANGRY_TEST(retrievesExistingApplicationWindowList)
+ANGRY_TEST(addressesKeyWindowEventsToWindow)
 {
-    int count = 0;
-    uint32_t *list = window_manager_existing_application_window_list(NULL, &count);
-    ANGRY_ASSERT(list != NULL || count >= 0, "expected existing application window list query to execute");
+    ProcessSerialNumber psn = { 0, kNoProcess };
+    window_manager_make_key_window(&psn, 9340);
+    bool addressed = angry_posted_event_window_id(0) == 9340 && angry_posted_event_window_id(1) == 9340;
+    ANGRY_ASSERT(addressed, "expected both key-window events to carry the window id");
 }
 
 ANGRY_TEST(createsAndAddsWindowHandlingUnknownWindow)
@@ -561,13 +588,6 @@ ANGRY_TEST(closesWindowReturningFailureOnNullButton)
     ANGRY_ASSERT(!closed, "expected close_window to fail on null window ref");
 }
 
-ANGRY_TEST(sendsWindowToSpaceHandlingSameSpace)
-{
-    struct window win = { .id = 9348 };
-    window_manager_send_window_to_space(&g_space_manager, &g_window_manager, &win, window_space(9348), false);
-    ANGRY_ASSERT(true, "expected send_window_to_space to same space to return cleanly");
-}
-
 ANGRY_TEST(appliesGridToWindowHandlingInvalidView)
 {
     struct window win = { .id = 9349 };
@@ -575,83 +595,26 @@ ANGRY_TEST(appliesGridToWindowHandlingInvalidView)
     ANGRY_ASSERT(err == WINDOW_OP_ERROR_INVALID_SRC_VIEW || err == WINDOW_OP_ERROR_SUCCESS, "expected apply_grid to execute");
 }
 
-ANGRY_TEST(makesWindowFloatingHandlingIneligibleWindow)
+ANGRY_TEST(keepsIneligibleWindowFromFloating)
 {
     struct window win = { .id = 9350, .is_root = false };
     window_manager_make_window_floating(&g_space_manager, &g_window_manager, &win, true, false);
-    ANGRY_ASSERT(true, "expected make_window_floating to return cleanly for ineligible window");
+    ANGRY_ASSERT(!window_check_flag(&win, WINDOW_FLOAT), "expected a window that is not a root window to stay non-floating");
 }
 
-ANGRY_TEST(makesWindowStickyHandlingIneligibleWindow)
+ANGRY_TEST(keepsIneligibleWindowFromBecomingSticky)
 {
     struct window win = { .id = 9351, .is_root = false };
     window_manager_make_window_sticky(&g_space_manager, &g_window_manager, &win, true);
-    ANGRY_ASSERT(true, "expected make_window_sticky to return cleanly for ineligible window");
+    ANGRY_ASSERT(!window_check_flag(&win, WINDOW_STICKY), "expected a window that is not a root window to stay non-sticky");
 }
 
-ANGRY_TEST(togglesWindowShadowDirectly)
+ANGRY_TEST(keepsShadowFlagWhenScriptingAdditionCannotChangeIt)
 {
     struct window win = { .id = 9352 };
+    window_set_flag(&win, WINDOW_SHADOW);
     window_manager_toggle_window_shadow(&win);
-    ANGRY_ASSERT(true, "expected toggle_window_shadow to execute cleanly");
-}
-
-ANGRY_TEST(waitsForNativeFullscreenTransitionOnWindow)
-{
-    g_mock_fast_usleep = true;
-    struct window win = { .id = 9353 };
-    window_manager_wait_for_native_fullscreen_transition(&win);
-    g_mock_fast_usleep = false;
-    ANGRY_ASSERT(true, "expected wait_for_native_fullscreen_transition to execute cleanly");
-}
-
-ANGRY_TEST(togglesWindowNativeFullscreenSafely)
-{
-    uint64_t active_sid = space_manager_active_space();
-    g_mock_active_space = active_sid;
-    g_mock_fast_usleep = true;
-    struct application app = { .pid = getpid() };
-    struct window win = { .id = 9390, .application = &app, .ref = NULL };
-    window_manager_toggle_window_native_fullscreen(&win);
-    g_mock_fast_usleep = false;
-    g_mock_active_space = 0;
-    ANGRY_ASSERT(true, "expected toggle_window_native_fullscreen to execute cleanly");
-}
-
-ANGRY_TEST(togglesWindowZoomParentOnWindow)
-{
-    struct window win = { .id = 9354 };
-    window_manager_toggle_window_zoom_parent(&g_window_manager, &win);
-    ANGRY_ASSERT(true, "expected toggle_window_zoom_parent to execute cleanly");
-}
-
-ANGRY_TEST(togglesWindowZoomFullscreenOnWindow)
-{
-    struct window win = { .id = 9355 };
-    window_manager_toggle_window_zoom_fullscreen(&g_window_manager, &win);
-    ANGRY_ASSERT(true, "expected toggle_window_zoom_fullscreen to execute cleanly");
-}
-
-ANGRY_TEST(togglesWindowWindowedFullscreenOnWindow)
-{
-    struct window win = { .id = 9356 };
-    window_manager_toggle_window_windowed_fullscreen(&win);
-    ANGRY_ASSERT(true, "expected toggle_window_windowed_fullscreen to execute cleanly");
-}
-
-ANGRY_TEST(togglesWindowExposeDirectly)
-{
-    struct application app = { .pid = getpid() };
-    struct window win = { .id = 9357, .application = &app, .ref = NULL };
-    window_manager_toggle_window_expose(&win);
-    ANGRY_ASSERT(true, "expected toggle_window_expose to execute cleanly");
-}
-
-ANGRY_TEST(togglesWindowPictureInPictureDirectly)
-{
-    struct window win = { .id = 9358 };
-    window_manager_toggle_window_pip(&g_space_manager, &win);
-    ANGRY_ASSERT(true, "expected toggle_window_pip to execute cleanly");
+    ANGRY_ASSERT(window_check_flag(&win, WINDOW_SHADOW), "expected the shadow flag to stay while the scripting addition is unreachable");
 }
 
 ANGRY_TEST(togglesScratchpadWindowByLabelReturningFalse)
@@ -681,40 +644,4 @@ ANGRY_TEST(findsScratchpadWindowByLabel)
 {
     struct window *win = window_manager_find_scratchpad_window(&g_window_manager, "nonexistent");
     ANGRY_ASSERT(win == NULL, "expected non-existent scratchpad label to return null");
-}
-
-ANGRY_TEST(recoversScratchpadWindowsSafely)
-{
-    buf_free(g_window_manager.applications_to_refresh);
-    g_window_manager.applications_to_refresh = NULL;
-    window_manager_scratchpad_recover_windows();
-    ANGRY_ASSERT(true, "expected scratchpad_recover_windows to execute cleanly");
-}
-
-ANGRY_TEST(correctsForMissionControlChangesSafely)
-{
-    buf_free(g_window_manager.applications_to_refresh);
-    g_window_manager.applications_to_refresh = NULL;
-    int display_count;
-    uint32_t *display_list = display_manager_active_display_list(&display_count);
-    for (int i = 0; i < display_count; ++i) {
-        uint64_t sid = display_space_id(display_list[i]);
-        if (sid && !space_manager_find_view(&g_space_manager, sid)) {
-            space_manager_refresh_view(&g_space_manager, sid);
-        }
-    }
-    window_manager_correct_for_mission_control_changes(&g_space_manager, &g_window_manager);
-    ANGRY_ASSERT(true, "expected correct_for_mission_control_changes to execute cleanly");
-}
-
-ANGRY_TEST(beginsWindowManagerLifecyleObservingWindows)
-{
-    buf_free(g_window_manager.applications_to_refresh);
-    g_window_manager.applications_to_refresh = NULL;
-    struct table saved_table = g_process_manager.process;
-    table_init(&g_process_manager.process, 1, hash_wm, compare_wm);
-    window_manager_begin(&g_space_manager, &g_window_manager);
-    table_free(&g_process_manager.process);
-    g_process_manager.process = saved_table;
-    ANGRY_ASSERT(true, "expected window_manager_begin to execute cleanly");
 }

@@ -40,8 +40,14 @@ typedef bool (test_function)(void);
 
 #define ANGRY_ENTRY(func_name) { #func_name, func_name },
 
+//
+// NOTE: the Dock never receives a notification during the tests; the fake
+// keeps the name of the last one so that tests can check what was asked.
+//
+static char g_mock_dock_notification[128];
 CGError CoreDockSendNotification(CFStringRef notification, int unknown)
 {
+    CFStringGetCString(notification, g_mock_dock_notification, sizeof(g_mock_dock_notification), kCFStringEncodingUTF8);
     return kCGErrorSuccess;
 }
 
@@ -155,9 +161,24 @@ CGError CGEnableEventStateCombining(boolean_t doCombineState)
     return kCGErrorSuccess;
 }
 
+//
+// NOTE: synthesized events are never delivered; the fake keeps the first few
+// of them so that tests can check which window an event was addressed to.
+//
+static int g_mock_posted_event_count;
+static uint8_t g_mock_posted_events[4][0xf8];
 CGError SLPSPostEventRecordTo(ProcessSerialNumber *psn, uint8_t *bytes)
 {
+    if (g_mock_posted_event_count < 4) memcpy(g_mock_posted_events[g_mock_posted_event_count], bytes, 0xf8);
+    ++g_mock_posted_event_count;
     return kCGErrorSuccess;
+}
+
+static uint32_t angry_posted_event_window_id(int index)
+{
+    uint32_t wid;
+    memcpy(&wid, g_mock_posted_events[index] + 0x3c, sizeof(uint32_t));
+    return wid;
 }
 
 static const char *g_mock_home = NULL;
@@ -204,6 +225,15 @@ uint64_t SLSGetActiveSpace(int cid)
     static real_fn r = NULL;
     if (!r) r = (real_fn)dlsym(RTLD_NEXT, "SLSGetActiveSpace");
     return r ? r(cid) : 1;
+}
+
+uint64_t SLSManagedDisplayGetCurrentSpace(int cid, CFStringRef uuid)
+{
+    if (g_mock_active_space) return g_mock_active_space;
+    typedef uint64_t (*real_fn)(int, CFStringRef);
+    static real_fn r = NULL;
+    if (!r) r = (real_fn)dlsym(RTLD_NEXT, "SLSManagedDisplayGetCurrentSpace");
+    return r ? r(cid, uuid) : 0;
 }
 
 CFArrayRef SLSCopySpacesForWindows(int cid, int selector, CFArrayRef window_list)
@@ -683,7 +713,8 @@ static void tests_isolate_scripting_addition(void)
     ANGRY_ENTRY(configuresSpaceLayoutAndValidates)                              \
     ANGRY_ENTRY(configuresGapForSpaceWithAbsAndRelTypes)                        \
     ANGRY_ENTRY(togglesGapForSpaceUpdatingState)                                \
-    ANGRY_ENTRY(togglesMissionControlAndShowDesktopSafely)                      \
+    ANGRY_ENTRY(asksDockToOpenMissionControl)                                   \
+    ANGRY_ENTRY(asksDockToShowDesktop)                                          \
     ANGRY_ENTRY(configuresLayoutForAllSpaces)                                   \
     ANGRY_ENTRY(configuresWindowGapForAllSpaces)                                 \
     ANGRY_ENTRY(configuresAllPaddingDimensionsForAllSpaces)                     \
@@ -696,22 +727,19 @@ static void tests_isolate_scripting_addition(void)
     ANGRY_ENTRY(togglesWindowSplitDirectionInBspSubtree)                        \
     ANGRY_ENTRY(resolvesMissionControlSpaceByDesktopIndex)                      \
     ANGRY_ENTRY(resolvesCursorSpaceMatchingCurrentCursor)                      \
-    ANGRY_ENTRY(resolvesPreviousAndNextSpaceFromCurrent)                        \
+    ANGRY_ENTRY(resolvesPreviousAndNextSpaceOtherThanCurrent)                   \
     ANGRY_ENTRY(resolvesFirstAndLastSpaceAcrossDisplays)                       \
-    ANGRY_ENTRY(movesWindowListAndSingleWindowToSpace)                          \
-    ANGRY_ENTRY(assignsProcessToSpaceAndAllSpaces)                              \
-    ANGRY_ENTRY(evaluatesWindowIsOnActiveSpaceAndSpecifiedSpace)                 \
+    ANGRY_ENTRY(reportsUnknownWindowAsNotOnActiveSpace)                         \
     ANGRY_ENTRY(swapsSpaceWithSpaceOnSameAndCrossDisplay)                       \
     ANGRY_ENTRY(movesSpaceToSpaceDetectingErrors)                               \
     ANGRY_ENTRY(movesSpaceToDisplayDetectingErrors)                             \
     ANGRY_ENTRY(switchesSpaceDetectingSameSpace)                                \
     ANGRY_ENTRY(destroysSpaceDetectingMissingAndInvalidSrc)                      \
     ANGRY_ENTRY(addsSpaceDetectingMissingSrc)                                   \
-    ANGRY_ENTRY(marksSpacesInvalidForDisplayAndAllDisplays)                     \
-    ANGRY_ENTRY(refreshesApplicationWindowsReturningStatus)                     \
-    ANGRY_ENTRY(handlesDisplayAddUpdatingSpaceViews)                            \
-    ANGRY_ENTRY(evaluatesIsSpaceLastUserSpaceAndFindFirstUserSpace)            \
-    ANGRY_ENTRY(evaluatesNaturalScrollingActiveForAutoAndExplicitModes)         \
+    ANGRY_ENTRY(reportsNoRefreshWhenNoApplicationIsPending)                     \
+    ANGRY_ENTRY(findsFirstUserSpaceOfMainDisplay)                               \
+    ANGRY_ENTRY(enablesNaturalScrollingWhenExplicitlyOn)                        \
+    ANGRY_ENTRY(disablesNaturalScrollingWhenExplicitlyOff)                      \
     ANGRY_ENTRY(advancesTokenPointerAndExtractsTokenText)                       \
     ANGRY_ENTRY(evaluatesTokenPrefixMatchingStartOfString)                      \
     ANGRY_ENTRY(evaluatesTokenEqualsAgainstExactStrings)                        \
@@ -796,35 +824,22 @@ static void tests_isolate_scripting_addition(void)
     ANGRY_ENTRY(dispatchesWindowStickyAndFocusAndScaleCommandsSafely)           \
     ANGRY_ENTRY(dispatchesWindowSwapProxyInAndOutCommandsSafely)                \
     ANGRY_ENTRY(dispatchesWindowOrderInCommandSafely)                           \
-    ANGRY_ENTRY(updatesWindowNotificationsAcrossWindowManagerWindows)           \
     ANGRY_ENTRY(updatesApplicationOpenMenusCounterAndAdjustsFfm)                \
     ANGRY_ENTRY(processesWindowDidReceiveFocusUpdatingWindowManagerState)       \
     ANGRY_ENTRY(initializesAndRunsEventLoopThreadProcessingEvents)              \
     ANGRY_ENTRY(handlesApplicationLaunchedEventForTerminatedAndRunningProcess)  \
-    ANGRY_ENTRY(triggersAxRetryBlockInApplicationLaunchedEvent)                 \
-    ANGRY_ENTRY(handlesApplicationTerminatedEventSafely)                        \
-    ANGRY_ENTRY(handlesApplicationFrontSwitchedEventSafely)                     \
-    ANGRY_ENTRY(handlesApplicationVisibilityEventsSafely)                      \
-    ANGRY_ENTRY(handlesWindowCreatedEventSafely)                                \
-    ANGRY_ENTRY(handlesWindowDestroyedAndFocusedEventsSafely)                   \
-    ANGRY_ENTRY(handlesWindowMovedAndResizedEventsSafely)                       \
-    ANGRY_ENTRY(handlesWindowMinimizedAndDeminimizedEventsSafely)               \
-    ANGRY_ENTRY(handlesWindowTitleChangedEventSafely)                          \
-    ANGRY_ENTRY(handlesSlsWindowOrderedAndDestroyedEventsSafely)                \
-    ANGRY_ENTRY(handlesSlsSpaceCreatedAndDestroyedEventsSafely)                 \
-    ANGRY_ENTRY(handlesSpaceChangedEventSafely)                                 \
-    ANGRY_ENTRY(handlesDisplayLifecycleAndGeometryChangeEventsSafely)          \
-    ANGRY_ENTRY(handlesMouseInteractionEventsSafely)                            \
+    ANGRY_ENTRY(remembersFrontSwitchOfApplicationNotYetObserved)                \
+    ANGRY_ENTRY(remembersFocusOfWindowNotYetObserved)                           \
+    ANGRY_ENTRY(dropsViewOfDestroyedSpace)                                      \
     ANGRY_ENTRY(keepsResizeGestureMovedAfterDragReturnsNearOrigin)              \
     ANGRY_ENTRY(ignoresFencelessLiveResizeStepAfterSplitHasMoved)               \
     ANGRY_ENTRY(entersShowAllWindowsModeOnMissionControlShowAllWindows)         \
     ANGRY_ENTRY(entersShowFrontWindowsModeOnMissionControlShowFrontWindows)     \
     ANGRY_ENTRY(entersShowDesktopModeOnMissionControlShowDesktop)               \
-    ANGRY_ENTRY(handlesMissionControlEnterWithDispatchBlocks)                   \
-    ANGRY_ENTRY(handlesMissionControlCheckForExitWithLegacyDispatchBlocks)      \
-    ANGRY_ENTRY(handlesMissionControlExitWithFocusRestorationDispatchBlocks)    \
-    ANGRY_ENTRY(handlesDockDidRestartEventSafely)                               \
-    ANGRY_ENTRY(handlesMenuAndSystemStateNotificationEventsSafely)             \
+    ANGRY_ENTRY(entersShowModeOnMissionControlEnter)                            \
+    ANGRY_ENTRY(leavesMissionControlModeOnExit)                                 \
+    ANGRY_ENTRY(countsMenuOpenedByObservedApplication)                          \
+    ANGRY_ENTRY(countsMenuClosedByObservedApplication)                          \
     ANGRY_ENTRY(answersConfigQueryReceivedOnDaemonSocket)                       \
     ANGRY_ENTRY(abortsWhenClientSendMessageReceivesNoArguments)                 \
     ANGRY_ENTRY(printsVersionAndExitsInParseArguments)                          \
@@ -841,29 +856,22 @@ static void tests_isolate_scripting_addition(void)
     ANGRY_ENTRY(matchesWindowAgainstRegexRule)                                  \
     ANGRY_ENTRY(appliesManageRuleEffectsToWindow)                               \
     ANGRY_ENTRY(appliesGeneralRuleEffectsToWindow)                              \
-    ANGRY_ENTRY(evaluatesManageRulesAcrossWindowManagers)                       \
-    ANGRY_ENTRY(evaluatesGeneralRulesAcrossWindowManagers)                      \
+    ANGRY_ENTRY(clearsManagedFlagWhenMatchingRuleTurnsManagementOff)            \
+    ANGRY_ENTRY(setsFocusFollowsMouseFlagWhenMatchingRuleEnablesIt)             \
     ANGRY_ENTRY(togglesGlobalWindowOpacityState)                                \
     ANGRY_ENTRY(evaluatesWhetherWindowShouldBeManaged)                          \
     ANGRY_ENTRY(adjustsWindowRatioReturningErrorOnUnmanagedWindow)              \
     ANGRY_ENTRY(movesWindowRelativelyForUnmanagedWindow)                        \
-    ANGRY_ENTRY(resizesWindowRelativeInternalWithAnimation)                     \
     ANGRY_ENTRY(resizesWindowRelativeHandlingUnmanagedWindow)                   \
-    ANGRY_ENTRY(movesWindowDirectlyWithNullReference)                           \
-    ANGRY_ENTRY(resizesWindowDirectlyWithNullReference)                          \
-    ANGRY_ENTRY(animatesWindowListAsynchronouslyWithEmptyList)                  \
     ANGRY_ENTRY(setsWindowPurifyModeAndIteratesWindows)                         \
-    ANGRY_ENTRY(setsWindowOpacityDirectly)                                      \
+    ANGRY_ENTRY(reportsFailedOpacityChangeWithoutScriptingAddition)             \
     ANGRY_ENTRY(setsMenubarOpacityDirectly)                                     \
     ANGRY_ENTRY(setsActiveWindowOpacityDirectly)                                \
     ANGRY_ENTRY(setsNormalWindowOpacityDirectly)                                \
-    ANGRY_ENTRY(setsWindowLayerAndAssociatedSublayers)                         \
+    ANGRY_ENTRY(remembersRequestedWindowLayer)                                  \
     ANGRY_ENTRY(findsRankOfWindowInWindowList)                                  \
-    ANGRY_ENTRY(findsWindowAtPointFilteringSpecifiedWindow)                     \
-    ANGRY_ENTRY(notifiesJankyBordersSafely)                                     \
     ANGRY_ENTRY(createsWindowProxySkippingNullImage)                            \
     ANGRY_ENTRY(destroysWindowProxyCleaningUpResources)                         \
-    ANGRY_ENTRY(buildsWindowProxyInThreadProcSafely)                            \
     ANGRY_ENTRY(processesWindowAnimationListStepInThreadProc)                  \
     ANGRY_ENTRY(findsClosestManagedWindowInDirection)                          \
     ANGRY_ENTRY(findsPrevManagedWindowOnActiveSpace)                            \
@@ -885,15 +893,15 @@ static void tests_isolate_scripting_addition(void)
     ANGRY_ENTRY(findsUncleForManagedWindowReturningNull)                        \
     ANGRY_ENTRY(findsFirstCousinForManagedWindowReturningNull)                  \
     ANGRY_ENTRY(findsSecondCousinForManagedWindowReturningNull)                 \
-    ANGRY_ENTRY(focusesWindowWithoutRaiseSynthesizingEvents)                    \
-    ANGRY_ENTRY(focusesWindowWithRaiseActivatingProcess)                        \
+    ANGRY_ENTRY(focusesWindowOfAnotherProcessWithoutRaiseByMakingItKey)         \
+    ANGRY_ENTRY(deactivatesFocusedWindowBeforeFocusingSiblingWithoutRaise)      \
     ANGRY_ENTRY(tracksLostFrontSwitchedEventInTable)                            \
     ANGRY_ENTRY(tracksLostFocusedEventInTable)                                  \
     ANGRY_ENTRY(addsAndRemovesWindowFromTable)                                  \
     ANGRY_ENTRY(addsAndRemovesApplicationFromTable)                             \
     ANGRY_ENTRY(findsWindowsBelongingToApplication)                             \
-    ANGRY_ENTRY(makesKeyWindowPostingEventRecords)                              \
-    ANGRY_ENTRY(retrievesExistingApplicationWindowList)                         \
+    ANGRY_ENTRY(postsTwoEventsToMakeWindowKey)                                  \
+    ANGRY_ENTRY(addressesKeyWindowEventsToWindow)                               \
     ANGRY_ENTRY(createsAndAddsWindowHandlingUnknownWindow)                      \
     ANGRY_ENTRY(addsApplicationWindowsSafely)                                   \
     ANGRY_ENTRY(addsExistingApplicationWindowsSafely)                           \
@@ -904,25 +912,14 @@ static void tests_isolate_scripting_addition(void)
     ANGRY_ENTRY(minimizesWindowCheckingCapabilities)                            \
     ANGRY_ENTRY(deminimizesWindowCheckingMinimizedState)                        \
     ANGRY_ENTRY(closesWindowReturningFailureOnNullButton)                       \
-    ANGRY_ENTRY(sendsWindowToSpaceHandlingSameSpace)                            \
     ANGRY_ENTRY(appliesGridToWindowHandlingInvalidView)                         \
-    ANGRY_ENTRY(makesWindowFloatingHandlingIneligibleWindow)                    \
-    ANGRY_ENTRY(makesWindowStickyHandlingIneligibleWindow)                      \
-    ANGRY_ENTRY(togglesWindowShadowDirectly)                                    \
-    ANGRY_ENTRY(waitsForNativeFullscreenTransitionOnWindow)                    \
-    ANGRY_ENTRY(togglesWindowNativeFullscreenSafely)                            \
-    ANGRY_ENTRY(togglesWindowZoomParentOnWindow)                                \
-    ANGRY_ENTRY(togglesWindowZoomFullscreenOnWindow)                            \
-    ANGRY_ENTRY(togglesWindowWindowedFullscreenOnWindow)                        \
-    ANGRY_ENTRY(togglesWindowExposeDirectly)                                    \
-    ANGRY_ENTRY(togglesWindowPictureInPictureDirectly)                          \
+    ANGRY_ENTRY(keepsIneligibleWindowFromFloating)                              \
+    ANGRY_ENTRY(keepsIneligibleWindowFromBecomingSticky)                        \
+    ANGRY_ENTRY(keepsShadowFlagWhenScriptingAdditionCannotChangeIt)             \
     ANGRY_ENTRY(togglesScratchpadWindowByLabelReturningFalse)                   \
     ANGRY_ENTRY(togglesScratchpadWindowDirectly)                                \
     ANGRY_ENTRY(setsAndRemovesScratchpadForWindow)                              \
-    ANGRY_ENTRY(findsScratchpadWindowByLabel)                                   \
-    ANGRY_ENTRY(recoversScratchpadWindowsSafely)                                \
-    ANGRY_ENTRY(correctsForMissionControlChangesSafely)                         \
-    ANGRY_ENTRY(beginsWindowManagerLifecyleObservingWindows)
+    ANGRY_ENTRY(findsScratchpadWindowByLabel)
 
 static struct test {
     char *name;
@@ -971,6 +968,8 @@ static void tests_reset_shared_state(void)
     g_mock_dispatch_after = false;
     g_mock_ax_cannot_complete = false;
     g_mock_dock_window_layer18 = false;
+    g_mock_posted_event_count = 0;
+    g_mock_dock_notification[0] = '\0';
 
     g_mission_control_mode = MISSION_CONTROL_MODE_INACTIVE;
     g_mission_control_prev_wid = 0;

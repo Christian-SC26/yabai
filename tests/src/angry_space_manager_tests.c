@@ -37,9 +37,9 @@ ANGRY_TEST(queriesSpacesForWindowToJsonStream) {
     struct window win = { .id = wid };
     char buf[2048] = {0};
     FILE *f = fmemopen(buf, sizeof(buf), "w");
-    bool ok = space_manager_query_spaces_for_window(f, &win, 0);
+    space_manager_query_spaces_for_window(f, &win, 0);
     fclose(f);
-    ANGRY_ASSERT(ok || !ok, "expected space_manager_query_spaces_for_window to query spaces for window");
+    ANGRY_ASSERT(buf[0] == '[', "expected the spaces of a window to be written as a json array");
 }
 
 ANGRY_TEST(queriesSpacesForDisplayToJsonStream) {
@@ -76,12 +76,13 @@ ANGRY_TEST(marksViewInvalidForSpace) {
 }
 
 ANGRY_TEST(untilesWindowFromSpaceView) {
-    struct view *view = angry_private_bsp_view(ANGRY_PRIVATE_SID(2));
-    struct application app = { .psn = {0, kCurrentProcess} };
-    struct window win = { .id = 99999, .application = &app, .ref = (AXUIElementRef)CFRetain(CFSTR("dummy")) };
+    uint64_t sid = ANGRY_PRIVATE_SID(2);
+    struct view *view = angry_private_bsp_view(sid);
+    struct window win = { .id = 99999, .ref = (AXUIElementRef)CFRetain(CFSTR("dummy")), .frame = {{0,0},{400,400}} };
+    space_manager_tile_window_on_space(&g_space_manager, &win, sid);
     space_manager_untile_window(view, &win);
     CFRelease(win.ref);
-    ANGRY_ASSERT(true, "space_manager_untile_window executed cleanly");
+    ANGRY_ASSERT(view_find_window_node(view, win.id) == NULL, "expected the untiled window to leave the view");
 }
 
 ANGRY_TEST(managesSpaceLabelsSettingAndQueryingAndRemoving) {
@@ -121,11 +122,14 @@ ANGRY_TEST(togglesGapForSpaceUpdatingState) {
     ANGRY_ASSERT(toggled_on && toggled_off, "space_manager_toggle_gap_for_space failed");
 }
 
-ANGRY_TEST(togglesMissionControlAndShowDesktopSafely) {
-    uint64_t sid = space_manager_active_space();
-    space_manager_toggle_mission_control(sid);
-    space_manager_toggle_show_desktop(sid);
-    ANGRY_ASSERT(true, "space_manager_toggle_mission_control and show_desktop executed cleanly");
+ANGRY_TEST(asksDockToOpenMissionControl) {
+    space_manager_toggle_mission_control(space_manager_active_space());
+    ANGRY_ASSERT(strcmp(g_mock_dock_notification, "com.apple.expose.awake") == 0, "expected the Dock to be asked to open Mission Control");
+}
+
+ANGRY_TEST(asksDockToShowDesktop) {
+    space_manager_toggle_show_desktop(space_manager_active_space());
+    ANGRY_ASSERT(strcmp(g_mock_dock_notification, "com.apple.showdesktop.awake") == 0, "expected the Dock to be asked to show the desktop");
 }
 
 ANGRY_TEST(configuresLayoutForAllSpaces) {
@@ -200,10 +204,21 @@ ANGRY_TEST(tilesWindowOnSpaceWithInsertionPoint) {
 }
 
 ANGRY_TEST(togglesWindowSplitDirectionInBspSubtree) {
-    uint32_t wid = get_active_test_window_id();
-    struct window win = { .id = wid };
-    space_manager_toggle_window_split(&g_space_manager, &win);
-    ANGRY_ASSERT(true, "space_manager_toggle_window_split executed cleanly");
+    uint64_t sid = ANGRY_PRIVATE_SID(11);
+    struct view *view = angry_private_bsp_view(sid);
+    g_mock_active_space = sid;
+    struct window a = { .id = 99996, .ref = (AXUIElementRef)CFRetain(CFSTR("dummy")), .frame = {{0,0},{400,400}} };
+    struct window b = { .id = 99997, .ref = (AXUIElementRef)CFRetain(CFSTR("dummy")), .frame = {{0,0},{400,400}} };
+    space_manager_tile_window_on_space(&g_space_manager, &a, sid);
+    space_manager_tile_window_on_space(&g_space_manager, &b, sid);
+    enum window_node_split before = view->root->split;
+    space_manager_toggle_window_split(&g_space_manager, &b);
+    enum window_node_split after = view->root->split;
+    space_manager_untile_window(view, &a);
+    space_manager_untile_window(view, &b);
+    CFRelease(a.ref);
+    CFRelease(b.ref);
+    ANGRY_ASSERT(before != after, "expected the split of the parent node to change direction");
 }
 
 ANGRY_TEST(resolvesMissionControlSpaceByDesktopIndex) {
@@ -217,11 +232,11 @@ ANGRY_TEST(resolvesCursorSpaceMatchingCurrentCursor) {
     ANGRY_ASSERT(sid > 0, "space_manager_cursor_space returned invalid sid");
 }
 
-ANGRY_TEST(resolvesPreviousAndNextSpaceFromCurrent) {
+ANGRY_TEST(resolvesPreviousAndNextSpaceOtherThanCurrent) {
     uint64_t sid = space_manager_active_space();
     uint64_t prev = space_manager_prev_space(sid);
     uint64_t next = space_manager_next_space(sid);
-    ANGRY_ASSERT(prev >= 0 && next >= 0, "space_manager_prev_space or next_space failed");
+    ANGRY_ASSERT(prev != sid && next != sid, "expected the previous and next space to differ from the current one");
 }
 
 ANGRY_TEST(resolvesFirstAndLastSpaceAcrossDisplays) {
@@ -230,29 +245,9 @@ ANGRY_TEST(resolvesFirstAndLastSpaceAcrossDisplays) {
     ANGRY_ASSERT(first > 0 && last > 0, "space_manager_first_space or last_space returned zero");
 }
 
-ANGRY_TEST(movesWindowListAndSingleWindowToSpace) {
-    uint64_t sid = space_manager_active_space();
-    uint32_t wid = get_active_test_window_id();
-    struct window win = { .id = wid };
-    space_manager_move_window_list_to_space(sid, &wid, 1);
-    space_manager_move_window_to_space(sid, &win);
-    ANGRY_ASSERT(true, "space_manager_move_window operations executed cleanly");
-}
-
-ANGRY_TEST(assignsProcessToSpaceAndAllSpaces) {
-    uint64_t sid = space_manager_active_space();
-    space_manager_assign_process_to_space(getpid(), sid);
-    space_manager_assign_process_to_all_spaces(getpid());
-    ANGRY_ASSERT(true, "space_manager process assignment operations executed cleanly");
-}
-
-ANGRY_TEST(evaluatesWindowIsOnActiveSpaceAndSpecifiedSpace) {
-    uint32_t wid = get_active_test_window_id();
-    struct window win = { .id = wid };
-    uint64_t sid = space_manager_active_space();
-    bool on_active = space_manager_is_window_on_active_space(&win);
-    bool on_sid = space_manager_is_window_on_space(sid, &win);
-    ANGRY_ASSERT(on_active == true || on_active == false || on_sid == true, "window on space evaluation failed");
+ANGRY_TEST(reportsUnknownWindowAsNotOnActiveSpace) {
+    struct window win = { .id = 0x7FFFFFF0 };
+    ANGRY_ASSERT(!space_manager_is_window_on_active_space(&win), "expected a window that does not exist to be on no space");
 }
 
 ANGRY_TEST(swapsSpaceWithSpaceOnSameAndCrossDisplay) {
@@ -298,39 +293,25 @@ ANGRY_TEST(addsSpaceDetectingMissingSrc) {
     ANGRY_ASSERT(err == SPACE_OP_ERROR_MISSING_SRC, "space_manager_add_space failed to detect missing src");
 }
 
-ANGRY_TEST(marksSpacesInvalidForDisplayAndAllDisplays) {
-    uint32_t did = display_manager_main_display_id();
-    space_manager_mark_spaces_invalid_for_display(&g_space_manager, did);
-    space_manager_mark_spaces_invalid(&g_space_manager);
-    ANGRY_ASSERT(true, "mark spaces invalid executed cleanly");
+ANGRY_TEST(reportsNoRefreshWhenNoApplicationIsPending) {
+    struct application **saved = g_window_manager.applications_to_refresh;
+    g_window_manager.applications_to_refresh = NULL;
+    bool refreshed = space_manager_refresh_application_windows(&g_space_manager);
+    g_window_manager.applications_to_refresh = saved;
+    ANGRY_ASSERT(!refreshed, "expected no refresh without pending applications");
 }
 
-ANGRY_TEST(refreshesApplicationWindowsReturningStatus) {
-    bool ref = space_manager_refresh_application_windows(&g_space_manager);
-    ANGRY_ASSERT(ref == true || ref == false, "space_manager_refresh_application_windows failed");
+ANGRY_TEST(findsFirstUserSpaceOfMainDisplay) {
+    uint64_t first = space_manager_find_first_user_space_for_display(display_manager_main_display_id());
+    ANGRY_ASSERT(space_is_user(first), "expected the first space found on the main display to be a user space");
 }
 
-ANGRY_TEST(handlesDisplayAddUpdatingSpaceViews) {
-    uint32_t did = display_manager_main_display_id();
-    space_manager_handle_display_add(&g_space_manager, did);
-    ANGRY_ASSERT(true, "space_manager_handle_display_add executed cleanly");
+ANGRY_TEST(enablesNaturalScrollingWhenExplicitlyOn) {
+    struct space_manager sm = { .gesture_natural_scrolling = SPACE_GESTURE_NATURAL_SCROLL_ON };
+    ANGRY_ASSERT(space_manager_is_natural_scrolling_active(&sm), "expected natural scrolling to be active when turned on");
 }
 
-ANGRY_TEST(evaluatesIsSpaceLastUserSpaceAndFindFirstUserSpace) {
-    uint64_t sid = space_manager_active_space();
-    uint32_t did = display_manager_main_display_id();
-    bool last = space_manager_is_space_last_user_space(sid);
-    uint64_t first = space_manager_find_first_user_space_for_display(did);
-    ANGRY_ASSERT((last == true || last == false) && first > 0, "space user helpers failed");
-}
-
-ANGRY_TEST(evaluatesNaturalScrollingActiveForAutoAndExplicitModes) {
-    struct space_manager sm = {0};
-    sm.gesture_natural_scrolling = SPACE_GESTURE_NATURAL_SCROLL_ON;
-    bool on_val = space_manager_is_natural_scrolling_active(&sm);
-    sm.gesture_natural_scrolling = SPACE_GESTURE_NATURAL_SCROLL_OFF;
-    bool off_val = space_manager_is_natural_scrolling_active(&sm);
-    sm.gesture_natural_scrolling = SPACE_GESTURE_NATURAL_SCROLL_AUTO;
-    bool auto_val = space_manager_is_natural_scrolling_active(&sm);
-    ANGRY_ASSERT(on_val == true && off_val == false && (auto_val == true || auto_val == false), "natural scrolling active failed check");
+ANGRY_TEST(disablesNaturalScrollingWhenExplicitlyOff) {
+    struct space_manager sm = { .gesture_natural_scrolling = SPACE_GESTURE_NATURAL_SCROLL_OFF };
+    ANGRY_ASSERT(!space_manager_is_natural_scrolling_active(&sm), "expected natural scrolling to be inactive when turned off");
 }
