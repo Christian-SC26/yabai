@@ -424,10 +424,11 @@ ANGRY_TEST(formatsDebugMessageIteratingTokens)
 
 ANGRY_TEST(terminatesWithExitFailureOnError)
 {
-    pid_t pid = fork();
+    pid_t pid = angry_fork();
     if (pid == 0) {
         freopen("/dev/null", "w", stderr);
         error("test error %d", 1);
+        _exit(127);
     }
     int status;
     waitpid(pid, &status, 0);
@@ -437,10 +438,11 @@ ANGRY_TEST(terminatesWithExitFailureOnError)
 
 ANGRY_TEST(terminatesWithExitSuccessOnRequire)
 {
-    pid_t pid = fork();
+    pid_t pid = angry_fork();
     if (pid == 0) {
         freopen("/dev/null", "w", stderr);
         require("test require %d", 2);
+        _exit(127);
     }
     int status;
     waitpid(pid, &status, 0);

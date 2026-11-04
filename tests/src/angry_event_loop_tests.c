@@ -234,12 +234,25 @@ ANGRY_TEST(ignoresFencelessLiveResizeStepAfterSplitHasMoved)
     ANGRY_ASSERT(height == 300.0f, "expected a vertical step with no fence to leave the window alone once the split has moved");
 }
 
-ANGRY_TEST(handlesMissionControlPresentationModeEventsSafely)
+ANGRY_TEST(entersShowAllWindowsModeOnMissionControlShowAllWindows)
 {
     EVENT_HANDLER_MISSION_CONTROL_SHOW_ALL_WINDOWS(NULL, 0);
+    ANGRY_ASSERT(g_mission_control_mode == MISSION_CONTROL_MODE_SHOW_ALL_WINDOWS,
+                 "expected Mission Control to be in show-all-windows mode");
+}
+
+ANGRY_TEST(entersShowFrontWindowsModeOnMissionControlShowFrontWindows)
+{
     EVENT_HANDLER_MISSION_CONTROL_SHOW_FRONT_WINDOWS(NULL, 0);
+    ANGRY_ASSERT(g_mission_control_mode == MISSION_CONTROL_MODE_SHOW_FRONT_WINDOWS,
+                 "expected Mission Control to be in show-front-windows mode");
+}
+
+ANGRY_TEST(entersShowDesktopModeOnMissionControlShowDesktop)
+{
     EVENT_HANDLER_MISSION_CONTROL_SHOW_DESKTOP(NULL, 0);
-    ANGRY_ASSERT(true, "expected mission control presentation events to execute cleanly");
+    ANGRY_ASSERT(g_mission_control_mode == MISSION_CONTROL_MODE_SHOW_DESKTOP,
+                 "expected Mission Control to be in show-desktop mode");
 }
 
 ANGRY_TEST(handlesMissionControlEnterWithDispatchBlocks)
@@ -298,13 +311,18 @@ ANGRY_TEST(handlesMenuAndSystemStateNotificationEventsSafely)
     ANGRY_ASSERT(true, "expected menu and system state events to execute cleanly");
 }
 
-ANGRY_TEST(handlesDaemonSocketMessageProcessingPayload)
+ANGRY_TEST(answersConfigQueryReceivedOnDaemonSocket)
 {
-    int pfd[2];
-    pipe(pfd);
-    int len = -1;
-    write(pfd[1], &len, sizeof(int));
-    close(pfd[1]);
-    EVENT_HANDLER_DAEMON_MESSAGE(NULL, pfd[0]);
-    ANGRY_ASSERT(true, "expected daemon message handler to process socket fd");
+    int sv[2];
+    socketpair(AF_UNIX, SOCK_STREAM, 0, sv);
+    char payload[] = "config\0window_gap\0";
+    int len = sizeof(payload);
+    write(sv[1], &len, sizeof(int));
+    write(sv[1], payload, len);
+    EVENT_HANDLER_DAEMON_MESSAGE(NULL, sv[0]);
+    char expected[32], answer[32] = {0};
+    snprintf(expected, sizeof(expected), "%d\n", g_space_manager.window_gap);
+    read(sv[1], answer, sizeof(answer) - 1);
+    close(sv[1]);
+    ANGRY_ASSERT(strcmp(answer, expected) == 0, "expected the daemon to answer with the configured window gap");
 }

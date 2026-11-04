@@ -161,28 +161,35 @@ void mission_control_unobserve(void)
     }
 }
 
+//
+// NOTE: kept at file scope rather than inside mission_control_is_active, so that
+// the test suite can start every test without a cached Mission Control state.
+//
+static struct {
+    uint64_t last_check_time;
+    uint64_t absent_start_time;
+    bool cached_state;
+} g_mission_control_active_cache;
+
 static inline bool mission_control_is_active(void)
 {
     static pthread_mutex_t mc_mutex = PTHREAD_MUTEX_INITIALIZER;
-    static uint64_t last_check_time = 0;
-    static bool cached_state = false;
-    static uint64_t mc_absent_start_time = 0;
 
     pthread_mutex_lock(&mc_mutex);
 
     uint64_t now = read_os_timer();
-    uint64_t dt_ms = (now > last_check_time) ? (now - last_check_time) / 1000000ULL : 0;
+    uint64_t dt_ms = (now > g_mission_control_active_cache.last_check_time) ? (now - g_mission_control_active_cache.last_check_time) / 1000000ULL : 0;
     if (dt_ms < 50) {
-        bool res = cached_state || (g_mission_control_mode != MISSION_CONTROL_MODE_INACTIVE);
+        bool res = g_mission_control_active_cache.cached_state || (g_mission_control_mode != MISSION_CONTROL_MODE_INACTIVE);
         pthread_mutex_unlock(&mc_mutex);
         return res;
     }
 
-    last_check_time = now;
+    g_mission_control_active_cache.last_check_time = now;
 
     CFArrayRef list = CGWindowListCopyWindowInfo(kCGWindowListOptionOnScreenOnly, kCGNullWindowID);
     if (!list) {
-        cached_state = false;
+        g_mission_control_active_cache.cached_state = false;
         bool res = g_mission_control_mode != MISSION_CONTROL_MODE_INACTIVE;
         pthread_mutex_unlock(&mc_mutex);
         return res;
@@ -211,30 +218,30 @@ static inline bool mission_control_is_active(void)
 
     bool in_mc = false;
     if (detected_mc) {
-        mc_absent_start_time = 0;
+        g_mission_control_active_cache.absent_start_time = 0;
         in_mc = true;
     } else {
         bool gesture_in_progress = __atomic_load_n(&__pending_gesture, __ATOMIC_RELAXED);
         uint64_t last_gesture_time = __atomic_load_n(&__last_gesture_time, __ATOMIC_RELAXED);
         uint64_t dt_gesture_ms = (now > last_gesture_time) ? (now - last_gesture_time) / 1000000ULL : 0;
 
-        if (g_mission_control_mode != MISSION_CONTROL_MODE_INACTIVE || cached_state) {
+        if (g_mission_control_mode != MISSION_CONTROL_MODE_INACTIVE || g_mission_control_active_cache.cached_state) {
             if (gesture_in_progress || dt_gesture_ms < 150) {
-                mc_absent_start_time = 0;
+                g_mission_control_active_cache.absent_start_time = 0;
                 in_mc = true;
             } else {
-                if (!mc_absent_start_time) mc_absent_start_time = now;
-                uint64_t absent_dt_ms = (now > mc_absent_start_time) ? (now - mc_absent_start_time) / 1000000ULL : 0;
+                if (!g_mission_control_active_cache.absent_start_time) g_mission_control_active_cache.absent_start_time = now;
+                uint64_t absent_dt_ms = (now > g_mission_control_active_cache.absent_start_time) ? (now - g_mission_control_active_cache.absent_start_time) / 1000000ULL : 0;
                 if (absent_dt_ms < 150) {
                     in_mc = true;
                 } else {
                     in_mc = false;
-                    mc_absent_start_time = 0;
+                    g_mission_control_active_cache.absent_start_time = 0;
                 }
             }
         } else {
             in_mc = false;
-            mc_absent_start_time = 0;
+            g_mission_control_active_cache.absent_start_time = 0;
         }
     }
 
@@ -248,7 +255,7 @@ static inline bool mission_control_is_active(void)
         event_loop_post(&g_event_loop, MISSION_CONTROL_EXIT, NULL, 0);
     }
 
-    cached_state = in_mc;
+    g_mission_control_active_cache.cached_state = in_mc;
     bool res = in_mc || (g_mission_control_mode != MISSION_CONTROL_MODE_INACTIVE);
     pthread_mutex_unlock(&mc_mutex);
     return res;

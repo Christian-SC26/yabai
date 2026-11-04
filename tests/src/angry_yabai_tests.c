@@ -1,6 +1,6 @@
 ANGRY_TEST(abortsWhenClientSendMessageReceivesNoArguments)
 {
-    pid_t pid = fork();
+    pid_t pid = angry_fork();
     if (pid == 0) {
         close(2);
         char *args[] = { "yabai" };
@@ -14,7 +14,7 @@ ANGRY_TEST(abortsWhenClientSendMessageReceivesNoArguments)
 
 ANGRY_TEST(printsVersionAndExitsInParseArguments)
 {
-    pid_t pid = fork();
+    pid_t pid = angry_fork();
     if (pid == 0) {
         close(1);
         char *args[] = { "yabai", "--version" };
@@ -30,5 +30,6 @@ ANGRY_TEST(initializesSettingsAndAttemptsLockAcquisition)
 {
     bool locked = configure_settings_and_acquire_lock();
     tests_isolate_scripting_addition();
+    signal(SIGCHLD, SIG_DFL);
     ANGRY_ASSERT(locked || !locked, "expected configure_settings_and_acquire_lock to initialize environment");
 }

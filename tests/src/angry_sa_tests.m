@@ -34,10 +34,10 @@ ANGRY_TEST(writesAndRemovesTemporaryOsaxFile)
 
 ANGRY_TEST(preparesOsaxBinariesPermissionsAndSignatures)
 {
-    g_mock_system = true;
+    scripting_addition_set_path();
     scripting_addition_prepare_binaries();
-    g_mock_system = false;
-    ANGRY_ASSERT(osax_bin_loader[0] != '\0', "expected binary preparation commands to execute");
+    ANGRY_ASSERT(strstr(g_mock_system_log, "chmod +x /Library/ScriptingAdditions/yabai.osax/Contents/MacOS/loader\n") != NULL,
+                 "expected the loader binary to be made executable");
 }
 
 ANGRY_TEST(restartsDockApplicationSafelyWithSwizzledTerminate)

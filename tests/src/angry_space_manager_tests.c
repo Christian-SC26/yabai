@@ -2,6 +2,20 @@
 #include <Cocoa/Cocoa.h>
 #include "../../src/space_manager.h"
 
+//
+// NOTE: tests that change a view work on a space id of their own instead of
+// the real active space, so they neither depend on nor leave behind a layout,
+// gap or tiled window that another test would see.
+//
+#define ANGRY_PRIVATE_SID(n) (0x7E570000ULL + (n))
+
+static struct view *angry_private_bsp_view(uint64_t sid)
+{
+    struct view *view = space_manager_find_view(&g_space_manager, sid);
+    view->layout = VIEW_BSP;
+    return view;
+}
+
 ANGRY_TEST(comparesViewsUsingKeyEquality) {
     uint64_t a = 100, b = 100, c = 200;
     bool eq = compare_view(&a, &b);
@@ -53,9 +67,8 @@ ANGRY_TEST(findsAndRefreshesViewForSpace) {
 }
 
 ANGRY_TEST(marksViewInvalidForSpace) {
-    uint64_t sid = space_manager_active_space();
-    struct view *view = space_manager_find_view(&g_space_manager, sid);
-    view->layout = VIEW_BSP;
+    uint64_t sid = ANGRY_PRIVATE_SID(1);
+    struct view *view = angry_private_bsp_view(sid);
     view_set_flag(view, VIEW_IS_VALID);
     space_manager_mark_view_invalid(&g_space_manager, sid);
     bool valid = view_check_flag(view, VIEW_IS_VALID);
@@ -63,8 +76,7 @@ ANGRY_TEST(marksViewInvalidForSpace) {
 }
 
 ANGRY_TEST(untilesWindowFromSpaceView) {
-    uint64_t sid = space_manager_active_space();
-    struct view *view = space_manager_find_view(&g_space_manager, sid);
+    struct view *view = angry_private_bsp_view(ANGRY_PRIVATE_SID(2));
     struct application app = { .psn = {0, kCurrentProcess} };
     struct window win = { .id = 99999, .application = &app, .ref = (AXUIElementRef)CFRetain(CFSTR("dummy")) };
     space_manager_untile_window(view, &win);
@@ -83,7 +95,8 @@ ANGRY_TEST(managesSpaceLabelsSettingAndQueryingAndRemoving) {
 }
 
 ANGRY_TEST(configuresSpaceLayoutAndValidates) {
-    uint64_t sid = space_manager_active_space();
+    uint64_t sid = ANGRY_PRIVATE_SID(3);
+    angry_private_bsp_view(sid);
     space_manager_set_layout_for_space(&g_space_manager, sid, VIEW_FLOAT);
     struct view *view = space_manager_find_view(&g_space_manager, sid);
     bool is_float = view->layout == VIEW_FLOAT;
@@ -92,7 +105,8 @@ ANGRY_TEST(configuresSpaceLayoutAndValidates) {
 }
 
 ANGRY_TEST(configuresGapForSpaceWithAbsAndRelTypes) {
-    uint64_t sid = space_manager_active_space();
+    uint64_t sid = ANGRY_PRIVATE_SID(4);
+    angry_private_bsp_view(sid);
     bool ok_abs = space_manager_set_gap_for_space(&g_space_manager, sid, TYPE_ABS, 12);
     bool ok_rel = space_manager_set_gap_for_space(&g_space_manager, sid, TYPE_REL, 4);
     struct view *view = space_manager_find_view(&g_space_manager, sid);
@@ -100,7 +114,8 @@ ANGRY_TEST(configuresGapForSpaceWithAbsAndRelTypes) {
 }
 
 ANGRY_TEST(togglesGapForSpaceUpdatingState) {
-    uint64_t sid = space_manager_active_space();
+    uint64_t sid = ANGRY_PRIVATE_SID(5);
+    angry_private_bsp_view(sid);
     bool toggled_on = space_manager_toggle_gap_for_space(&g_space_manager, sid);
     bool toggled_off = space_manager_toggle_gap_for_space(&g_space_manager, sid);
     ANGRY_ASSERT(toggled_on && toggled_off, "space_manager_toggle_gap_for_space failed");
@@ -141,7 +156,8 @@ ANGRY_TEST(configuresSplitTypeAndAutoBalanceForAllSpaces) {
 }
 
 ANGRY_TEST(configuresPaddingForSpaceWithAbsAndRelTypes) {
-    uint64_t sid = space_manager_active_space();
+    uint64_t sid = ANGRY_PRIVATE_SID(6);
+    angry_private_bsp_view(sid);
     bool ok_abs = space_manager_set_padding_for_space(&g_space_manager, sid, TYPE_ABS, 5, 6, 7, 8);
     bool ok_rel = space_manager_set_padding_for_space(&g_space_manager, sid, TYPE_REL, 2, 2, 2, 2);
     struct view *view = space_manager_find_view(&g_space_manager, sid);
@@ -150,28 +166,32 @@ ANGRY_TEST(configuresPaddingForSpaceWithAbsAndRelTypes) {
 }
 
 ANGRY_TEST(togglesPaddingForSpaceUpdatingState) {
-    uint64_t sid = space_manager_active_space();
+    uint64_t sid = ANGRY_PRIVATE_SID(7);
+    angry_private_bsp_view(sid);
     bool ok1 = space_manager_toggle_padding_for_space(&g_space_manager, sid);
     bool ok2 = space_manager_toggle_padding_for_space(&g_space_manager, sid);
     ANGRY_ASSERT(ok1 && ok2, "space_manager_toggle_padding_for_space failed");
 }
 
 ANGRY_TEST(rotatesAndMirrorsSpaceSubtree) {
-    uint64_t sid = space_manager_active_space();
+    uint64_t sid = ANGRY_PRIVATE_SID(8);
+    angry_private_bsp_view(sid);
     bool rot = space_manager_rotate_space(&g_space_manager, sid, 90);
     bool mir = space_manager_mirror_space(&g_space_manager, sid, SPLIT_X);
     ANGRY_ASSERT(rot && mir, "space_manager_rotate_space or mirror_space failed");
 }
 
 ANGRY_TEST(equalizesAndBalancesSpaceSubtree) {
-    uint64_t sid = space_manager_active_space();
+    uint64_t sid = ANGRY_PRIVATE_SID(9);
+    angry_private_bsp_view(sid);
     bool eq = space_manager_equalize_space(&g_space_manager, sid, 0);
     bool bal = space_manager_balance_space(&g_space_manager, sid, 0);
     ANGRY_ASSERT(eq && bal, "space_manager_equalize_space or balance_space failed");
 }
 
 ANGRY_TEST(tilesWindowOnSpaceWithInsertionPoint) {
-    uint64_t sid = space_manager_active_space();
+    uint64_t sid = ANGRY_PRIVATE_SID(10);
+    angry_private_bsp_view(sid);
     struct window win = { .id = 99998, .ref = (AXUIElementRef)CFRetain(CFSTR("dummy")), .frame = {{0,0},{400,400}} };
     struct view *v1 = space_manager_tile_window_on_space_with_insertion_point(&g_space_manager, &win, sid, 0);
     struct view *v2 = space_manager_tile_window_on_space(&g_space_manager, &win, sid);

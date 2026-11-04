@@ -68,9 +68,18 @@ int csr_get_active_config(uint32_t *config)
     return real_csr ? real_csr(config) : 0;
 }
 
+//
+// NOTE: system() never runs a command during the tests; it only keeps a log
+// of what it was asked to run, which tests can check.
+//
 static bool g_mock_system = false;
+static char g_mock_system_log[4096];
 int system(const char *command)
 {
+    if (command) {
+        size_t used = strlen(g_mock_system_log);
+        snprintf(g_mock_system_log + used, sizeof(g_mock_system_log) - used, "%s\n", command);
+    }
     return 0;
 }
 
@@ -267,6 +276,19 @@ CFArrayRef CGWindowListCopyWindowInfo(CGWindowListOption option, CGWindowID rela
 // ones included, which leaves them drawn on their space while the Dock still lists them as minimized.
 // No test may reach the real Dock, so the socket points nowhere for the whole run.
 //
+//
+// NOTE: a child that returns from the code under test, or exits through
+// exit() with the parent's unflushed stdout, would replay output or keep
+// running the rest of the suite. SIGCHLD is set back to the default because
+// configure_settings_and_acquire_lock ignores it, which makes waitpid fail.
+//
+static pid_t angry_fork(void)
+{
+    signal(SIGCHLD, SIG_DFL);
+    fflush(NULL);
+    return fork();
+}
+
 #define TESTS_SA_SOCKET_FILE "/tmp/yabai-tests-no-sa.socket"
 
 static void tests_isolate_scripting_addition(void)
@@ -795,13 +817,15 @@ static void tests_isolate_scripting_addition(void)
     ANGRY_ENTRY(handlesMouseInteractionEventsSafely)                            \
     ANGRY_ENTRY(keepsResizeGestureMovedAfterDragReturnsNearOrigin)              \
     ANGRY_ENTRY(ignoresFencelessLiveResizeStepAfterSplitHasMoved)               \
-    ANGRY_ENTRY(handlesMissionControlPresentationModeEventsSafely)              \
+    ANGRY_ENTRY(entersShowAllWindowsModeOnMissionControlShowAllWindows)         \
+    ANGRY_ENTRY(entersShowFrontWindowsModeOnMissionControlShowFrontWindows)     \
+    ANGRY_ENTRY(entersShowDesktopModeOnMissionControlShowDesktop)               \
     ANGRY_ENTRY(handlesMissionControlEnterWithDispatchBlocks)                   \
     ANGRY_ENTRY(handlesMissionControlCheckForExitWithLegacyDispatchBlocks)      \
     ANGRY_ENTRY(handlesMissionControlExitWithFocusRestorationDispatchBlocks)    \
     ANGRY_ENTRY(handlesDockDidRestartEventSafely)                               \
     ANGRY_ENTRY(handlesMenuAndSystemStateNotificationEventsSafely)             \
-    ANGRY_ENTRY(handlesDaemonSocketMessageProcessingPayload)                    \
+    ANGRY_ENTRY(answersConfigQueryReceivedOnDaemonSocket)                       \
     ANGRY_ENTRY(abortsWhenClientSendMessageReceivesNoArguments)                 \
     ANGRY_ENTRY(printsVersionAndExitsInParseArguments)                          \
     ANGRY_ENTRY(initializesSettingsAndAttemptsLockAcquisition)                  \
@@ -900,12 +924,76 @@ static void tests_isolate_scripting_addition(void)
     ANGRY_ENTRY(correctsForMissionControlChangesSafely)                         \
     ANGRY_ENTRY(beginsWindowManagerLifecyleObservingWindows)
 
-static struct {
+static struct test {
     char *name;
     test_function *func;
 } tests[] = {
     TEST_LIST
 };
+
+//
+// NOTE: the suite runs in a shuffled order so that a test relying on state
+// left behind by another test fails instead of passing by luck. YT_SEED=<n>
+// replays an order, YT_SEED=0 keeps the declaration order.
+//
+static const char *g_running_test_name;
+static uint32_t g_tests_seed;
+
+static void tests_report_crash(int sig)
+{
+    char line[512];
+    int len = snprintf(line, sizeof(line), "\n\e[1;31m -- %s crashed in %s (replay with YT_SEED=%u)\e[m\n",
+                       strsignal(sig), g_running_test_name ? g_running_test_name : "?", g_tests_seed);
+    write(STDERR_FILENO, line, len);
+    _exit(128 + sig);
+}
+
+static void tests_report_early_exit(void)
+{
+    if (!g_running_test_name || getpid() != g_pid) return;
+    fprintf(stderr, "\n\e[1;31m -- exited inside %s (replay with YT_SEED=%u)\e[m\n", g_running_test_name, g_tests_seed);
+}
+
+//
+// NOTE: every test starts with the fakes switched off and Mission Control
+// inactive, whatever the previous test left behind.
+//
+static void tests_reset_shared_state(void)
+{
+    g_mock_uid = (uid_t)-1;
+    g_mock_csr_config = -1;
+    g_mock_system = false;
+    g_mock_system_log[0] = '\0';
+    g_mock_home = NULL;
+    g_mock_posix_spawn = false;
+    g_mock_fast_usleep = false;
+    g_mock_active_space = 0;
+    g_mock_dispatch_after = false;
+    g_mock_ax_cannot_complete = false;
+    g_mock_dock_window_layer18 = false;
+
+    g_mission_control_mode = MISSION_CONTROL_MODE_INACTIVE;
+    g_mission_control_prev_wid = 0;
+    g_mission_control_prev_sid = 0;
+    g_mission_control_prev_pid = 0;
+    g_mission_control_mouse_clicked = false;
+    g_mission_control_exit_time = 0;
+    g_mission_control_posted_exit = false;
+    g_mission_control_hover_wid = 0;
+    g_mission_control_cursor_moved = false;
+    g_mission_control_reverted_activations = 0;
+    memset(&g_mission_control_active_cache, 0, sizeof(g_mission_control_active_cache));
+}
+
+static void tests_shuffle(struct test *list, int count, uint32_t seed)
+{
+    uint32_t x = seed;
+    for (int i = count - 1; i > 0; --i) {
+        x ^= x << 13; x ^= x >> 17; x ^= x << 5;
+        int j = x % (uint32_t)(i + 1);
+        struct test tmp = list[i]; list[i] = list[j]; list[j] = tmp;
+    }
+}
 
 int main(int argc, char **argv)
 {
@@ -929,17 +1017,42 @@ int main(int argc, char **argv)
     g_event_loop.head->next = NULL;
     g_event_loop.tail = g_event_loop.head;
 
+    //
+    // NOTE: the process-wide state yabai sets up at launch, so that no test
+    // depends on another test having run configure_settings_and_acquire_lock
+    // or process_manager_begin first.
+    //
+    g_pid = getpid();
+    g_event_bytes = calloc(1, 0x100);
+    g_cv_host_clock_frequency = CVGetHostClockFrequency();
+    SLSPerformAsynchronousBridgedWindowManagementOperation = macho_find_symbol("/System/Library/PrivateFrameworks/SkyLight.framework/Versions/A/SkyLight", "__ZL54SLSPerformAsynchronousBridgedWindowManagementOperationP47SLSAsynchronousBridgedWindowManagementOperation");
+    task_get_special_port(mach_task_self(), TASK_BOOTSTRAP_PORT, &g_bs_port);
+    table_init(&g_process_manager.process, 125, hash_psn, compare_psn);
+    signal(SIGPIPE, SIG_IGN);
+
     int succeeded = 0;
     int failed = 0;
     int slow = 0;
     int total = array_count(tests);
-    printf("\e[1;34m -- Running %d Angry Tests (<50ms/test standard)\e[m\n\n", total);
+    char *seed_env = getenv("YT_SEED");
+    g_tests_seed = seed_env ? (uint32_t)strtoul(seed_env, NULL, 10) : (arc4random() | 1);
+    if (g_tests_seed) tests_shuffle(tests, total, g_tests_seed);
+    atexit(tests_report_early_exit);
+    signal(SIGSEGV, tests_report_crash);
+    signal(SIGBUS, tests_report_crash);
+    signal(SIGABRT, tests_report_crash);
+    signal(SIGILL, tests_report_crash);
+    signal(SIGTRAP, tests_report_crash);
+
+    printf("\e[1;34m -- Running %d Angry Tests (<50ms/test standard, YT_SEED=%u)\e[m\n\n", total, g_tests_seed);
 
     uint64_t cpu_freq  = read_cpu_freq();
     uint64_t begin_tsc = read_cpu_timer();
 
     for (int i = 0; i < total; ++i) {
         uint64_t tsc = read_cpu_timer();
+        g_running_test_name = tests[i].name;
+        tests_reset_shared_state();
         bool result = tests[i].func();
         double ms_elapsed = 1000.0 * (double)(read_cpu_timer() - tsc) / (double)cpu_freq;
 
@@ -953,6 +1066,7 @@ int main(int argc, char **argv)
                is_slow ? " \e[1;35m[SLOW > 50ms]\e[m" : "");
         if (result) ++succeeded; else ++failed;
     }
+    g_running_test_name = NULL;
 
     double ms_elapsed = 1000.0 * (double)(read_cpu_timer() - begin_tsc) / (double)cpu_freq;
     printf("\n\e[1;34m -- Completed (%0.4fms)\e[m\n", ms_elapsed);
@@ -962,6 +1076,7 @@ int main(int argc, char **argv)
         printf("\t%d \e[1;35mslow (>50ms)\e[m\n", slow);
     }
     printf("\t%d \e[1;33mtotal\e[m\n", total);
+    if (failed) printf("\n\e[1;34m -- Replay this order with YT_SEED=%u\e[m\n", g_tests_seed);
 
     return total == succeeded ? EXIT_SUCCESS : EXIT_FAILURE;
 }
