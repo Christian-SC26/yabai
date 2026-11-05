@@ -387,8 +387,32 @@ uint64_t SLSManagedDisplayGetCurrentSpace(int cid, CFStringRef uuid)
     return r ? r(cid, uuid) : 0;
 }
 
+//
+// NOTE: a test can put single windows on spaces of its own; any other window
+// is on the fake active space when there is one, and where WindowServer says
+// otherwise.
+//
+static struct { uint32_t wid; uint64_t sid; } g_mock_window_space[8];
+static int g_mock_window_space_count;
+
+static void angry_place_window(uint32_t wid, uint64_t sid)
+{
+    g_mock_window_space[g_mock_window_space_count++] = (typeof(g_mock_window_space[0])) { wid, sid };
+}
+
 CFArrayRef SLSCopySpacesForWindows(int cid, int selector, CFArrayRef window_list)
 {
+    if (CFArrayGetCount(window_list) == 1) {
+        uint32_t wid = 0;
+        CFNumberGetValue(CFArrayGetValueAtIndex(window_list, 0), kCFNumberSInt32Type, &wid);
+        for (int i = 0; i < g_mock_window_space_count; ++i) {
+            if (g_mock_window_space[i].wid != wid) continue;
+            CFNumberRef num = CFNumberCreate(NULL, kCFNumberSInt64Type, &g_mock_window_space[i].sid);
+            CFArrayRef arr = CFArrayCreate(NULL, (const void **)&num, 1, &kCFTypeArrayCallBacks);
+            CFRelease(num);
+            return arr;
+        }
+    }
     if (g_mock_active_space) {
         CFNumberRef num = CFNumberCreate(NULL, kCFNumberSInt64Type, &g_mock_active_space);
         CFArrayRef arr = CFArrayCreate(NULL, (const void **)&num, 1, &kCFTypeArrayCallBacks);
@@ -399,6 +423,55 @@ CFArrayRef SLSCopySpacesForWindows(int cid, int selector, CFArrayRef window_list
     static real_fn r = NULL;
     if (!r) r = (real_fn)dlsym(RTLD_NEXT, "SLSCopySpacesForWindows");
     return r ? r(cid, selector, window_list) : NULL;
+}
+
+//
+// NOTE: the spaces tests make up (ANGRY_PRIVATE_SID and friends, 0x7E57xxxx)
+// are user spaces of the main display, so that switching between them never
+// looks like moving to another display.
+//
+CFStringRef SLSCopyManagedDisplayForSpace(int cid, uint64_t sid)
+{
+    if ((sid >> 16) == 0x7E57) {
+        CFUUIDRef uuid = CGDisplayCreateUUIDFromDisplayID(CGMainDisplayID());
+        CFStringRef result = CFUUIDCreateString(NULL, uuid);
+        CFRelease(uuid);
+        return result;
+    }
+    typedef CFStringRef (*real_fn)(int, uint64_t);
+    static real_fn r = NULL;
+    if (!r) r = (real_fn)dlsym(RTLD_NEXT, "SLSCopyManagedDisplayForSpace");
+    return r ? r(cid, sid) : NULL;
+}
+
+//
+// NOTE: a test can make its own process the front process, so that code which
+// asks WindowServer for the front application finds one the test registered.
+//
+static bool g_mock_front_is_test_process;
+OSStatus _SLPSGetFrontProcess(ProcessSerialNumber *psn)
+{
+    if (g_mock_front_is_test_process) return GetCurrentProcess(psn);
+    typedef OSStatus (*real_fn)(ProcessSerialNumber *);
+    static real_fn r = NULL;
+    if (!r) r = (real_fn)dlsym(RTLD_NEXT, "_SLPSGetFrontProcess");
+    return r ? r(psn) : -1;
+}
+
+int SLSSpaceGetType(int cid, uint64_t sid)
+{
+    if ((sid >> 16) == 0x7E57) return 0;
+    typedef int (*real_fn)(int, uint64_t);
+    static real_fn r = NULL;
+    if (!r) r = (real_fn)dlsym(RTLD_NEXT, "SLSSpaceGetType");
+    return r ? r(cid, sid) : 0;
+}
+
+static int g_mock_mouse_event_count;
+CGError CGPostMouseEvent(CGPoint position, boolean_t update, CGButtonCount count, boolean_t down, ...)
+{
+    ++g_mock_mouse_event_count;
+    return kCGErrorSuccess;
 }
 
 static bool g_mock_dispatch_after = false;
@@ -1165,7 +1238,9 @@ static void tests_isolate_scripting_addition(void)
     ANGRY_ENTRY(asksDockToExposeWindowsOfFrontApplication)                      \
     ANGRY_ENTRY(asksScriptingAdditionToScaleWindowForPictureInPicture)          \
     ANGRY_ENTRY(scalesWindowToDisplayBoundsForPictureInPicture)                 \
-    ANGRY_ENTRY(keepsSpacePaddingForPictureInPicture)
+    ANGRY_ENTRY(keepsSpacePaddingForPictureInPicture)                           \
+    ANGRY_ENTRY(followsActivatedApplicationToSpaceOfItsShownTab)                \
+    ANGRY_ENTRY(handsFocusAwayFromApplicationWhoseOnlyWindowOnSpaceIsHiddenTab)
 
 static struct test {
     char *name;
@@ -1212,6 +1287,9 @@ static void tests_reset_shared_state(void)
     g_mock_cursor_warp_count = 0;
     g_mock_event_post_count = 0;
     g_mock_current_space_set = 0;
+    g_mock_window_space_count = 0;
+    g_mock_mouse_event_count = 0;
+    g_mock_front_is_test_process = false;
     g_mock_windows_moved_to_space = 0;
     g_mock_bridged_operation_count = 0;
     g_mock_ax_write_count = 0;

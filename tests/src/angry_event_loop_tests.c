@@ -201,3 +201,96 @@ ANGRY_TEST(answersConfigQueryReceivedOnDaemonSocket)
     close(sv[1]);
     ANGRY_ASSERT(strcmp(answer, expected) == 0, "expected the daemon to answer with the configured window gap");
 }
+
+//
+// NOTE: an application with two native tabs on fake spaces of the main display.
+// The shown tab is on a space that is not visible; the hidden tab is ordered
+// out, and WindowServer still reports the visible space it was last shown on,
+// which is what happens when a tabbed window is moved to another space.
+//
+struct angry_tabbed_application
+{
+    struct application app;
+    struct window shown, hidden;
+    uint64_t visible_sid, other_sid;
+    pid_t front_pid, last_front_pid;
+    uint32_t focused_wid, last_wid;
+    bool skip_animation;
+};
+
+static void angry_tabbed_application_begin(struct angry_tabbed_application *t, pid_t pid)
+{
+    t->visible_sid = 0x7E576001ULL;
+    t->other_sid = 0x7E576002ULL;
+    g_mock_active_space = t->visible_sid;
+
+    t->app = (struct application) { .pid = pid, .name = "tabbed_app", .psn = { 0, (UInt32) pid }, .ref = AXUIElementCreateApplication(pid) };
+    t->shown  = (struct window) { .id = 95001, .application = &t->app };
+    t->hidden = (struct window) { .id = 95002, .application = &t->app };
+    window_set_flag(&t->hidden, WINDOW_TAB_MEMBER);
+    angry_place_window(t->shown.id, t->other_sid);
+    angry_place_window(t->hidden.id, t->visible_sid);
+
+    table_add(&g_window_manager.application, &t->app.pid, &t->app);
+    table_add(&g_window_manager.window, &t->shown.id, &t->shown);
+    table_add(&g_window_manager.window, &t->hidden.id, &t->hidden);
+
+    t->front_pid = g_process_manager.front_pid;
+    t->last_front_pid = g_process_manager.last_front_pid;
+    t->focused_wid = g_window_manager.focused_window_id;
+    t->last_wid = g_window_manager.last_window_id;
+    t->skip_animation = g_space_manager.skip_window_focus_animation;
+
+    __atomic_store_n(&__last_empty_space_focus_time, 0, __ATOMIC_RELEASE);
+    __atomic_store_n(&__last_gesture_time, 0, __ATOMIC_RELEASE);
+    __atomic_store_n(&__pending_gesture, false, __ATOMIC_RELEASE);
+}
+
+static void angry_tabbed_application_end(struct angry_tabbed_application *t)
+{
+    table_remove(&g_window_manager.window, &t->shown.id);
+    table_remove(&g_window_manager.window, &t->hidden.id);
+    table_remove(&g_window_manager.application, &t->app.pid);
+    CFRelease(t->app.ref);
+
+    g_process_manager.front_pid = t->front_pid;
+    g_process_manager.last_front_pid = t->last_front_pid;
+    g_window_manager.focused_window_id = t->focused_wid;
+    g_window_manager.last_window_id = t->last_wid;
+    g_space_manager.skip_window_focus_animation = t->skip_animation;
+}
+
+ANGRY_TEST(followsActivatedApplicationToSpaceOfItsShownTab)
+{
+    struct angry_tabbed_application t;
+    angry_tabbed_application_begin(&t, 9978);
+    g_space_manager.skip_window_focus_animation = true;
+
+    struct process process = { .pid = t.app.pid, .name = "tabbed_app", .psn = t.app.psn };
+    struct angry_sa_server server;
+    angry_sa_server_begin(&server);
+    EVENT_HANDLER_APPLICATION_FRONT_SWITCHED(&process, 0);
+    angry_sa_server_end(&server);
+    angry_tabbed_application_end(&t);
+
+    uint64_t requested = 0;
+    angry_sa_unpack(&server, 0, &requested, sizeof(requested));
+    ANGRY_ASSERT_ALL("expected yabai to switch to the space of the shown tab, past the hidden tab left on the visible space",
+                     angry_sa_opcode(&server) == SA_OPCODE_SPACE_FOCUS,
+                     requested == t.other_sid);
+}
+
+ANGRY_TEST(handsFocusAwayFromApplicationWhoseOnlyWindowOnSpaceIsHiddenTab)
+{
+    struct angry_tabbed_application t;
+    angry_tabbed_application_begin(&t, getpid());
+    GetCurrentProcess(&t.app.psn);
+    g_mock_front_is_test_process = true;
+
+    EVENT_HANDLER_SPACE_CHANGED(NULL, 0);
+    angry_tabbed_application_end(&t);
+
+    ANGRY_ASSERT_ALL("expected focus to leave an application that shows nothing on the new space",
+                     g_mock_front_process_count == 1,
+                     g_mock_front_process_wid == 0);
+}
