@@ -1331,7 +1331,11 @@ static void tests_shuffle(struct test *list, int count, uint32_t seed)
     }
 }
 
-int main(int argc, char **argv)
+//
+// NOTE: the process-wide state the suite runs against. The benchmarks in
+// bench/ include this file for its fakes and call this before they measure.
+//
+static void tests_init_process(void)
 {
     ts_init(MEGABYTES(8));
     tests_isolate_scripting_addition();
@@ -1365,6 +1369,12 @@ int main(int argc, char **argv)
     task_get_special_port(mach_task_self(), TASK_BOOTSTRAP_PORT, &g_bs_port);
     table_init(&g_process_manager.process, 125, hash_psn, compare_psn);
     signal(SIGPIPE, SIG_IGN);
+}
+
+#ifndef ANGRY_BENCH
+int main(int argc, char **argv)
+{
+    tests_init_process();
 
     int succeeded = 0;
     int failed = 0;
@@ -1416,3 +1426,4 @@ int main(int argc, char **argv)
 
     return total == succeeded ? EXIT_SUCCESS : EXIT_FAILURE;
 }
+#endif
