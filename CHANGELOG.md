@@ -5,6 +5,8 @@ All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Fixed
+- **Switching to an application running under a debugger**: An application launched from Xcode could not be reached with `cmd + tab` or the Dock while its windows were on another space. yabai ignores such processes so that one stopped at a breakpoint cannot block it, and their activations were dropped too. yabai now follows them to their space through WindowServer, still without sending them any accessibility request
 
 ## [7.3.2] - 2026-11-05
 ### Fixed
