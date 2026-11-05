@@ -6,6 +6,10 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [7.3.2] - 2026-11-05
+### Fixed
+- **Switching to an application with native tabs**: With `window_native_tabs on`, activating an application from the Dock or with a hotkey could take several tries to reach its space. A hidden tab keeps reporting the space it was last shown on after its group moves to another space, so yabai thought the application already had a window on screen and stayed put. Hidden tabs no longer count when yabai decides where an application is
+
 ## [7.3.1] - 2026-11-04
 ### Fixed
 - **Native Tab Opacity ([#9](https://github.com/Christian-SC26/yabai/issues/9))**:
@@ -995,7 +999,8 @@ The *window_destroyed* signal is now triggered for windows that are implicitly d
 ### Added
 - First official release
 
-[Unreleased]: https://github.com/Christian-SC26/yabai/compare/v7.3.1...HEAD
+[Unreleased]: https://github.com/Christian-SC26/yabai/compare/v7.3.2...HEAD
+[7.3.2]: https://github.com/Christian-SC26/yabai/compare/v7.3.1...v7.3.2
 [7.3.1]: https://github.com/Christian-SC26/yabai/compare/v7.3.0...v7.3.1
 [7.3.0]: https://github.com/Christian-SC26/yabai/compare/v7.2.1...v7.3.0
 [7.2.1]: https://github.com/Christian-SC26/yabai/compare/v7.2.0...v7.2.1
