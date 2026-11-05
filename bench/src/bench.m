@@ -293,11 +293,11 @@ BENCH_VIEW_SETUPS(64)
 
 //
 // NOTE: a stack holds at most NODE_MAX_WINDOW_COUNT windows in one node, so
-// the largest stack measured is one short of it.
+// the largest stack measured is a full one.
 //
 static void *setup_view_stack_4(void)  { return bench_view_create(4,  VIEW_STACK, true); }
 static void *setup_view_stack_16(void) { return bench_view_create(16, VIEW_STACK, true); }
-static void *setup_view_stack_31(void) { return bench_view_create(NODE_MAX_WINDOW_COUNT - 1, VIEW_STACK, true); }
+static void *setup_view_stack_32(void) { return bench_view_create(NODE_MAX_WINDOW_COUNT, VIEW_STACK, true); }
 
 // ---------------------------------------------------------------------------
 // layout store: dumping a space's tree as json
@@ -691,7 +691,7 @@ static struct bench g_benches[] = {
     BENCH_VIEW_ENTRIES(64)
     { "view/stack_update/4",      setup_view_stack_4,   run_view_update,          bench_view_destroy },
     { "view/stack_update/16",     setup_view_stack_16,  run_view_update,          bench_view_destroy },
-    { "view/stack_update/31",     setup_view_stack_31,  run_view_update,          bench_view_destroy },
+    { "view/stack_update/32",     setup_view_stack_32,  run_view_update,          bench_view_destroy },
     { "layout/dump/16",           setup_layout_16,      run_layout_dump,          teardown_layout_16 },
     { "rule/match/1",             setup_rules_1,        run_rules_match,          teardown_rules },
     { "rule/match/50",            setup_rules_50,       run_rules_match,          teardown_rules },

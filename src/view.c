@@ -815,7 +815,12 @@ struct window_node *view_add_window_node_with_insertion_point(struct view *view,
             view->insertion_point = prev_insertion_point;
 
             if (leaf) {
-                bool do_stack = leaf->insert_dir == STACK;
+                //
+                // NOTE: a stack holds at most NODE_MAX_WINDOW_COUNT windows. When the
+                // stack the window was meant for is full, the window gets a tile of its
+                // own next to it instead.
+                //
+                bool do_stack = leaf->insert_dir == STACK && leaf->window_count < NODE_MAX_WINDOW_COUNT;
 
                 leaf->insert_dir = 0;
                 insert_feedback_destroy(leaf);
@@ -849,6 +854,13 @@ struct window_node *view_add_window_node_with_insertion_point(struct view *view,
 
         return leaf;
     } else if (view->layout == VIEW_STACK) {
+        //
+        // NOTE: a space with a stack layout is a single node, so it holds at most
+        // NODE_MAX_WINDOW_COUNT windows. A window past that is not added, and stays
+        // where it is like a window on a space with a float layout.
+        //
+        if (view->root->window_count >= NODE_MAX_WINDOW_COUNT) return NULL;
+
         view_stack_window_node(view->root, window);
         return view->root;
     }

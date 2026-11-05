@@ -448,7 +448,10 @@ struct view *space_manager_tile_window_on_space_with_insertion_point(struct spac
 
     window_manager_adjust_layer(window, LAYER_BELOW);
     struct window_node *node = view_add_window_node_with_insertion_point(view, window, insertion_point);
-    assert(node);
+    if (!node) {
+        window_manager_adjust_layer(window, LAYER_NORMAL);
+        return view;
+    }
 
     if (space_is_visible(view->sid)) {
         window_node_flush(node);

@@ -103,3 +103,66 @@ ANGRY_TEST(displaysAndDestroysInsertFeedbackWindow) {
                      showed,
                      destroyed);
 }
+
+//
+// NOTE: a node keeps its windows in arrays of NODE_MAX_WINDOW_COUNT entries.
+// A space with a stack layout is a single node, so the window after the last
+// one that fits used to be written past the end of those arrays.
+//
+ANGRY_TEST(leavesFullStackLayoutUntouchedWhenOneMoreWindowArrives)
+{
+    struct view *view = view_create(999);
+    view->layout = VIEW_STACK;
+    struct window windows[NODE_MAX_WINDOW_COUNT + 1];
+    for (int i = 0; i <= NODE_MAX_WINDOW_COUNT; ++i) windows[i] = (struct window) { .id = 5000 + i };
+    for (int i = 0; i < NODE_MAX_WINDOW_COUNT; ++i) view_add_window_node(view, &windows[i]);
+    struct window *extra = &windows[NODE_MAX_WINDOW_COUNT];
+    struct window_node *node = view_add_window_node(view, extra);
+    bool kept = ANGRY_ALL((node == NULL),
+                          (view->root->window_count == NODE_MAX_WINDOW_COUNT),
+                          (!window_node_contains_window(view->root, extra->id)),
+                          (view->root->window_order[0] == windows[NODE_MAX_WINDOW_COUNT - 1].id));
+    view_destroy(view);
+    ANGRY_ASSERT(kept, "a window past the capacity of a stack layout must not be added to its node");
+}
+
+ANGRY_TEST(tilesWindowBesideFullStackInsteadOfStackingOntoIt)
+{
+    struct view *view = view_create(999);
+    view->layout = VIEW_BSP;
+    struct window windows[NODE_MAX_WINDOW_COUNT];
+    for (int i = 0; i < NODE_MAX_WINDOW_COUNT; ++i) windows[i] = (struct window) { .id = 6000 + i };
+    view_add_window_node(view, &windows[0]);
+    for (int i = 1; i < NODE_MAX_WINDOW_COUNT; ++i) view_stack_window_node(view->root, &windows[i]);
+    view->root->insert_dir = STACK;
+    view->insertion_point = windows[0].id;
+    struct window extra = { .id = 6100 };
+    view_add_window_node(view, &extra);
+    struct window_node *stack = view_find_window_node(view, windows[0].id);
+    struct window_node *tile = view_find_window_node(view, extra.id);
+    bool beside = ANGRY_ALL((stack != NULL),
+                            (tile != NULL),
+                            (stack != tile),
+                            (stack->window_count == NODE_MAX_WINDOW_COUNT),
+                            (tile->window_count == 1));
+    view_destroy(view);
+    ANGRY_ASSERT(beside, "a window meant for a full stack must get a tile of its own next to it");
+}
+
+ANGRY_TEST(leavesWindowOutOfLayoutWhenTilingOnFullStackSpace)
+{
+    uint64_t sid = 0xBE5C0001;
+    struct view *view = space_manager_find_view(&g_space_manager, sid);
+    view->layout = VIEW_STACK;
+    struct application app = { .pid = 4400, .name = "stack_app" };
+    struct window windows[NODE_MAX_WINDOW_COUNT + 1];
+    for (int i = 0; i <= NODE_MAX_WINDOW_COUNT; ++i) windows[i] = (struct window) { .id = 7000 + i, .application = &app };
+    for (int i = 0; i < NODE_MAX_WINDOW_COUNT; ++i) space_manager_tile_window_on_space(&g_space_manager, &windows[i], sid);
+    struct window *extra = &windows[NODE_MAX_WINDOW_COUNT];
+    struct view *result = space_manager_tile_window_on_space(&g_space_manager, extra, sid);
+    bool left_out = ANGRY_ALL((result == view),
+                              (view_find_window_node(view, extra->id) == NULL),
+                              (view->root->window_count == NODE_MAX_WINDOW_COUNT));
+    for (int i = NODE_MAX_WINDOW_COUNT - 1; i >= 0; --i) space_manager_untile_window(view, &windows[i]);
+    ANGRY_ASSERT(left_out, "tiling a window on a full stack space must leave it out of the layout instead of failing");
+}

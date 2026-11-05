@@ -972,6 +972,9 @@ static void tests_isolate_scripting_addition(void)
     ANGRY_ENTRY(serializesBspViewPropertiesToJsonStream)                        \
     ANGRY_ENTRY(clearsViewRootTreeAndResetsNodeDimensions)                     \
     ANGRY_ENTRY(displaysAndDestroysInsertFeedbackWindow)                        \
+    ANGRY_ENTRY(leavesFullStackLayoutUntouchedWhenOneMoreWindowArrives)         \
+    ANGRY_ENTRY(tilesWindowBesideFullStackInsteadOfStackingOntoIt)              \
+    ANGRY_ENTRY(leavesWindowOutOfLayoutWhenTilingOnFullStackSpace)              \
     ANGRY_ENTRY(resolvesDisplayOfTestWindow)                                    \
     ANGRY_ENTRY(resolvesSpaceOfTestWindow)                                      \
     ANGRY_ENTRY(reportsNormalLevelOfTestWindow)                                 \
