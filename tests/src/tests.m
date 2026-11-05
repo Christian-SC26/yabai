@@ -1240,7 +1240,8 @@ static void tests_isolate_scripting_addition(void)
     ANGRY_ENTRY(scalesWindowToDisplayBoundsForPictureInPicture)                 \
     ANGRY_ENTRY(keepsSpacePaddingForPictureInPicture)                           \
     ANGRY_ENTRY(followsActivatedApplicationToSpaceOfItsShownTab)                \
-    ANGRY_ENTRY(handsFocusAwayFromApplicationWhoseOnlyWindowOnSpaceIsHiddenTab)
+    ANGRY_ENTRY(handsFocusAwayFromApplicationWhoseOnlyWindowOnSpaceIsHiddenTab) \
+    ANGRY_ENTRY(followsApplicationRunningUnderDebuggerToSpaceOfItsWindow)
 
 static struct test {
     char *name;
@@ -1290,6 +1291,7 @@ static void tests_reset_shared_state(void)
     g_mock_window_space_count = 0;
     g_mock_mouse_event_count = 0;
     g_mock_front_is_test_process = false;
+    memset(&g_last_follow_to_space, 0, sizeof(g_last_follow_to_space));
     g_mock_windows_moved_to_space = 0;
     g_mock_bridged_operation_count = 0;
     g_mock_ax_write_count = 0;

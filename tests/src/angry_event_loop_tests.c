@@ -294,3 +294,34 @@ ANGRY_TEST(handsFocusAwayFromApplicationWhoseOnlyWindowOnSpaceIsHiddenTab)
                      g_mock_front_process_count == 1,
                      g_mock_front_process_wid == 0);
 }
+
+ANGRY_TEST(followsApplicationRunningUnderDebuggerToSpaceOfItsWindow)
+{
+    uint32_t wid = angry_test_window();
+    uint64_t other_sid = 0x7E577002ULL;
+    g_mock_active_space = 0x7E577001ULL;
+    angry_place_window(wid, other_sid);
+
+    bool skip_animation = g_space_manager.skip_window_focus_animation;
+    g_space_manager.skip_window_focus_animation = true;
+    __atomic_store_n(&__last_empty_space_focus_time, 0, __ATOMIC_RELEASE);
+    __atomic_store_n(&__last_gesture_time, 0, __ATOMIC_RELEASE);
+    __atomic_store_n(&__pending_gesture, false, __ATOMIC_RELEASE);
+
+    ProcessSerialNumber psn;
+    GetCurrentProcess(&psn);
+    int connection = 0;
+    SLSGetConnectionIDForPSN(g_connection, &psn, &connection);
+
+    struct angry_sa_server server;
+    angry_sa_server_begin(&server);
+    EVENT_HANDLER_DEBUGGED_APPLICATION_FRONT_SWITCHED((void *)(intptr_t) getpid(), connection);
+    angry_sa_server_end(&server);
+    g_space_manager.skip_window_focus_animation = skip_animation;
+
+    uint64_t requested = 0;
+    angry_sa_unpack(&server, 0, &requested, sizeof(requested));
+    ANGRY_ASSERT_ALL("expected an application under a debugger to be followed to the space of its window without asking it anything",
+                     angry_sa_opcode(&server) == SA_OPCODE_SPACE_FOCUS,
+                     requested == other_sid);
+}

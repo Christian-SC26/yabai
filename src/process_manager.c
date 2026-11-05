@@ -210,7 +210,21 @@ static PROCESS_EVENT_HANDLER(process_handler)
     } break;
     case kEventAppFrontSwitched: {
         struct process *process = process_manager_find_process(pm, &psn);
-        if (!process) return noErr;
+        if (!process) {
+            //
+            // NOTE: A process running under a debugger is not tracked, as an accessibility request to one that is
+            // stopped at a breakpoint would block yabai. Activating it should still bring the user to its space,
+            // and that only takes WindowServer, which answers for the process whether it is stopped or not.
+            //
+
+            pid_t pid = process_pid_for_psn(psn);
+            if (process_is_being_debugged(pid)) {
+                int connection = 0;
+                SLSGetConnectionIDForPSN(g_connection, &psn, &connection);
+                event_loop_post(&g_event_loop, DEBUGGED_APPLICATION_FRONT_SWITCHED, (void *)(intptr_t) pid, connection);
+            }
+            return noErr;
+        }
 
         event_loop_post(&g_event_loop, APPLICATION_FRONT_SWITCHED, process, 0);
     } break;
