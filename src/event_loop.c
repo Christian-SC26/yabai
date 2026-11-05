@@ -514,8 +514,15 @@ static EVENT_HANDLER(APPLICATION_FRONT_SWITCHED)
     struct window *visible_win = NULL;
     bool focused_on_visible_space = false;
 
+    //
+    // NOTE: A hidden native tab is ordered out, and WindowServer keeps reporting the space it was last shown on,
+    // even after its group has moved to another space. It says nothing about where the application is, so only
+    // the windows that are actually shown are considered when deciding whether to follow the application.
+    //
+
     for (int w = 0; w < win_count; ++w) {
         struct window *win = win_list[w];
+        if (window_check_flag(win, WINDOW_TAB_MEMBER)) continue;
         if (window_check_flag(win, WINDOW_STICKY) || window_is_sticky(win->id)) {
             focused_on_visible_space = true;
             if (!visible_win) visible_win = win;
@@ -556,6 +563,7 @@ static EVENT_HANDLER(APPLICATION_FRONT_SWITCHED)
 
             if (!target_sid && win_count > 0) {
                 for (int w = 0; w < win_count; ++w) {
+                    if (window_check_flag(win_list[w], WINDOW_TAB_MEMBER)) continue;
                     if (!window_is_sticky(win_list[w]->id) && !window_check_flag(win_list[w], WINDOW_STICKY)) {
                         uint64_t w_sid = window_space(win_list[w]->id);
                         if (w_sid) {
@@ -634,6 +642,7 @@ static EVENT_HANDLER(APPLICATION_FRONT_SWITCHED)
         }
     } else if (!window && win_count > 0) {
         for (int w = 0; w < win_count; ++w) {
+            if (window_check_flag(win_list[w], WINDOW_TAB_MEMBER)) continue;
             uint64_t sid = window_space(win_list[w]->id);
             if (space_is_visible(sid) || window_is_sticky(win_list[w]->id) || window_check_flag(win_list[w], WINDOW_STICKY)) {
                 window = win_list[w];
@@ -1754,6 +1763,7 @@ static EVENT_HANDLER(SPACE_CHANGED)
 
                 for (int w = 0; w < win_count; ++w) {
                     struct window *win = win_list[w];
+                    if (window_check_flag(win, WINDOW_TAB_MEMBER)) continue;
                     if (window_check_flag(win, WINDOW_STICKY) || window_is_sticky(win->id) || space_is_visible(window_space(win->id))) {
                         has_visible_window = true;
                         break;
