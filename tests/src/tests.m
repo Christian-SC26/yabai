@@ -975,6 +975,7 @@ static void tests_isolate_scripting_addition(void)
     ANGRY_ENTRY(displaysAndDestroysInsertFeedbackWindow)                        \
     ANGRY_ENTRY(movesInsertFeedbackEntryToNewFrontWindowOfStack) \
     ANGRY_ENTRY(handsInsertFeedbackEntryToParentWhenSiblingIsRemoved) \
+    ANGRY_ENTRY(keepsWholeWindowListOfFullStackOutOfNextTemporaryAllocation) \
     ANGRY_ENTRY(leavesFullStackLayoutUntouchedWhenOneMoreWindowArrives)         \
     ANGRY_ENTRY(tilesWindowBesideFullStackInsteadOfStackingOntoIt)              \
     ANGRY_ENTRY(leavesWindowOutOfLayoutWhenTilingOnFullStackSpace)              \

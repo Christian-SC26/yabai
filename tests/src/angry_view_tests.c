@@ -202,3 +202,21 @@ ANGRY_TEST(leavesWindowOutOfLayoutWhenTilingOnFullStackSpace)
     for (int i = NODE_MAX_WINDOW_COUNT - 1; i >= 0; --i) space_manager_untile_window(view, &windows[i]);
     ANGRY_ASSERT(left_out, "tiling a window on a full stack space must leave it out of the layout instead of failing");
 }
+
+ANGRY_TEST(keepsWholeWindowListOfFullStackOutOfNextTemporaryAllocation) {
+    struct view *view = view_create(997);
+    view->layout = VIEW_STACK;
+    struct window windows[NODE_MAX_WINDOW_COUNT];
+    for (int i = 0; i < NODE_MAX_WINDOW_COUNT; ++i) {
+        windows[i] = (struct window) { .id = 7300 + i };
+        view_add_window_node(view, &windows[i]);
+    }
+    int count = 0;
+    uint32_t *list = view_find_window_list(view, &count);
+    uint32_t *next = ts_alloc_list(uint32_t, NODE_MAX_WINDOW_COUNT);
+    memset(next, 0xff, sizeof(uint32_t) * NODE_MAX_WINDOW_COUNT);
+    bool intact = count == NODE_MAX_WINDOW_COUNT;
+    for (int i = 0; intact && i < count; ++i) intact = list[i] != 0xffffffff;
+    view_destroy(view);
+    ANGRY_ASSERT(intact, "the next temporary allocation overwrote the window list of a full stack");
+}

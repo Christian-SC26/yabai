@@ -575,18 +575,27 @@ struct window_node *window_node_fence(struct window_node *node, int dir)
 
 struct window_node *view_find_min_depth_leaf_node(struct window_node *node)
 {
+    //
+    // NOTE: breadth-first, so the first leaf found is the shallowest. Once the
+    // queue is full, the nodes already in it are still checked but their children
+    // are not queued, and a tree with no leaf in its first 256 nodes falls back to
+    // the first leaf.
+    //
+
     struct window_node *list[256] = { node };
 
-    for (int i = 0, j = 0; i < 256; ++i) {
+    for (int i = 0, j = 0; i <= j; ++i) {
         if (window_node_is_leaf(list[i])) {
             return list[i];
         }
 
-        list[++j] = list[i]->left;
-        list[++j] = list[i]->right;
+        if (j + 2 < (int) array_count(list)) {
+            list[++j] = list[i]->left;
+            list[++j] = list[i]->right;
+        }
     }
 
-    return NULL;
+    return window_node_find_first_leaf(node);
 }
 
 static inline bool area_is_in_direction(struct area *r1, CGPoint r1_max, struct area *r2, CGPoint r2_max, int direction)
@@ -921,7 +930,7 @@ uint32_t *view_find_window_list(struct view *view, int *window_count)
     uint32_t *window_list = ts_alloc_list(uint32_t, capacity);
 
     for (struct window_node *node = window_node_find_first_leaf(view->root); node; node = window_node_find_next_leaf(node)) {
-        if (*window_count + node->window_count >= capacity) {
+        while (*window_count + node->window_count > capacity) {
             ts_expand(window_list, sizeof(uint32_t) * capacity, sizeof(uint32_t) * capacity);
             capacity *= 2;
         }
