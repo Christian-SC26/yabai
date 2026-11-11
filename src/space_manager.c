@@ -559,10 +559,27 @@ uint64_t space_manager_cursor_space(void)
     return display_space_id(did);
 }
 
+//
+// NOTE: read the id of a space the way mission control lookups do, preferring
+// ManagedSpaceID and falling back to id64, and give 0 when neither is there.
+//
+
+static uint64_t space_manager_space_ref_id(CFDictionaryRef space_ref)
+{
+    uint64_t result = 0;
+
+    CFNumberRef sid_ref = CFDictionaryGetValue(space_ref, CFSTR("ManagedSpaceID"));
+    if (!sid_ref) sid_ref = CFDictionaryGetValue(space_ref, CFSTR("id64"));
+    if (sid_ref) CFNumberGetValue(sid_ref, kCFNumberSInt64Type, &result);
+
+    return result;
+}
+
 uint64_t space_manager_prev_space(uint64_t sid)
 {
     uint64_t p_sid = 0;
     uint64_t n_sid = 0;
+    bool found_sid = false;
 
     CFArrayRef display_spaces_ref = SLSCopyManagedDisplaySpaces(g_connection);
     if (!display_spaces_ref) return 0;
@@ -575,9 +592,11 @@ uint64_t space_manager_prev_space(uint64_t sid)
 
         for (int j = 0; j < spaces_count; ++j) {
             CFDictionaryRef space_ref = CFArrayGetValueAtIndex(spaces_ref, j);
-            CFNumberRef sid_ref = CFDictionaryGetValue(space_ref, CFSTR("id64"));
-            CFNumberGetValue(sid_ref, CFNumberGetType(sid_ref), &n_sid);
-            if (n_sid == sid) goto out;
+            n_sid = space_manager_space_ref_id(space_ref);
+            if (n_sid == sid) {
+                found_sid = true;
+                goto out;
+            }
 
             p_sid = n_sid;
         }
@@ -585,7 +604,7 @@ uint64_t space_manager_prev_space(uint64_t sid)
 
 out:
     CFRelease(display_spaces_ref);
-    return p_sid != sid ? p_sid : 0;
+    return found_sid && p_sid != sid ? p_sid : 0;
 }
 
 uint64_t space_manager_next_space(uint64_t sid)
@@ -604,13 +623,14 @@ uint64_t space_manager_next_space(uint64_t sid)
 
         for (int j = 0; j < spaces_count; ++j) {
             CFDictionaryRef space_ref = CFArrayGetValueAtIndex(spaces_ref, j);
-            CFNumberRef sid_ref = CFDictionaryGetValue(space_ref, CFSTR("id64"));
-            CFNumberGetValue(sid_ref, CFNumberGetType(sid_ref), &n_sid);
+            n_sid = space_manager_space_ref_id(space_ref);
             if (found_sid) goto out;
 
             found_sid = n_sid == sid;
         }
     }
+
+    n_sid = 0;
 
 out:
     CFRelease(display_spaces_ref);
@@ -768,8 +788,8 @@ static enum space_op_error space_manager_swap_space_with_space_on_display(uint32
     int b_window_list_count = 0;
     uint32_t *b_window_list = space_window_list(b_sid, &b_window_list_count, true);
 
-    struct view *a_view = table_find(&g_space_manager.view, &a_sid);
-    struct view *b_view = table_find(&g_space_manager.view, &b_sid);
+    struct view *a_view = space_manager_find_view(&g_space_manager, a_sid);
+    struct view *b_view = space_manager_find_view(&g_space_manager, b_sid);
 
     table_remove(&g_space_manager.view, &a_sid);
     table_remove(&g_space_manager.view, &b_sid);
