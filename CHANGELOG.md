@@ -5,6 +5,8 @@ All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [7.3.3] - 2026-11-11
 ### Fixed
 - **Switching to an application running under a debugger**: An application launched from Xcode could not be reached with `cmd + tab` or the Dock while its windows were on another space. yabai ignores such processes so that one stopped at a breakpoint cannot block it, and their activations were dropped too. yabai now follows them to their space through WindowServer, still without sending them any accessibility request
 - **Stacks past 32 windows**: yabai keeps the windows of a stack in one layout node with room for 32 of them. `window --stack` and dropping a window onto a stack with the mouse refused a window past that limit, but two other ways into a stack never checked it:
@@ -12,6 +14,16 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   - a window opened after `window --insert stack` on a BSP space, when the stack it was meant for was already full
 
   The 33rd window was written past the end of the node's window list, over the window order, the window count, the split ratio and the insert feedback state of that node. The layout went wrong from then on, and yabai could crash. Now a window past the limit of a stack layout stays out of the layout where it is, like a window on a space with `layout float`, and a window meant for a full stack on a BSP space gets a tile of its own next to the stack. Found by the new benchmarks in `bench/`, which crashed on a stack of 64 windows
+- **Full stacks with `window --stack` and mouse drops**: Both refused a window one place early, at 31 windows. And when the stack really was full, `window --stack` had already taken the window out of its tile, so it was left out of the layout. A stack now takes up to 32 windows, and a full one leaves the window where it was. A window yabai could not tile is no longer counted as managed either
+- **Insert feedback in stacks**: The insert feedback of a stack was tied to the window that was in front when it was shown. Focusing, swapping or stacking another window in front, or removing the front one, left it ordered against the wrong window or pointing at a node that no longer existed, which could crash yabai. Ending a drag on an error path also left the drag feedback on screen. The feedback now follows the front window of its stack and is always cleaned up
+- **Rule order after removing a rule**: `rule --remove` and expired one-shot rules moved the last rule into the gap. Rules are applied in the order they were added, so this could change which rule won. Removing a rule now keeps the order of the others
+- **Clients that stop talking to the daemon**: A `yabai -m` client that connected and then stopped sending or reading held up all window management until it went away. Messages with a zero, negative or huge length were trusted too. The daemon now gives a client one second and refuses lengths outside 2 bytes to 1 MB
+- **Bursts of events**: Under a long burst of events the event queue could wrap around and overwrite events that had not been handled yet. It now waits for room, and the mouse and event loop threads drop the event instead, since they cannot wait without deadlocking
+- **Layout of a display that comes back**: When a display came back, the fresh empty view macOS triggered for one of its new spaces could take the place of the view that held the layout. The view with the layout now wins
+- **Long window lists sent to the Dock**: Lists of window ids for animations, ordering and moving windows between spaces were packed into one fixed 4 KB message and ran past it with about a thousand windows. They are now sent in several messages, and the Dock reads a list only as far as the bytes it received. The scripting addition is now 2.1.38, so run `sudo yabai --load-sa` once after upgrading
+- **Previous and next space**: `space --focus prev` and `next` now read space ids the same way as the rest of the macOS 27 code. An unknown space gives an error instead of jumping to the last space, and `space --move` to a missing space reports it
+- **Layout and session files with wrong value types**: A string where a number was expected, or the other way round, raised an Objective-C exception and stopped the daemon. Such values are now skipped, and a tree that cannot be rebuilt puts its windows back the usual way
+- **Smaller crash fixes and leaks**: yabai now handles a display without a uuid, short WindowServer notifications, a full signal buffer, two mouse buttons pressed while a click is held, more than 512 animated windows reported to JankyBorders, deep layout trees and stacks with many windows without crashing. Leaks of accessibility elements and of rule scratchpad names are fixed
 
 ## [7.3.2] - 2026-11-05
 ### Fixed
@@ -1006,7 +1018,8 @@ The *window_destroyed* signal is now triggered for windows that are implicitly d
 ### Added
 - First official release
 
-[Unreleased]: https://github.com/Christian-SC26/yabai/compare/v7.3.2...HEAD
+[Unreleased]: https://github.com/Christian-SC26/yabai/compare/v7.3.3...HEAD
+[7.3.3]: https://github.com/Christian-SC26/yabai/compare/v7.3.2...v7.3.3
 [7.3.2]: https://github.com/Christian-SC26/yabai/compare/v7.3.1...v7.3.2
 [7.3.1]: https://github.com/Christian-SC26/yabai/compare/v7.3.0...v7.3.1
 [7.3.0]: https://github.com/Christian-SC26/yabai/compare/v7.2.1...v7.3.0
