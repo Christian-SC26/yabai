@@ -39,6 +39,12 @@
 
 #define page_align(addr) (vm_address_t)((uintptr_t)(addr) & (~(vm_page_size - 1)))
 #define unpack(v) memcpy(&v, message, sizeof(v)); message += sizeof(v)
+
+//
+// NOTE: a list message carries its own count. Read the entries of a list only as
+// far as the bytes actually received go, whatever that count says.
+//
+#define has_bytes(n) ((size_t)(end - message) >= (size_t)(n))
 #define lerp(a, t, b) (((1.0-t)*a) + (t*b))
 
 extern int SLSMainConnectionID(void);
@@ -943,19 +949,22 @@ static void do_window_shadow(char *message)
     }
 }
 
-static void do_window_swap_proxy_in(char *message)
+static void do_window_swap_proxy_in(char *message, char *end)
 {
     int count = 0;
+    if (!has_bytes(sizeof(count))) return;
     unpack(count);
     if (!count) return;
 
     CFTypeRef transaction = SLSTransactionCreate(SLSMainConnectionID());
     for (int i = 0; i < count; ++i) {
         uint32_t wid;
+        if (!has_bytes(sizeof(wid))) break;
         unpack(wid);
         if (!wid) continue;
 
         uint32_t proxy_wid;
+        if (!has_bytes(sizeof(proxy_wid))) break;
         unpack(proxy_wid);
 
         SLSTransactionOrderWindowGroup(transaction, proxy_wid, 1, wid);
@@ -965,19 +974,22 @@ static void do_window_swap_proxy_in(char *message)
     CFRelease(transaction);
 }
 
-static void do_window_swap_proxy_out(char *message)
+static void do_window_swap_proxy_out(char *message, char *end)
 {
     int count = 0;
+    if (!has_bytes(sizeof(count))) return;
     unpack(count);
     if (!count) return;
 
     CFTypeRef transaction = SLSTransactionCreate(SLSMainConnectionID());
     for (int i = 0; i < count; ++i) {
         uint32_t wid;
+        if (!has_bytes(sizeof(wid))) break;
         unpack(wid);
         if (!wid) continue;
 
         uint32_t proxy_wid;
+        if (!has_bytes(sizeof(proxy_wid))) break;
         unpack(proxy_wid);
 
         SLSTransactionSetWindowSystemAlpha(transaction, wid, 1.0f);
@@ -1002,15 +1014,17 @@ static void do_window_order(char *message)
     SLSOrderWindow(SLSMainConnectionID(), a_wid, order, b_wid);
 }
 
-static void do_window_order_in(char *message)
+static void do_window_order_in(char *message, char *end)
 {
     int count = 0;
+    if (!has_bytes(sizeof(count))) return;
     unpack(count);
     if (!count) return;
 
     CFTypeRef transaction = SLSTransactionCreate(SLSMainConnectionID());
     for (int i = 0; i < count; ++i) {
         uint32_t wid;
+        if (!has_bytes(sizeof(wid))) break;
         unpack(wid);
         if (!wid) continue;
 
@@ -1037,13 +1051,15 @@ static inline CFArrayRef cfarray_of_cfnumbers(void *values, size_t size, int cou
     return result;
 }
 
-static void do_window_list_move_to_space(char *message)
+static void do_window_list_move_to_space(char *message, char *end)
 {
     uint64_t sid;
-    unpack(sid);
-
     int count = 0;
+    if (!has_bytes(sizeof(sid) + sizeof(count))) return;
+
+    unpack(sid);
     unpack(count);
+    if (count <= 0 || !has_bytes((size_t) count * sizeof(uint32_t))) return;
 
     CFArrayRef window_list_ref = cfarray_of_cfnumbers((uint32_t*)message, sizeof(uint32_t), count, kCFNumberSInt32Type);
     SLSMoveWindowsToManagedSpace(SLSMainConnectionID(), window_list_ref, sid);
@@ -1088,8 +1104,9 @@ static void do_handshake(int sockfd)
     send(sockfd, bytes, bytes_length+1, 0);
 }
 
-static void handle_message(int sockfd, char *message)
+static void handle_message(int sockfd, char *message, int length)
 {
+    char *end = message + length;
     enum sa_opcode op = *message++;
     switch (op) {
     case SA_OPCODE_HANDSHAKE: {
@@ -1132,19 +1149,19 @@ static void handle_message(int sockfd, char *message)
         do_window_scale(message);
     } break;
     case SA_OPCODE_WINDOW_SWAP_PROXY_IN: {
-        do_window_swap_proxy_in(message);
+        do_window_swap_proxy_in(message, end);
     } break;
     case SA_OPCODE_WINDOW_SWAP_PROXY_OUT: {
-        do_window_swap_proxy_out(message);
+        do_window_swap_proxy_out(message, end);
     } break;
     case SA_OPCODE_WINDOW_ORDER: {
         do_window_order(message);
     } break;
     case SA_OPCODE_WINDOW_ORDER_IN: {
-        do_window_order_in(message);
+        do_window_order_in(message, end);
     } break;
     case SA_OPCODE_WINDOW_LIST_TO_SPACE: {
-        do_window_list_move_to_space(message);
+        do_window_list_move_to_space(message, end);
     } break;
     case SA_OPCODE_WINDOW_TO_SPACE: {
         do_window_move_to_space(message);
@@ -1152,7 +1169,7 @@ static void handle_message(int sockfd, char *message)
     }
 }
 
-static inline bool read_message(int sockfd, char *message)
+static inline int read_message(int sockfd, char *message)
 {
     int bytes_read    = 0;
     int bytes_to_read = 0;
@@ -1168,10 +1185,10 @@ static inline bool read_message(int sockfd, char *message)
             bytes_read += cur_read;
         } while (bytes_read < bytes_to_read);
 
-        return bytes_read == bytes_to_read;
+        return bytes_read == bytes_to_read ? bytes_read : 0;
     }
 
-    return false;
+    return 0;
 }
 
 static void *handle_connection(void *unused)
@@ -1181,8 +1198,9 @@ static void *handle_connection(void *unused)
         if (sockfd == -1) continue;
 
         char message[SA_SOCKET_BUFF_LEN];
-        if (read_message(sockfd, message)) {
-            handle_message(sockfd, message);
+        int length = read_message(sockfd, message);
+        if (length > 0) {
+            handle_message(sockfd, message, length);
         }
 
         shutdown(sockfd, SHUT_RDWR);
