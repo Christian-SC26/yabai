@@ -186,7 +186,7 @@ bool rule_remove_by_index(int index)
     for (int i = 0; i < buf_len(g_window_manager.rules); ++i) {
         if (i == index) {
             rule_destroy(&g_window_manager.rules[i]);
-            buf_del(g_window_manager.rules, i);
+            buf_del_ordered(g_window_manager.rules, i);
             return true;
         }
     }
@@ -199,7 +199,7 @@ bool rule_remove_by_label(char *label)
     for (int i = 0; i < buf_len(g_window_manager.rules); ++i) {
         if (string_equals(g_window_manager.rules[i].label, label)) {
             rule_destroy(&g_window_manager.rules[i]);
-            buf_del(g_window_manager.rules, i);
+            buf_del_ordered(g_window_manager.rules, i);
             return true;
         }
     }

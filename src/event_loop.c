@@ -972,7 +972,7 @@ static EVENT_HANDLER(WINDOW_CREATED)
     for (int i = 0; i < rule_len; ++i) {
         if (rule_check_flag(&g_window_manager.rules[i], RULE_ONE_SHOT_REMOVE)) {
             rule_destroy(&g_window_manager.rules[i]);
-            if (buf_del(g_window_manager.rules, i)) {
+            if (buf_del_ordered(g_window_manager.rules, i)) {
                 --i;
                 --rule_len;
             }

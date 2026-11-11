@@ -167,6 +167,22 @@ ANGRY_TEST(removesRuleByIndexFromWindowManagerBuffer) {
     ANGRY_ASSERT(ok, "Removing rule by index failed to reduce count or remove correct item");
 }
 
+ANGRY_TEST(keepsRegistrationOrderOfRulesAfterRemovingFirstRule) {
+    buf_free(g_window_manager.rules);
+    g_window_manager.rules = NULL;
+    struct rule r1 = { .label = string_copy("q7-first") };
+    struct rule r2 = { .label = string_copy("q7-middle") };
+    struct rule r3 = { .label = string_copy("q7-last") };
+    rule_add(&r1);
+    rule_add(&r2);
+    rule_add(&r3);
+    rule_remove_by_index(0);
+    bool ok = buf_len(g_window_manager.rules) == 2 && strcmp(g_window_manager.rules[0].label, "q7-middle") == 0;
+    buf_free(g_window_manager.rules);
+    g_window_manager.rules = NULL;
+    ANGRY_ASSERT(ok, "Removing the first rule moved the last rule ahead of the one registered before it");
+}
+
 ANGRY_TEST(returnsFalseWhenRemovingRuleByInvalidIndex) {
     buf_free(g_window_manager.rules);
     g_window_manager.rules = NULL;

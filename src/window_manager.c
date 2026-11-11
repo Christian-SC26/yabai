@@ -1634,7 +1634,7 @@ struct window **window_manager_add_application_windows(struct space_manager *sm,
     for (int i = 0; i < rule_len; ++i) {
         if (rule_check_flag(&wm->rules[i], RULE_ONE_SHOT_REMOVE)) {
             rule_destroy(&wm->rules[i]);
-            if (buf_del(wm->rules, i)) {
+            if (buf_del_ordered(wm->rules, i)) {
                 --i;
                 --rule_len;
             }

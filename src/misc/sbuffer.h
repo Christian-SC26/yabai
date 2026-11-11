@@ -17,6 +17,11 @@ struct buf_hdr
 #define buf_last(b) ((b)[buf_len(b)-1])
 #define buf_push(b, x) (buf__fit(b, 1), (b)[buf_len(b)] = (x), buf__hdr(b)->len++)
 #define buf_del(b, x) ((b) ? (b)[x] = (b)[buf_len(b)-1], buf__hdr(b)->len-- : 0)
+//
+// NOTE: buf_del moves the last element into the hole. buf_del_ordered keeps the
+// order of the remaining elements, for buffers where that order means something.
+//
+#define buf_del_ordered(b, x) ((b) ? memmove((b)+(x), (b)+(x)+1, sizeof(*(b))*(buf_len(b)-(x)-1)), buf__hdr(b)->len-- : 0)
 #define buf_free(b) ((b) ? free(buf__hdr(b)) : 0)
 
 static void *buf__grow_f(const void *buf, int new_len, int elem_size)

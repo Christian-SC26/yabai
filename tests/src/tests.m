@@ -820,6 +820,7 @@ static void tests_isolate_scripting_addition(void)
     ANGRY_ENTRY(addsRuleToWindowManagerRulesBuffer)                             \
     ANGRY_ENTRY(replacesExistingRuleWhenAddingRuleWithIdenticalLabel)           \
     ANGRY_ENTRY(removesRuleByIndexFromWindowManagerBuffer)                      \
+    ANGRY_ENTRY(keepsRegistrationOrderOfRulesAfterRemovingFirstRule) \
     ANGRY_ENTRY(returnsFalseWhenRemovingRuleByInvalidIndex)                     \
     ANGRY_ENTRY(removesRuleByLabelFromWindowManagerBuffer)                      \
     ANGRY_ENTRY(returnsFalseWhenRemovingRuleByNonexistentLabel)                 \
