@@ -2034,6 +2034,12 @@ static EVENT_HANDLER(MOUSE_UP)
 err:
     g_mouse_state.window = NULL;
 res:
+    if (g_mouse_state.feedback_node) {
+        g_mouse_state.feedback_node->insert_dir = 0;
+        insert_feedback_destroy(g_mouse_state.feedback_node);
+        g_mouse_state.feedback_node = NULL;
+    }
+
     g_mouse_state.live_resized = false;
     g_mouse_state.current_action = MOUSE_MODE_NONE;
 out:
