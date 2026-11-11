@@ -300,7 +300,7 @@ ANGRY_TEST(movesSpaceToSpaceDetectingErrors) {
     uint64_t sid = space_manager_active_space();
     enum space_op_error err_same = space_manager_move_space_to_space(sid, sid);
     enum space_op_error err_diff = space_manager_move_space_to_space(sid, 0);
-    bool ok_diff = err_diff == SPACE_OP_ERROR_SAME_DISPLAY || err_diff == SPACE_OP_ERROR_SCRIPTING_ADDITION;
+    bool ok_diff = err_diff == SPACE_OP_ERROR_MISSING_DST;
     ANGRY_ASSERT_ALL("move_space_to_space failed error checks",
                      err_same == SPACE_OP_ERROR_SAME_SPACE,
                      ok_diff);

@@ -888,6 +888,7 @@ enum space_op_error space_manager_move_space_to_space(uint64_t acting_sid, uint6
     uint32_t selector_did = space_display_id(selector_sid);
 
     if (acting_sid == selector_sid) return SPACE_OP_ERROR_SAME_SPACE;
+    if (!selector_sid) return SPACE_OP_ERROR_MISSING_DST;
     if (acting_did != selector_did) return SPACE_OP_ERROR_SAME_DISPLAY;
 
     bool is_animating = display_manager_display_is_animating(acting_did);

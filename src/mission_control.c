@@ -18,7 +18,7 @@ volatile bool g_mission_control_cursor_moved = false;
 volatile int g_mission_control_reverted_activations = 0;
 CGPoint g_mission_control_enter_cursor;
 
-void mission_control_record_state(void)
+static void mission_control_record_state_on_thread(bool on_event_tap)
 {
     if (!__atomic_load_n(&g_mission_control_prev_sid, __ATOMIC_RELAXED)) {
         uint32_t wid = g_window_manager.focused_window_id ? g_window_manager.focused_window_id : g_window_manager.last_window_id;
@@ -30,7 +30,14 @@ void mission_control_record_state(void)
         // so current_space_id can be stale. The focused window knows which space the user is on.
         //
 
-        uint64_t wid_sid = (wid && window_manager_find_window(&g_window_manager, wid)) ? window_space(wid) : 0;
+        //
+        // NOTE: at the start of a dock swipe this runs on the event tap thread, where
+        // the window table must not be read while the event loop changes it. There
+        // window_space alone tells whether the window still exists, giving 0 if not.
+        //
+
+        bool known = wid && (on_event_tap || window_manager_find_window(&g_window_manager, wid));
+        uint64_t wid_sid = known ? window_space(wid) : 0;
         if (wid_sid && space_is_user(wid_sid) && space_is_visible(wid_sid)) sid = wid_sid;
         if (sid) {
             __atomic_store_n(&g_mission_control_prev_wid, wid, __ATOMIC_RELEASE);
@@ -48,6 +55,16 @@ void mission_control_record_state(void)
     }
 }
 
+void mission_control_record_state(void)
+{
+    mission_control_record_state_on_thread(false);
+}
+
+void mission_control_record_state_from_event_tap(void)
+{
+    mission_control_record_state_on_thread(true);
+}
+
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunused-parameter"
 static CONNECTION_CALLBACK(connection_handler)
@@ -55,19 +72,19 @@ static CONNECTION_CALLBACK(connection_handler)
     if (type == 1204) {
         event_loop_post(&g_event_loop, MISSION_CONTROL_ENTER, NULL, 0);
     } else if (type == 1327) {
-        uint64_t sid; memcpy(&sid, data, sizeof(uint64_t));
-        event_loop_post(&g_event_loop, SLS_SPACE_CREATED, (void *) (intptr_t) sid , 0);
+        uint64_t sid = 0; if (data && data_length >= sizeof(uint64_t)) memcpy(&sid, data, sizeof(uint64_t));
+        if (sid) event_loop_post(&g_event_loop, SLS_SPACE_CREATED, (void *) (intptr_t) sid , 0);
     } else if (type == 1328) {
-        uint64_t sid; memcpy(&sid, data, sizeof(uint64_t));
-        event_loop_post(&g_event_loop, SLS_SPACE_DESTROYED, (void *) (intptr_t) sid, 0);
+        uint64_t sid = 0; if (data && data_length >= sizeof(uint64_t)) memcpy(&sid, data, sizeof(uint64_t));
+        if (sid) event_loop_post(&g_event_loop, SLS_SPACE_DESTROYED, (void *) (intptr_t) sid, 0);
     } else if (type == 808) {
-        uint32_t wid; memcpy(&wid, data, sizeof(uint32_t));
-        event_loop_post(&g_event_loop, SLS_WINDOW_ORDERED, (void *) (intptr_t) wid, 0);
+        uint32_t wid = 0; if (data && data_length >= sizeof(uint32_t)) memcpy(&wid, data, sizeof(uint32_t));
+        if (wid) event_loop_post(&g_event_loop, SLS_WINDOW_ORDERED, (void *) (intptr_t) wid, 0);
     } else if (type == 804) {
-        uint32_t wid; memcpy(&wid, data, sizeof(uint32_t));
-        event_loop_post(&g_event_loop, SLS_WINDOW_DESTROYED, (void *) (intptr_t) wid, 0);
+        uint32_t wid = 0; if (data && data_length >= sizeof(uint32_t)) memcpy(&wid, data, sizeof(uint32_t));
+        if (wid) event_loop_post(&g_event_loop, SLS_WINDOW_DESTROYED, (void *) (intptr_t) wid, 0);
     } else if (type == 815) {
-        uint32_t wid; memcpy(&wid, data, sizeof(uint32_t));
+        uint32_t wid = 0; if (data && data_length >= sizeof(uint32_t)) memcpy(&wid, data, sizeof(uint32_t));
         if (wid && g_window_manager.window_native_tabs) event_loop_post(&g_event_loop, SLS_WINDOW_VISIBLE, (void *) (intptr_t) wid, 0);
     } else if (type == 1325 || type == 1326) {
         // NOTE: space-membership payload is { u64 sid; u32 wid }, so the wid sits at offset 8.

@@ -95,7 +95,7 @@ static MOUSE_HANDLER(mouse_handler)
                 if (phase == /* kCGSGesturePhaseBegan */ 1) {
                     __atomic_store_n(&__pending_gesture, true, __ATOMIC_RELEASE);
                     if (motion == /* kCGGestureMotionVertical */ 2) {
-                        mission_control_record_state();
+                        mission_control_record_state_from_event_tap();
                     }
                 } else if (phase == /* kCGSGesturePhaseEnded */ 4 || phase == /* kCGSGesturePhaseCancelled */ 8) {
                     __atomic_store_n(&__pending_gesture, false, __ATOMIC_RELEASE);
