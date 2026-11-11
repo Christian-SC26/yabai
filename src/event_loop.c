@@ -2670,6 +2670,8 @@ static EVENT_HANDLER(SYSTEM_WOKE)
     event_signal_push(SIGNAL_SYSTEM_WOKE, NULL);
 }
 
+#define DAEMON_MESSAGE_MAX_LENGTH (1 << 20)
+
 static EVENT_HANDLER(DAEMON_MESSAGE)
 {
     TIME_FUNCTION;
@@ -2678,8 +2680,16 @@ static EVENT_HANDLER(DAEMON_MESSAGE)
     int bytes_read    = 0;
     int bytes_to_read = 0;
 
-    if (read(param1, &bytes_to_read, sizeof(int)) == sizeof(int)) {
-        char *message = ts_alloc_unaligned(bytes_to_read);
+    //
+    // NOTE: the length comes from the client. A message is at least one empty
+    // token and its terminator, and anything larger than DAEMON_MESSAGE_MAX_LENGTH
+    // is refused rather than allowed to run out the temporary storage.
+    //
+
+    if (read(param1, &bytes_to_read, sizeof(int)) == sizeof(int) && bytes_to_read >= 2 && bytes_to_read <= DAEMON_MESSAGE_MAX_LENGTH) {
+        char *message = ts_alloc_unaligned(bytes_to_read + 2);
+        message[bytes_to_read + 0] = '\0';
+        message[bytes_to_read + 1] = '\0';
 
         do {
             int cur_read = read(param1, message+bytes_read, bytes_to_read-bytes_read);
