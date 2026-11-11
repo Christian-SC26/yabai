@@ -1282,6 +1282,31 @@ bool space_manager_refresh_application_windows(struct space_manager *sm)
     return window_count != g_window_manager.window.count;
 }
 
+//
+// NOTE: a view that is replaced by another view for the same space. Its windows
+// are no longer managed through it, and space validation tiles them again in the
+// view that takes its place. A window another view manages stays with that view.
+//
+
+static void space_manager_discard_view(struct view *view)
+{
+    int window_count = 0;
+    uint32_t *window_list = view_find_window_list(view, &window_count);
+
+    for (int i = 0; i < window_count; ++i) {
+        if (table_find(&g_window_manager.managed_window, &window_list[i]) == view) {
+            window_manager_remove_managed_window(&g_window_manager, window_list[i]);
+        }
+    }
+
+    for (struct window_node *node = window_node_find_first_leaf(view->root); node; node = window_node_find_next_leaf(node)) {
+        node->window_count = 0;
+    }
+
+    view_destroy(view);
+    free(view);
+}
+
 void space_manager_handle_display_add(struct space_manager *sm, uint32_t did)
 {
     int space_count;
@@ -1298,36 +1323,69 @@ void space_manager_handle_display_add(struct space_manager *sm, uint32_t did)
         ++list_count;
     })
 
+    //
+    // NOTE: the spaces of a display that comes back get new ids, and the views from
+    // before are found again by the uuid of their space. Before DISPLAY_ADDED is
+    // handled, anything that looked up a view for one of the new ids has already
+    // created a fresh, empty view there with the same uuid. Prefer the view from
+    // before, which holds the layout, and let it replace the fresh one.
+    //
+
+    struct view *moved_view[space_count];
+    uint64_t moved_sid[space_count];
+    struct space_label *moved_label[space_count];
+    int moved_count = 0;
+
     for (int i = 0; i < space_count; ++i) {
         uint64_t sid = space_list[i];
         CFStringRef uuid = SLSSpaceCopyName(g_connection, sid);
         if (!uuid) continue;
 
+        int match = -1;
         for (int j = 0; j < list_count; ++j) {
-            CFStringRef view_uuid = uuid_list[j];
-            if (!view_uuid) continue;
+            if (!uuid_list[j] || !CFEqual(uuid_list[j], uuid)) continue;
 
-            if (CFEqual(view_uuid, uuid)) {
-                struct view *view = view_list[j];
+            if (match == -1 || view_list[match]->sid == sid) match = j;
+            if (view_list[match]->sid != sid) break;
+        }
 
-                uuid_list[j] = NULL;
-                view_list[j] = NULL;
+        if (match != -1) {
+            uuid_list[match] = NULL;
 
-                table_remove(&sm->view, &view->sid);
-                CFRelease(view->uuid);
-
-                struct space_label *label = space_manager_get_label_for_space(sm, view->sid);
-                if (label) label->sid = sid;
-
-                view->sid = sid;
-                view->uuid = CFRetain(uuid);
-
-                table_add(&sm->view, &sid, view);
-                break;
+            if (view_list[match]->sid != sid) {
+                moved_view[moved_count] = view_list[match];
+                moved_sid[moved_count] = sid;
+                moved_label[moved_count] = space_manager_get_label_for_space(sm, view_list[match]->sid);
+                ++moved_count;
             }
         }
 
         CFRelease(uuid);
+    }
+
+    //
+    // NOTE: take every view that moves off its old id first, so that a view moving
+    // to an id that another moving view still holds does not find it taken.
+    //
+
+    for (int i = 0; i < moved_count; ++i) {
+        struct view *view = moved_view[i];
+        if (table_find(&sm->view, &view->sid) == view) table_remove(&sm->view, &view->sid);
+    }
+
+    for (int i = 0; i < moved_count; ++i) {
+        struct view *view = moved_view[i];
+        uint64_t sid = moved_sid[i];
+
+        struct view *existing = table_find(&sm->view, &sid);
+        if (existing) {
+            table_remove(&sm->view, &sid);
+            space_manager_discard_view(existing);
+        }
+
+        if (moved_label[i]) moved_label[i]->sid = sid;
+        view->sid = sid;
+        table_add(&sm->view, &sid, view);
     }
 
     sm->current_space_id = space_manager_active_space();

@@ -1045,6 +1045,7 @@ static void tests_isolate_scripting_addition(void)
     ANGRY_ENTRY(reportsUnknownWindowAsNotOnActiveSpace)                         \
     ANGRY_ENTRY(swapsSpaceWithSpaceOnSameAndCrossDisplay)                       \
     ANGRY_ENTRY(movesSpaceToSpaceDetectingErrors)                               \
+    ANGRY_ENTRY(prefersViewFromBeforeOverFreshViewWhenDisplayComesBack) \
     ANGRY_ENTRY(movesSpaceToDisplayDetectingErrors)                             \
     ANGRY_ENTRY(switchesSpaceDetectingSameSpace)                                \
     ANGRY_ENTRY(destroysSpaceDetectingMissingAndInvalidSrc)                      \

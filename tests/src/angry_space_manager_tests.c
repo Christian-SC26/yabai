@@ -359,3 +359,44 @@ ANGRY_TEST(disablesNaturalScrollingWhenExplicitlyOff) {
     struct space_manager sm = { .gesture_natural_scrolling = SPACE_GESTURE_NATURAL_SCROLL_OFF };
     ANGRY_ASSERT(!space_manager_is_natural_scrolling_active(&sm), "expected natural scrolling to be inactive when turned off");
 }
+
+ANGRY_TEST(prefersViewFromBeforeOverFreshViewWhenDisplayComesBack) {
+    uint32_t did = display_manager_active_display_id();
+    uint64_t sid = display_space_id(did);
+    struct view *original = table_find(&g_space_manager.view, &sid);
+    if (original) table_remove(&g_space_manager.view, &sid);
+
+    struct view *fresh = view_create(sid);
+    table_add(&g_space_manager.view, &sid, fresh);
+    struct view *before = view_create(sid);
+    before->sid = 0x7fff0001;
+    table_add(&g_space_manager.view, &before->sid, before);
+
+    struct window in_fresh = { .id = 7501 };
+    struct window in_before = { .id = 7502 };
+    view_add_window_node(fresh, &in_fresh);
+    table_add(&g_window_manager.managed_window, &in_fresh.id, fresh);
+    view_add_window_node(before, &in_before);
+    table_add(&g_window_manager.managed_window, &in_before.id, before);
+
+    space_manager_handle_display_add(&g_space_manager, did);
+
+    bool replaced = table_find(&g_space_manager.view, &sid) == before && before->sid == sid;
+    bool kept = table_find(&g_window_manager.managed_window, &in_before.id) == before;
+    bool released = table_find(&g_window_manager.managed_window, &in_fresh.id) == NULL;
+
+    table_remove(&g_window_manager.managed_window, &in_fresh.id);
+    table_remove(&g_window_manager.managed_window, &in_before.id);
+    struct view *now = table_find(&g_space_manager.view, &sid);
+    table_remove(&g_space_manager.view, &sid);
+    uint64_t stale_sid = 0x7fff0001;
+    table_remove(&g_space_manager.view, &stale_sid);
+    if (now) { view_destroy(now); free(now); }
+    if (now != before && before) { view_destroy(before); free(before); }
+    if (original) table_add(&g_space_manager.view, &sid, original);
+
+    ANGRY_ASSERT_ALL("a returning display kept the fresh view instead of the view with the layout",
+                     replaced,
+                     kept,
+                     released);
+}
