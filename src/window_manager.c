@@ -2050,6 +2050,16 @@ enum window_op_error window_manager_stack_window(struct space_manager *sm, struc
     struct view *a_view = window_manager_find_managed_window(wm, a);
     if (!a_view) return WINDOW_OP_ERROR_INVALID_SRC_NODE;
 
+    //
+    // NOTE: check for room before b is taken out of its node, so that a full stack
+    // leaves b where it is. b does not take a slot of its own if it is already in
+    // the stack. Untiling b can free and merge nodes, so look up a_node again after.
+    //
+
+    struct window_node *a_node = view_find_window_node(a_view, a->id);
+    int stack_count = a_node->window_count - window_node_contains_window(a_node, b->id);
+    if (stack_count >= NODE_MAX_WINDOW_COUNT) return WINDOW_OP_ERROR_MAX_STACK;
+
     struct view *b_view = window_manager_find_managed_window(wm, b);
     if (b_view) {
         space_manager_untile_window(b_view, b);
@@ -2061,8 +2071,7 @@ enum window_op_error window_manager_stack_window(struct space_manager *sm, struc
         if (window_check_flag(b, WINDOW_STICKY)) window_manager_make_window_sticky(sm, wm, b, false);
     }
 
-    struct window_node *a_node = view_find_window_node(a_view, a->id);
-    if (a_node->window_count+1 >= NODE_MAX_WINDOW_COUNT) return WINDOW_OP_ERROR_MAX_STACK;
+    a_node = view_find_window_node(a_view, a->id);
 
     view_stack_window_node(a_node, b);
     window_manager_add_managed_window(wm, b, a_view);
