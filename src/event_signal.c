@@ -104,7 +104,18 @@ void event_signal_push(enum signal_type type, void *context)
     uint64_t arg_size = 128;
     uint64_t size = sizeof(struct event_signal);
 
+    //
+    // NOTE: signals are stored until the end of the event that raised them. One
+    // that does not fit is dropped rather than written into the guard page.
+    //
+
     uint64_t used = __sync_fetch_and_add(&g_signal_storage.used, size);
+    if (used + size > g_signal_storage.size) {
+        __sync_fetch_and_sub(&g_signal_storage.used, size);
+        debug("%s: signal storage is full, dropping signal %d..\n", __FUNCTION__, type);
+        return;
+    }
+
     struct event_signal *es = g_signal_storage.memory + used;
 
     es->type         = type;

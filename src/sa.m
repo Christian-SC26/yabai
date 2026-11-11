@@ -435,6 +435,16 @@ out:
 #define pack(v) memcpy(bytes+length, &v, sizeof(v)); length += sizeof(v)
 #define sa_payload_send(op) *(int16_t*)bytes = length-sizeof(length), bytes[sizeof(length)] = op, scripting_addition_send_bytes(bytes, length)
 
+//
+// NOTE: a payload fits in one SA_SOCKET_BUFF_LEN buffer, after the length and the
+// opcode. A list too long for that is sent in several messages of at most the
+// given number of entries; the Dock handles each entry on its own.
+//
+#define SA_PAYLOAD_SPACE(fixed) (SA_SOCKET_BUFF_LEN - (int)(sizeof(int16_t) + 1) - (int)(fixed))
+#define SA_SWAP_PROXY_MAX_COUNT SA_PAYLOAD_SPACE(sizeof(int)) / (int)(2 * sizeof(uint32_t))
+#define SA_ORDER_IN_MAX_COUNT SA_PAYLOAD_SPACE(sizeof(int)) / (int)sizeof(uint32_t)
+#define SA_LIST_TO_SPACE_MAX_COUNT SA_PAYLOAD_SPACE(sizeof(uint64_t) + sizeof(int)) / (int)sizeof(uint32_t)
+
 static bool scripting_addition_send_bytes(char *bytes, int length)
 {
     int sockfd;
@@ -578,33 +588,51 @@ bool scripting_addition_scale_window(uint32_t wid, float x, float y, float w, fl
 bool scripting_addition_swap_window_proxy_in(struct window_animation *animation_list, int animation_count)
 {
     uint32_t dummy_wid = 0;
-    sa_payload_init();
-    pack(animation_count);
-    for (int i = 0; i < animation_count; ++i) {
-        if (__atomic_load_n(&animation_list[i].skip, __ATOMIC_RELAXED)) {
-            pack(dummy_wid);
-        } else {
-            pack(animation_list[i].wid);
-            pack(animation_list[i].proxy.id);
+    bool result = true;
+    int start = 0;
+
+    do {
+        int count = min(animation_count - start, SA_SWAP_PROXY_MAX_COUNT);
+        sa_payload_init();
+        pack(count);
+        for (int i = start; i < start + count; ++i) {
+            if (__atomic_load_n(&animation_list[i].skip, __ATOMIC_RELAXED)) {
+                pack(dummy_wid);
+            } else {
+                pack(animation_list[i].wid);
+                pack(animation_list[i].proxy.id);
+            }
         }
-    }
-    return sa_payload_send(SA_OPCODE_WINDOW_SWAP_PROXY_IN);
+        result &= (sa_payload_send(SA_OPCODE_WINDOW_SWAP_PROXY_IN));
+        start += count;
+    } while (start < animation_count);
+
+    return result;
 }
 
 bool scripting_addition_swap_window_proxy_out(struct window_animation *animation_list, int animation_count)
 {
     uint32_t dummy_wid = 0;
-    sa_payload_init();
-    pack(animation_count);
-    for (int i = 0; i < animation_count; ++i) {
-        if (__atomic_load_n(&animation_list[i].skip, __ATOMIC_RELAXED)) {
-            pack(dummy_wid);
-        } else {
-            pack(animation_list[i].wid);
-            pack(animation_list[i].proxy.id);
+    bool result = true;
+    int start = 0;
+
+    do {
+        int count = min(animation_count - start, SA_SWAP_PROXY_MAX_COUNT);
+        sa_payload_init();
+        pack(count);
+        for (int i = start; i < start + count; ++i) {
+            if (__atomic_load_n(&animation_list[i].skip, __ATOMIC_RELAXED)) {
+                pack(dummy_wid);
+            } else {
+                pack(animation_list[i].wid);
+                pack(animation_list[i].proxy.id);
+            }
         }
-    }
-    return sa_payload_send(SA_OPCODE_WINDOW_SWAP_PROXY_OUT);
+        result &= (sa_payload_send(SA_OPCODE_WINDOW_SWAP_PROXY_OUT));
+        start += count;
+    } while (start < animation_count);
+
+    return result;
 }
 
 bool scripting_addition_order_window(uint32_t a_wid, int order, uint32_t b_wid)
@@ -621,29 +649,46 @@ bool scripting_addition_order_window_in(uint32_t *window_list, int window_count)
 {
     uint32_t dummy_wid = 0;
     uint8_t ordered_in = 0;
+    bool result = true;
+    int start = 0;
 
-    sa_payload_init();
-    pack(window_count);
-    for (int i = 0; i < window_count; ++i) {
-        SLSWindowIsOrderedIn(g_connection, window_list[i], &ordered_in);
-        if (ordered_in) {
-            pack(dummy_wid);
-        } else {
-            pack(window_list[i]);
+    do {
+        int count = min(window_count - start, SA_ORDER_IN_MAX_COUNT);
+        sa_payload_init();
+        pack(count);
+        for (int i = start; i < start + count; ++i) {
+            SLSWindowIsOrderedIn(g_connection, window_list[i], &ordered_in);
+            if (ordered_in) {
+                pack(dummy_wid);
+            } else {
+                pack(window_list[i]);
+            }
         }
-    }
-    return sa_payload_send(SA_OPCODE_WINDOW_ORDER_IN);
+        result &= (sa_payload_send(SA_OPCODE_WINDOW_ORDER_IN));
+        start += count;
+    } while (start < window_count);
+
+    return result;
 }
 
 bool scripting_addition_move_window_list_to_space(uint64_t sid, uint32_t *window_list, int window_count)
 {
-    sa_payload_init();
-    pack(sid);
-    pack(window_count);
-    for (int i = 0; i < window_count; ++i) {
-        pack(window_list[i]);
-    }
-    return sa_payload_send(SA_OPCODE_WINDOW_LIST_TO_SPACE);
+    bool result = true;
+    int start = 0;
+
+    do {
+        int count = min(window_count - start, SA_LIST_TO_SPACE_MAX_COUNT);
+        sa_payload_init();
+        pack(sid);
+        pack(count);
+        for (int i = start; i < start + count; ++i) {
+            pack(window_list[i]);
+        }
+        result &= (sa_payload_send(SA_OPCODE_WINDOW_LIST_TO_SPACE));
+        start += count;
+    } while (start < window_count);
+
+    return result;
 }
 
 bool scripting_addition_move_window_to_space(uint64_t sid, uint32_t wid)
@@ -657,3 +702,7 @@ bool scripting_addition_move_window_to_space(uint64_t sid, uint32_t wid)
 #undef sa_payload_init
 #undef pack
 #undef sa_payload_send
+#undef SA_PAYLOAD_SPACE
+#undef SA_SWAP_PROXY_MAX_COUNT
+#undef SA_ORDER_IN_MAX_COUNT
+#undef SA_LIST_TO_SPACE_MAX_COUNT

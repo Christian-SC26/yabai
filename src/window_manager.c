@@ -473,7 +473,7 @@ static inline void window_manager_notify_jankyborders(struct window_animation *a
             uint32_t real_wid[512];
         } data = { event, 0 };
 
-        for (int i = 0; i < animation_count; ++i) {
+        for (int i = 0; i < animation_count && data.count < array_count(data.proxy_wid); ++i) {
             if (skip && __atomic_load_n(&animation_list[i].skip, __ATOMIC_RELAXED)) continue;
 
             data.proxy_wid[data.count] = animation_list[i].proxy.id;
