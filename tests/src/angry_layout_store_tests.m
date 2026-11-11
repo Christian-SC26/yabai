@@ -53,6 +53,21 @@ ANGRY_TEST(reconstructsWindowNodeHierarchyFromSerializedDictionary) {
     ANGRY_ASSERT(n == NULL, "reconstruct_node with no windows correctly returned NULL");
 }
 
+ANGRY_TEST(reconstructsWindowNodeFromDictionaryWithWrongValueTypes) {
+    NSDictionary *d = @{ @"type": @"branch", @"split": @7, @"ratio": [NSNull null],
+                         @"left": @{ @"type": @"leaf", @"apps": @[ @3, [NSNull null] ] },
+                         @"right": @{ @"type": @42 } };
+    struct window w = { .id = 7401 };
+    struct window *avail[1] = { &w };
+    bool used[1] = { false };
+    NSMutableArray *apps = [NSMutableArray array];
+    layout_store_collect_tree_apps(d, apps);
+    struct window_node *n = layout_store_reconstruct_node(d, avail, used, 1, NULL, CHILD_NONE);
+    bool ok = n && n->window_count == 1 && n->window_list[0] == 7401 && [apps count] == 0;
+    free(n);
+    ANGRY_ASSERT(ok, "reconstruct_node did not skip values of the wrong JSON type");
+}
+
 ANGRY_TEST(buildsSessionDictionaryCapturingDisplaysAndSpaces) {
     NSDictionary *dict = layout_store_build_session_dict();
     ANGRY_ASSERT_ALL("build_session_dict failed",

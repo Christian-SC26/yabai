@@ -1089,6 +1089,7 @@ static void tests_isolate_scripting_addition(void)
     ANGRY_ENTRY(serializesLeafAndBranchWindowNodesToDictionary)                 \
     ANGRY_ENTRY(collectsAppNamesRecursivelyFromSerializedNodeDictionary)        \
     ANGRY_ENTRY(reconstructsWindowNodeHierarchyFromSerializedDictionary)        \
+    ANGRY_ENTRY(reconstructsWindowNodeFromDictionaryWithWrongValueTypes) \
     ANGRY_ENTRY(buildsSessionDictionaryCapturingDisplaysAndSpaces)              \
     ANGRY_ENTRY(refusesToSaveLayoutOfFloatingSpace)                             \
     ANGRY_ENTRY(refusesToDumpLayoutOfFloatingSpace)                             \

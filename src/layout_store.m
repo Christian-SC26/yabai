@@ -1,5 +1,21 @@
 #include "layout_store.h"
 
+//
+// NOTE: a session or layout file is user input. A value of the wrong JSON type
+// would raise an unrecognized selector exception and abort the daemon, so read
+// strings and numbers through these, which give nil for anything else.
+//
+
+static inline NSString *layout_store_string(id value)
+{
+    return [value isKindOfClass:[NSString class]] ? value : nil;
+}
+
+static inline id layout_store_number(id value)
+{
+    return [value isKindOfClass:[NSNumber class]] || [value isKindOfClass:[NSString class]] ? value : nil;
+}
+
 static NSString *layout_store_resolve_path(const char *name_or_path, uint64_t sid)
 {
     NSString *home = NSHomeDirectory();
@@ -98,12 +114,12 @@ static NSDictionary *layout_store_serialize_node(struct window_node *node)
 static void layout_store_collect_tree_apps(NSDictionary *node_dict, NSMutableArray *apps)
 {
     if (!node_dict || ![node_dict isKindOfClass:[NSDictionary class]]) return;
-    NSString *type = node_dict[@"type"];
+    NSString *type = layout_store_string(node_dict[@"type"]);
     if ([type isEqualToString:@"leaf"]) {
         NSArray *node_apps = node_dict[@"apps"];
         if (node_apps && [node_apps isKindOfClass:[NSArray class]]) {
             for (NSString *a in node_apps) {
-                [apps addObject:a];
+                if ([a isKindOfClass:[NSString class]]) [apps addObject:a];
             }
         }
     } else {
@@ -231,12 +247,13 @@ static struct window_node *layout_store_reconstruct_node(NSDictionary *dict, str
 {
     if (!dict || ![dict isKindOfClass:[NSDictionary class]]) return NULL;
 
-    NSString *type = dict[@"type"];
+    NSString *type = layout_store_string(dict[@"type"]);
     if ([type isEqualToString:@"leaf"]) {
         struct window *matched = NULL;
         NSArray *apps = dict[@"apps"];
         if (apps && [apps isKindOfClass:[NSArray class]]) {
             for (NSString *desired_app in apps) {
+                if (![desired_app isKindOfClass:[NSString class]]) continue;
                 for (int i = 0; i < avail_count; ++i) {
                     if (!used[i] && avail[i]->application && avail[i]->application->name) {
                         if ([desired_app isEqualToString:[NSString stringWithUTF8String:avail[i]->application->name]]) {
@@ -276,8 +293,8 @@ static struct window_node *layout_store_reconstruct_node(NSDictionary *dict, str
         memset(branch, 0, sizeof(struct window_node));
         branch->parent = parent;
         branch->child = child;
-        branch->split = [dict[@"split"] isEqualToString:@"horizontal"] ? SPLIT_X : SPLIT_Y;
-        branch->ratio = [dict[@"ratio"] floatValue];
+        branch->split = [layout_store_string(dict[@"split"]) isEqualToString:@"horizontal"] ? SPLIT_X : SPLIT_Y;
+        branch->ratio = [layout_store_number(dict[@"ratio"]) floatValue];
         if (branch->ratio < 0.05f || branch->ratio > 0.95f) branch->ratio = 0.5f;
 
         branch->left = layout_store_reconstruct_node(dict[@"left"], avail, used, avail_count, branch, CHILD_FIRST);
@@ -380,11 +397,11 @@ bool layout_store_restore(uint64_t sid, const char *name_or_path, char *out_path
             window_manager_add_managed_window(&g_window_manager, avail[i], view);
         }
 
-        if (root_dict[@"top_padding"])    view->top_padding    = [root_dict[@"top_padding"] intValue];
-        if (root_dict[@"bottom_padding"]) view->bottom_padding = [root_dict[@"bottom_padding"] intValue];
-        if (root_dict[@"left_padding"])   view->left_padding   = [root_dict[@"left_padding"] intValue];
-        if (root_dict[@"right_padding"])  view->right_padding  = [root_dict[@"right_padding"] intValue];
-        if (root_dict[@"window_gap"])     view->window_gap     = [root_dict[@"window_gap"] intValue];
+        if (root_dict[@"top_padding"])    view->top_padding    = [layout_store_number(root_dict[@"top_padding"]) intValue];
+        if (root_dict[@"bottom_padding"]) view->bottom_padding = [layout_store_number(root_dict[@"bottom_padding"]) intValue];
+        if (root_dict[@"left_padding"])   view->left_padding   = [layout_store_number(root_dict[@"left_padding"]) intValue];
+        if (root_dict[@"right_padding"])  view->right_padding  = [layout_store_number(root_dict[@"right_padding"]) intValue];
+        if (root_dict[@"window_gap"])     view->window_gap     = [layout_store_number(root_dict[@"window_gap"]) intValue];
 
         view_update(view);
         view_flush(view);
@@ -575,7 +592,7 @@ bool layout_store_restore_session(const char *name_or_path, char *out_path, size
         for (NSDictionary *s_dict in spaces_arr) {
             if (![s_dict isKindOfClass:[NSDictionary class]]) continue;
 
-            int mci = [s_dict[@"index"] intValue];
+            int mci = [layout_store_number(s_dict[@"index"]) intValue];
             if (mci <= 0) continue;
 
             uint64_t sid = space_manager_mission_control_space(mci);
@@ -591,7 +608,9 @@ bool layout_store_restore_session(const char *name_or_path, char *out_path, size
             NSMutableArray *expected_apps = [NSMutableArray array];
             if (s_dict[@"windows"] && [s_dict[@"windows"] isKindOfClass:[NSArray class]]) {
                 for (NSDictionary *w_dict in s_dict[@"windows"]) {
-                    if (w_dict[@"app"]) [expected_apps addObject:w_dict[@"app"]];
+                    if (![w_dict isKindOfClass:[NSDictionary class]]) continue;
+                    NSString *app = layout_store_string(w_dict[@"app"]);
+                    if (app) [expected_apps addObject:app];
                 }
             } else if (s_dict[@"tree"] && [s_dict[@"tree"] isKindOfClass:[NSDictionary class]]) {
                 layout_store_collect_tree_apps(s_dict[@"tree"], expected_apps);
@@ -628,35 +647,43 @@ bool layout_store_restore_session(const char *name_or_path, char *out_path, size
                 }
             }
 
-            NSString *layout_str = s_dict[@"layout"];
+            NSString *layout_str = layout_store_string(s_dict[@"layout"]);
             enum view_type new_layout = VIEW_BSP;
             if ([layout_str isEqualToString:@"stack"]) new_layout = VIEW_STACK;
             else if ([layout_str isEqualToString:@"float"]) new_layout = VIEW_FLOAT;
             view->layout = new_layout;
 
-            if (s_dict[@"top_padding"])    view->top_padding    = [s_dict[@"top_padding"] intValue];
-            if (s_dict[@"bottom_padding"]) view->bottom_padding = [s_dict[@"bottom_padding"] intValue];
-            if (s_dict[@"left_padding"])   view->left_padding   = [s_dict[@"left_padding"] intValue];
-            if (s_dict[@"right_padding"])  view->right_padding  = [s_dict[@"right_padding"] intValue];
-            if (s_dict[@"window_gap"])     view->window_gap     = [s_dict[@"window_gap"] intValue];
+            if (s_dict[@"top_padding"])    view->top_padding    = [layout_store_number(s_dict[@"top_padding"]) intValue];
+            if (s_dict[@"bottom_padding"]) view->bottom_padding = [layout_store_number(s_dict[@"bottom_padding"]) intValue];
+            if (s_dict[@"left_padding"])   view->left_padding   = [layout_store_number(s_dict[@"left_padding"]) intValue];
+            if (s_dict[@"right_padding"])  view->right_padding  = [layout_store_number(s_dict[@"right_padding"]) intValue];
+            if (s_dict[@"window_gap"])     view->window_gap     = [layout_store_number(s_dict[@"window_gap"]) intValue];
 
             if (view->layout == VIEW_BSP) {
                 NSDictionary *tree_dict = s_dict[@"tree"];
+                struct window_node *new_root = NULL;
                 if (tree_dict && [tree_dict isKindOfClass:[NSDictionary class]] && space_win_count > 0) {
-                    struct window_node *new_root = layout_store_reconstruct_node(tree_dict, space_windows, space_used, space_win_count, NULL, CHILD_NONE);
-                    if (new_root) {
-                        if (view->root) {
-                            insert_feedback_destroy(view->root);
-                            window_node_destroy(view->root);
-                        }
-                        view->root = new_root;
+                    new_root = layout_store_reconstruct_node(tree_dict, space_windows, space_used, space_win_count, NULL, CHILD_NONE);
+                }
 
-                        for (int k = 0; k < space_win_count; ++k) {
-                            if (!space_used[k]) {
-                                view_add_window_node_with_insertion_point(view, space_windows[k], 0);
-                            }
-                            window_manager_add_managed_window(&g_window_manager, space_windows[k], view);
+                //
+                // NOTE: the windows have already been taken from their old views, so a
+                // tree that gives no root, as an invalid one does, must still put them
+                // back. They are then added the way a missing tree adds them.
+                //
+
+                if (new_root) {
+                    if (view->root) {
+                        insert_feedback_destroy(view->root);
+                        window_node_destroy(view->root);
+                    }
+                    view->root = new_root;
+
+                    for (int k = 0; k < space_win_count; ++k) {
+                        if (!space_used[k]) {
+                            view_add_window_node_with_insertion_point(view, space_windows[k], 0);
                         }
+                        window_manager_add_managed_window(&g_window_manager, space_windows[k], view);
                     }
                 } else {
                     if (view->root) {
