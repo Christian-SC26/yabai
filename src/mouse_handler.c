@@ -37,6 +37,7 @@ static MOUSE_HANDLER(mouse_handler)
         event_loop_post(&g_event_loop, MOUSE_DOWN, (void *) CFRetain(event), mod);
 
         if (mod == mouse_state->modifier) {
+            if (mouse_state->consume_mouse_click) CFRelease(mouse_state->consumed_event);
             mouse_state->consume_mouse_click = true;
             mouse_state->consumed_event = (CGEventRef) CFRetain(event);
             return NULL;
@@ -47,6 +48,7 @@ static MOUSE_HANDLER(mouse_handler)
         event_loop_post(&g_event_loop, MOUSE_DOWN, (void *) CFRetain(event), mod);
 
         if (mod == mouse_state->modifier) {
+            if (mouse_state->consume_mouse_click) CFRelease(mouse_state->consumed_event);
             mouse_state->consume_mouse_click = true;
             mouse_state->consumed_event = (CGEventRef) CFRetain(event);
             return NULL;
@@ -56,7 +58,12 @@ static MOUSE_HANDLER(mouse_handler)
     case kCGEventRightMouseUp: {
         event_loop_post(&g_event_loop, MOUSE_UP, (void *) CFRetain(event), 0);
 
-        if (mouse_state->consume_mouse_click) {
+        //
+        // NOTE: a second consumed mouse down replaces the first, so only the up of
+        // the same button ends the consumed click and is posted with its down.
+        //
+
+        if (mouse_state->consume_mouse_click && CGEventGetType(mouse_state->consumed_event) + 1 == type) {
             if (!mouse_state->drag_detected) {
                 CGEventTapPostEvent(proxy, mouse_state->consumed_event);
                 CGEventTapPostEvent(proxy, event);

@@ -200,6 +200,7 @@ CFStringRef display_manager_arrangement_display_uuid(int arrangement)
 {
     CFStringRef result = NULL;
     CFArrayRef displays = SLSCopyManagedDisplays(g_connection);
+    if (!displays) return NULL;
 
     int count = CFArrayGetCount(displays);
     int index = arrangement - 1;
@@ -417,7 +418,10 @@ static AXUIElementRef display_manager_find_element_at_point(CGPoint point)
 
     CFTypeRef role = NULL;
     AXUIElementCopyAttributeValue(element_ref, kAXRoleAttribute, &role);
-    if (!role) return NULL;
+    if (!role) {
+        CFRelease(element_ref);
+        return NULL;
+    }
 
     if (CFEqual(role, kAXWindowRole)) {
         CFRelease(role);
@@ -462,6 +466,8 @@ void display_manager_set_active_display_id(uint32_t did)
     if (did == g_display_manager.current_display_id) return;
 
     CFStringRef uuid = display_uuid(did);
+    if (!uuid) return;
+
     SLSSetActiveMenuBarDisplayIdentifier(g_connection, uuid, uuid);
     CFRelease(uuid);
     g_display_manager.current_display_id = did;
