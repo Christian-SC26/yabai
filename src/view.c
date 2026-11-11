@@ -41,7 +41,8 @@ void insert_feedback_show(struct window_node *node)
         CGContextFlush(node->feedback_window.context);
         SLSReenableUpdate(g_connection);
         SLSOrderWindow(g_connection, node->feedback_window.id, 1, node->window_order[0]);
-        table_add(&g_window_manager.insert_feedback, &node->window_order[0], node);
+        node->feedback_window.wid = node->window_order[0];
+        table_add(&g_window_manager.insert_feedback, &node->feedback_window.wid, node);
         if (!workspace_is_macos_sequoia() && !(workspace_is_macos_tahoe() || workspace_is_macos_goldengate())) {
             update_window_notifications();
         }
@@ -106,7 +107,7 @@ void insert_feedback_show(struct window_node *node)
 void insert_feedback_destroy(struct window_node *node)
 {
     if (node->feedback_window.id) {
-        table_remove(&g_window_manager.insert_feedback, &node->window_order[0]);
+        table_remove(&g_window_manager.insert_feedback, &node->feedback_window.wid);
 
         if (!workspace_is_macos_sequoia() && !(workspace_is_macos_tahoe() || workspace_is_macos_goldengate())) {
             update_window_notifications();
@@ -116,6 +117,32 @@ void insert_feedback_destroy(struct window_node *node)
         CGContextRelease(node->feedback_window.context);
         SLSReleaseWindow(g_connection, node->feedback_window.id);
         memset(&node->feedback_window, 0, sizeof(struct feedback_window));
+    }
+}
+
+//
+// NOTE: insert_feedback maps the front window of a node to the node, so that the
+// feedback can be ordered above that window when it moves. The entry is keyed by
+// the window the feedback was registered for, kept in feedback_window.wid. Call
+// this after the front window of a node with feedback changes, or after its
+// feedback moves to another node.
+//
+
+void insert_feedback_rekey(struct window_node *node)
+{
+    if (!node->feedback_window.id) return;
+
+    table_remove(&g_window_manager.insert_feedback, &node->feedback_window.wid);
+    node->feedback_window.wid = node->window_order[0];
+    table_remove(&g_window_manager.insert_feedback, &node->feedback_window.wid);
+    table_add(&g_window_manager.insert_feedback, &node->feedback_window.wid, node);
+
+    SLSSetWindowLevel(g_connection, node->feedback_window.id, window_level(node->window_order[0]));
+    SLSSetWindowSubLevel(g_connection, node->feedback_window.id, window_sub_level(node->window_order[0]));
+    SLSOrderWindow(g_connection, node->feedback_window.id, 1, node->window_order[0]);
+
+    if (!workspace_is_macos_sequoia() && !(workspace_is_macos_tahoe() || workspace_is_macos_goldengate())) {
+        update_window_notifications();
     }
 }
 
@@ -437,6 +464,9 @@ void window_node_swap_window_list(struct window_node *a_node, struct window_node
 
     a_node->zoom = NULL;
     b_node->zoom = NULL;
+
+    insert_feedback_rekey(a_node);
+    insert_feedback_rekey(b_node);
 }
 
 struct window_node *window_node_find_first_leaf(struct window_node *root)
@@ -644,23 +674,15 @@ bool view_swap_node_window(struct view *view, uint32_t old_wid, uint32_t new_wid
     struct window_node *node = view_find_window_node(view, old_wid);
     if (!node) return false;
 
-    // NOTE: insert_feedback is keyed by window_order[0]; re-key it or the entry dangles.
-    bool rekey = node->feedback_window.id && node->window_order[0] == old_wid;
+    bool rekey = node->window_order[0] == old_wid;
     if (view->insertion_point == old_wid) view->insertion_point = new_wid;
-    if (rekey) table_remove(&g_window_manager.insert_feedback, &node->window_order[0]);
 
     for (int i = 0; i < node->window_count; ++i) {
         if (node->window_list[i]  == old_wid) node->window_list[i]  = new_wid;
         if (node->window_order[i] == old_wid) node->window_order[i] = new_wid;
     }
 
-    if (rekey) {
-        table_add(&g_window_manager.insert_feedback, &node->window_order[0], node);
-        SLSOrderWindow(g_connection, node->feedback_window.id, 1, node->window_order[0]);
-        if (!workspace_is_macos_sequoia() && !(workspace_is_macos_tahoe() || workspace_is_macos_goldengate())) {
-            update_window_notifications();
-        }
-    }
+    if (rekey) insert_feedback_rekey(node);
 
     return true;
 }
@@ -689,6 +711,8 @@ struct window_node *view_remove_window_node(struct view *view, struct window *wi
         assert(removed_entry);
         assert(removed_order);
         --node->window_count;
+
+        if (node->window_order[0] != node->feedback_window.wid) insert_feedback_rekey(node);
 
         if (view->insertion_point == window->id) {
             view->insertion_point = node->window_order[0];
@@ -731,6 +755,9 @@ struct window_node *view_remove_window_node(struct view *view, struct window *wi
         parent->split           = child->split;
         parent->child           = child->child;
         insert_feedback_show(parent);
+        insert_feedback_rekey(parent);
+    } else {
+        insert_feedback_destroy(child);
     }
 
     if (window_node_is_intermediate(child) && !window_node_is_leaf(child)) {
@@ -802,6 +829,8 @@ void view_stack_window_node(struct window_node *node, struct window *window)
     memmove(node->window_order + 1, node->window_order, sizeof(uint32_t) * node->window_count);
     node->window_order[0] = window->id;
     ++node->window_count;
+
+    insert_feedback_rekey(node);
 }
 
 struct window_node *view_add_window_node_with_insertion_point(struct view *view, struct window *window, uint32_t insertion_point)

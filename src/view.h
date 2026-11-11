@@ -145,6 +145,7 @@ static const char *auto_balance_str[] = {
 struct feedback_window
 {
     uint32_t id;
+    uint32_t wid;
     CGContextRef context;
 };
 
@@ -221,6 +222,7 @@ struct view
 
 void insert_feedback_show(struct window_node *node);
 void insert_feedback_destroy(struct window_node *node);
+void insert_feedback_rekey(struct window_node *node);
 
 void window_node_flush(struct window_node *node);
 void window_node_flush_direct(struct window_node *node);

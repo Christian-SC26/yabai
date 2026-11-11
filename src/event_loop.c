@@ -120,6 +120,7 @@ static void window_did_receive_focus(struct window_manager *wm, struct mouse_sta
 
         memmove(node->window_order + 1, node->window_order, sizeof(uint32_t) * i);
         node->window_order[0] = window->id;
+        if (i > 0) insert_feedback_rekey(node);
 
         break;
     }

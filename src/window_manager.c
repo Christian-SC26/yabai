@@ -2245,6 +2245,7 @@ enum window_op_error window_manager_swap_window(struct space_manager *sm, struct
 
         a_node->window_list[b_list_index] = a->id;
         a_node->window_order[b_order_index] = a->id;
+        insert_feedback_rekey(a_node);
 
         if (a->id == wm->focused_window_id) {
             window_manager_focus_window_with_raise(&b->application->psn, b->id, b->ref);
