@@ -2730,6 +2730,7 @@ static void *event_loop_run(void *context)
                 next = __atomic_load_n(&head->next, __ATOMIC_RELAXED);
                 if (!next) goto empty;
             } while (!__sync_bool_compare_and_swap(&event_loop->head, head, next));
+            __atomic_sub_fetch(&event_loop->count, 1, __ATOMIC_RELEASE);
 
             enum event_type type = __atomic_load_n(&next->type, __ATOMIC_RELAXED);
             if (type == MOUSE_DRAGGED || type == MOUSE_MOVED) {
@@ -2737,6 +2738,7 @@ static void *event_loop_run(void *context)
                 while ((peek = __atomic_load_n(&next->next, __ATOMIC_RELAXED)) != NULL) {
                     if (__atomic_load_n(&peek->type, __ATOMIC_RELAXED) != type) break;
                     if (!__sync_bool_compare_and_swap(&event_loop->head, next, peek)) break;
+                    __atomic_sub_fetch(&event_loop->count, 1, __ATOMIC_RELEASE);
                     void *old_context = __atomic_load_n(&next->context, __ATOMIC_RELAXED);
                     if (old_context) CFRelease(old_context);
                     next = peek;
@@ -2763,10 +2765,49 @@ empty:
     return NULL;
 }
 
+//
+// NOTE: events live in a ring of fixed slots that memory_pool_push hands out in
+// turn, and the ring wraps around without knowing which slots the event loop has
+// not handled yet. Every event takes a slot from count before it is pushed and
+// gives it back once the event loop moves past it, so a full ring never reuses
+// the slot of a waiting event. The slot of the event the event loop moved past
+// last, and the slack where the ring wraps, are kept free.
+//
+// When the ring is full a poster waits for room, except on the event loop
+// thread, which would wait for itself, and on the event tap thread, which the
+// event loop joins when the mouse handler is restarted. There the event is
+// dropped; the mouse events posted from the event tap give their retained event
+// back, other contexts are given up.
+//
+
+static bool event_loop_take_slot(struct event_loop *event_loop)
+{
+    uint64_t limit = event_loop->pool.size / sizeof(struct event) - 4;
+    pthread_t self = pthread_self();
+    bool can_wait = !pthread_equal(self, event_loop->thread) && !pthread_equal(self, g_mouse_state.thread);
+
+    for (;;) {
+        uint64_t count = __atomic_load_n(&event_loop->count, __ATOMIC_ACQUIRE);
+        if (count < limit) {
+            if (__sync_bool_compare_and_swap(&event_loop->count, count, count + 1)) return true;
+            continue;
+        }
+
+        if (!can_wait) return false;
+        usleep(1000);
+    }
+}
+
 void event_loop_post(struct event_loop *event_loop, enum event_type type, void *context, int param1)
 {
     bool success;
     struct event *tail, *new_tail;
+
+    if (!event_loop_take_slot(event_loop)) {
+        debug("%s: event queue is full, dropping event %d..\n", __FUNCTION__, type);
+        if (context && (type == MOUSE_DOWN || type == MOUSE_UP || type == MOUSE_DRAGGED || type == MOUSE_MOVED)) CFRelease(context);
+        return;
+    }
 
     new_tail = memory_pool_push(&event_loop->pool, sizeof(struct event));
     __atomic_store_n(&new_tail->type, type, __ATOMIC_RELEASE);

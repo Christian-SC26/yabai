@@ -379,6 +379,32 @@ ANGRY_TEST(coalescesConsecutiveMouseDraggedEventsInQueue)
     ANGRY_ASSERT(last_val == 5, "event queue coalescing must skip obsolete intermediate drag positions to the latest");
 }
 
+ANGRY_TEST(keepsWaitingEventsWhenEventQueueIsFull)
+{
+    struct event_loop loop = { .thread = pthread_self() };
+    memory_pool_init(&loop.pool, KILOBYTES(16));
+    loop.head = memory_pool_push(&loop.pool, sizeof(struct event));
+    loop.head->next = NULL;
+    loop.tail = loop.head;
+    loop.semaphore = sem_open("angry_full_queue_sem", O_CREAT, 0600, 0);
+    sem_unlink("angry_full_queue_sem");
+    int slots = (int)(loop.pool.size / sizeof(struct event));
+    for (int i = 1; i <= 2 * slots; ++i) {
+        event_loop_post(&loop, SYSTEM_WOKE, NULL, i);
+    }
+    int chained = 0;
+    bool in_order = true;
+    for (struct event *e = loop.head->next; e && chained <= slots; e = e->next) {
+        in_order &= e->param1 == ++chained;
+    }
+    sem_close(loop.semaphore);
+    munmap(loop.pool.memory, loop.pool.size + getpagesize());
+    ANGRY_ASSERT_ALL("a full event queue overwrote events that were still waiting",
+                     chained == (int) loop.count,
+                     chained > slots / 2,
+                     in_order);
+}
+
 ANGRY_TEST(clearsDirtyFlagOnDirectViewFlush)
 {
     uint32_t did = display_manager_active_display_id();

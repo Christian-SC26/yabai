@@ -73,6 +73,7 @@ struct event_loop
     struct memory_pool pool;
     struct event *head;
     struct event *tail;
+    volatile uint64_t count;
 };
 
 bool event_loop_begin(struct event_loop *event_loop);

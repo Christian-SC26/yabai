@@ -706,6 +706,7 @@ static void tests_isolate_scripting_addition(void)
     ANGRY_ENTRY(capturesFrontmostWindowAndSpaceStateOnMissionControlEnter)      \
     ANGRY_ENTRY(maintainsIdempotencyWhenMissionControlStateAlreadyRecorded)     \
     ANGRY_ENTRY(coalescesConsecutiveMouseDraggedEventsInQueue)                  \
+    ANGRY_ENTRY(keepsWaitingEventsWhenEventQueueIsFull) \
     ANGRY_ENTRY(clearsDirtyFlagOnDirectViewFlush)                               \
     ANGRY_ENTRY(defaultsBspLiveResizeToEnabled)                                 \
     ANGRY_ENTRY(coercesInsertDirectionToStackWhenTargetViewIsStacked)           \
