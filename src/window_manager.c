@@ -302,6 +302,18 @@ void window_manager_remove_managed_window(struct window_manager *wm, uint32_t wi
 void window_manager_add_managed_window(struct window_manager *wm, struct window *window, struct view *view)
 {
     if (view->layout == VIEW_FLOAT) return;
+
+    //
+    // NOTE: a window that did not get a node, because the stack it was meant for
+    // is full, is not managed. It stays where it is at the normal layer, and gets
+    // picked up again once there is room for it.
+    //
+
+    if (!view_find_window_node(view, window->id)) {
+        window_manager_adjust_layer(window, LAYER_NORMAL);
+        return;
+    }
+
     table_add(&wm->managed_window, &window->id, view);
     window_manager_purify_window(wm, window);
 }

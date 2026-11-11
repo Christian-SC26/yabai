@@ -113,7 +113,7 @@ static void window_did_receive_focus(struct window_manager *wm, struct mouse_sta
     if (!view) return;
 
     struct window_node *node = view_find_window_node(view, window->id);
-    if (node->window_count <= 1) return;
+    if (!node || node->window_count <= 1) return;
 
     for (int i = 0; i < node->window_count; ++i) {
         if (node->window_order[i] != window->id) continue;
