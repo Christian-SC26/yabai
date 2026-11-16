@@ -6,6 +6,12 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [7.3.4] - 2026-11-16
+### Fixed
+- **Moving windows to hidden spaces on macOS 27**: `window --space` exited 0 but left the window where it was when the target space was not visible, and moving it back to the visible space failed the same way. yabai used the bridged WindowServer operation whenever macOS offered it, and on macOS 27.2 that operation does nothing for hidden spaces. With the scripting addition loaded, yabai now asks the Dock to move the window first, on macOS 15 and later and on recent 12 to 14 point releases, and falls back to the previous ways when the scripting addition is not loaded, so nothing changes with SIP enabled ([#10](https://github.com/Christian-SC26/yabai/issues/10), [#11](https://github.com/Christian-SC26/yabai/pull/11) by @aiguofer)
+- **Short messages to the Dock**: the scripting addition read the fields of its fixed-size messages (spaces, window moves, opacity, layer, sticky, shadow, focus, scale, order and moving to a space) without checking how many bytes arrived. A short message made it act on bytes left over from an earlier one. Such messages are now dropped. The scripting addition is now 2.1.39, so run `sudo yabai --load-sa` once after upgrading
+- **Installing the service without `~/Library/LaunchAgents`**: `--install-service` and `--start-service` created only the last directory of the plist path, and failed when a parent directory was missing. They now create every missing directory
+
 ## [7.3.3] - 2026-11-11
 ### Fixed
 - **Switching to an application running under a debugger**: An application launched from Xcode could not be reached with `cmd + tab` or the Dock while its windows were on another space. yabai ignores such processes so that one stopped at a breakpoint cannot block it, and their activations were dropped too. yabai now follows them to their space through WindowServer, still without sending them any accessibility request
@@ -1018,7 +1024,8 @@ The *window_destroyed* signal is now triggered for windows that are implicitly d
 ### Added
 - First official release
 
-[Unreleased]: https://github.com/Christian-SC26/yabai/compare/v7.3.3...HEAD
+[Unreleased]: https://github.com/Christian-SC26/yabai/compare/v7.3.4...HEAD
+[7.3.4]: https://github.com/Christian-SC26/yabai/compare/v7.3.3...v7.3.4
 [7.3.3]: https://github.com/Christian-SC26/yabai/compare/v7.3.2...v7.3.3
 [7.3.2]: https://github.com/Christian-SC26/yabai/compare/v7.3.1...v7.3.2
 [7.3.1]: https://github.com/Christian-SC26/yabai/compare/v7.3.0...v7.3.1
