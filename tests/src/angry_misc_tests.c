@@ -536,6 +536,7 @@ ANGRY_TEST(uninstallsLaunchdServiceFromMockHomeDirectory)
 {
     g_mock_home = "/tmp/yabai_mock_home";
     char *p = populate_plist_path();
+    ensure_directory_exists(p);
     FILE *f = fopen(p, "w"); if (f) fclose(f);
     int res = service_uninstall();
     free(p);
@@ -558,6 +559,7 @@ ANGRY_TEST(restartsLaunchdServiceInMockEnvironment)
 {
     g_mock_home = "/tmp/yabai_mock_home";
     char *p = populate_plist_path();
+    ensure_directory_exists(p);
     FILE *f = fopen(p, "w"); if (f) fclose(f);
     int res = service_restart();
     unlink(p);
@@ -570,6 +572,7 @@ ANGRY_TEST(stopsLaunchdServiceInMockEnvironment)
 {
     g_mock_home = "/tmp/yabai_mock_home";
     char *p = populate_plist_path();
+    ensure_directory_exists(p);
     FILE *f = fopen(p, "w"); if (f) fclose(f);
     int res = service_stop();
     unlink(p);

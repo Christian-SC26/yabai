@@ -178,24 +178,21 @@ static char *populate_plist(int *length)
 static inline void ensure_directory_exists(char *yabai_plist_path)
 {
     //
-    // NOTE(asmvik): Temporarily remove filename.
-    // We know the filepath will contain a slash, as
-    // it is controlled by us, so don't bother checking
-    // the result..
+    // NOTE(asmvik): Temporarily cut the path at each slash after the first,
+    // and create every missing directory on the way to the file, like
+    // mkdir -p. We know the filepath will contain a slash, as it is
+    // controlled by us. Each slash is restored before moving on.
     //
 
-    char *last_slash = strrchr(yabai_plist_path, '/');
-    *last_slash = '\0';
+    for (char *slash = strchr(yabai_plist_path + 1, '/'); slash; slash = strchr(slash + 1, '/')) {
+        *slash = '\0';
 
-    if (!directory_exists(yabai_plist_path)) {
-        mkdir(yabai_plist_path, 0755);
+        if (!directory_exists(yabai_plist_path)) {
+            mkdir(yabai_plist_path, 0755);
+        }
+
+        *slash = '/';
     }
-
-    //
-    // NOTE(asmvik): Restore original filename.
-    //
-
-    *last_slash = '/';
 }
 
 static int service_install_internal(char *yabai_plist_path)
