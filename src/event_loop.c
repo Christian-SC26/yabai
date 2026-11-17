@@ -525,16 +525,33 @@ static EVENT_HANDLER(APPLICATION_FRONT_SWITCHED)
         if (prev_pid && process->pid == prev_pid) {
             debug("%s: %s (%d) matches prev_pid, allowing restoration after mission control exit..\n", __FUNCTION__, process->name, process->pid);
         } else {
-            debug("%s: %s (%d) spurious front switch after mission control cancellation (prev_pid=%d), suppressing..\n",
-                  __FUNCTION__, process->name, process->pid, prev_pid);
-
             struct window *restore_win = NULL;
             if (prev_wid) {
                 restore_win = window_manager_find_window(&g_window_manager, prev_wid);
+
+                //
+                // NOTE: the previous application can have no window on the previous space -- the user went there
+                // without activating anything. Putting it in front of that space makes the space hand focus back to
+                // its own top window, which is suppressed again here, and the two keep reordering windows across
+                // spaces until one of them leaves a window ordered in on a space it does not belong to.
+                //
+
+                if (restore_win && prev_sid && window_space(restore_win->id) != prev_sid && !window_is_sticky(restore_win->id)) {
+                    restore_win = NULL;
+                }
             }
             if (!restore_win && prev_sid) {
                 restore_win = window_manager_find_window_on_space_by_rank_filtering_window(&g_window_manager, prev_sid, 1, 0);
             }
+
+            if (restore_win && restore_win->application->pid == process->pid) {
+                debug("%s: %s (%d) owns the top window of space %lld, allowing front switch after mission control exit..\n",
+                      __FUNCTION__, process->name, process->pid, prev_sid);
+                goto allow;
+            }
+
+            debug("%s: %s (%d) spurious front switch after mission control cancellation (prev_pid=%d), suppressing..\n",
+                  __FUNCTION__, process->name, process->pid, prev_pid);
 
             if (restore_win) {
                 debug("%s: forcing front process back to %s (%d) on space %lld\n",
@@ -553,6 +570,7 @@ static EVENT_HANDLER(APPLICATION_FRONT_SWITCHED)
         }
     }
 
+allow:
     for (int i = 0; i < buf_len(g_window_manager.applications_to_refresh); ++i) {
         if (application == g_window_manager.applications_to_refresh[i]) {
             debug("%s: %s has windows that are not yet resolved\n", __FUNCTION__, application->name);

@@ -950,6 +950,10 @@ struct window *window_manager_find_window_on_space_by_rank_filtering_window(stru
         struct window *window = window_manager_find_window(wm, window_list[i]);
         if (!window) continue;
 
+        // NOTE: a child or system window of an application sits above its parent, and focusing or raising it
+        // on its own leaves it behind on other spaces (Rex keeps an empty AXSystemDialog child over each window).
+        if (!window->is_eligible) continue;
+
         if (++j == rank) {
             result = window;
             break;
