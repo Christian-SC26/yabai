@@ -1847,6 +1847,82 @@ void window_manager_add_existing_tabs(struct space_manager *sm, struct window_ma
     update_window_notifications();
 }
 
+// NOTE: a window that its application lists but yabai does not track is never picked up again -- no
+// further create is posted for it, and a restart can resolve the wrong window of the same application.
+// Only the log shows when it happened, so name it there the first time it is seen untracked.
+static uint32_t *g_reported_untracked;
+
+static bool window_manager_untracked_was_reported(uint32_t wid, bool forget)
+{
+    for (int i = 0; i < buf_len(g_reported_untracked); ++i) {
+        if (g_reported_untracked[i] != wid) continue;
+        if (forget) buf_del(g_reported_untracked, i);
+        return true;
+    }
+
+    return false;
+}
+
+static int window_manager_report_untracked_application_windows(struct window_manager *wm, struct application *application, const char *reason)
+{
+    CFArrayRef window_list_ref = application_window_list(application);
+    if (!window_list_ref) return 0;
+
+    int count = 0;
+    for (int i = 0; i < CFArrayGetCount(window_list_ref); ++i) {
+        AXUIElementRef window_ref = CFArrayGetValueAtIndex(window_list_ref, i);
+        uint32_t wid = ax_window_id(window_ref);
+        if (!wid) continue;
+
+        if (window_manager_find_window(wm, wid)) {
+            window_manager_untracked_was_reported(wid, true);
+            continue;
+        }
+
+        CFTypeRef role = NULL, subrole = NULL, title = NULL;
+        AXUIElementCopyAttributeValue(window_ref, kAXRoleAttribute, &role);
+        AXUIElementCopyAttributeValue(window_ref, kAXSubroleAttribute, &subrole);
+
+        // NOTE: yabai ignores AXUnknown windows on purpose; once one reports a real subrole it counts.
+        bool is_window = role && CFEqual(role, kAXWindowRole) && !(subrole && CFEqual(subrole, kAXUnknownSubrole));
+
+        if (is_window && !window_manager_untracked_was_reported(wid, false)) {
+            AXUIElementCopyAttributeValue(window_ref, kAXTitleAttribute, &title);
+            uint8_t ordered_in = 0;
+            SLSWindowIsOrderedIn(g_connection, wid, &ordered_in);
+
+            char *subrole_str = subrole ? ts_cfstring_copy(subrole) : NULL;
+            char *title_str = title && CFGetTypeID(title) == CFStringGetTypeID() ? ts_cfstring_copy(title) : NULL;
+            debug("%s: UNTRACKED WINDOW %s (%d) %d %s ordered-in=%d title='%s' (on %s)\n", __FUNCTION__,
+                  application->name, application->pid, wid, subrole_str ? subrole_str : "<none>", ordered_in,
+                  title_str ? title_str : "", reason);
+
+            buf_push(g_reported_untracked, wid);
+            ++count;
+        }
+
+        if (role) CFRelease(role);
+        if (subrole) CFRelease(subrole);
+        if (title) CFRelease(title);
+    }
+
+    CFRelease(window_list_ref);
+    return count;
+}
+
+int window_manager_report_untracked_windows(struct window_manager *wm, struct application *application, const char *reason)
+{
+    if (!g_verbose) return 0;
+    if (application) return window_manager_report_untracked_application_windows(wm, application, reason);
+
+    int count = 0;
+    table_for (struct application *it, wm->application, {
+        count += window_manager_report_untracked_application_windows(wm, it, reason);
+    })
+
+    return count;
+}
+
 bool window_manager_add_existing_application_windows(struct space_manager *sm, struct window_manager *wm, struct application *application, int refresh_index)
 {
     bool result = false;

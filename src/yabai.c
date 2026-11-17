@@ -351,6 +351,7 @@ int main(int argc, char **argv)
     window_manager_init(&g_window_manager);
     space_manager_begin(&g_space_manager);
     window_manager_begin(&g_space_manager, &g_window_manager);
+    window_manager_report_untracked_windows(&g_window_manager, NULL, "startup");
 
     if (workspace_is_macos_sequoia() || (workspace_is_macos_tahoe() || workspace_is_macos_goldengate())) {
         update_window_notifications();

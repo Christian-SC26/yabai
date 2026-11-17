@@ -561,6 +561,8 @@ static EVENT_HANDLER(APPLICATION_FRONT_SWITCHED)
         }
     }
 
+    window_manager_report_untracked_windows(&g_window_manager, application, "front switched");
+
     uint32_t active_did = display_manager_active_display_id();
     uint64_t active_sid = display_space_id(active_did);
 
@@ -1086,6 +1088,8 @@ static EVENT_HANDLER(WINDOW_DESTROYED)
         event_signal_push(SIGNAL_WINDOW_DESTROYED, window);
     }
 
+    struct application *application = window->application;
+
     window_manager_remove_scratchpad_for_window(&g_window_manager, window, false);
     window_manager_remove_window(&g_window_manager, window->id);
     window_unobserve(window);
@@ -1094,6 +1098,8 @@ static EVENT_HANDLER(WINDOW_DESTROYED)
     if (workspace_is_macos_sequoia() || (workspace_is_macos_tahoe() || workspace_is_macos_goldengate())) {
         update_window_notifications();
     }
+
+    if (application) window_manager_report_untracked_windows(&g_window_manager, application, "window destroyed");
 }
 
 #define WINDOW_FOCUS_FROM_TAB 1
@@ -1772,6 +1778,8 @@ static EVENT_HANDLER(SPACE_CHANGED)
             window_manager_remove_lost_focused_event(&g_window_manager, focused_window->id);
         }
     }
+
+    window_manager_report_untracked_windows(&g_window_manager, NULL, "space changed");
 
     if (!mission_control_is_active() && space_is_user(g_space_manager.current_space_id)) {
         window_manager_validate_and_check_for_windows_on_space(&g_space_manager, &g_window_manager, g_space_manager.current_space_id);

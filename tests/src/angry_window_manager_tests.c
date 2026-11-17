@@ -557,6 +557,29 @@ ANGRY_TEST(addsExistingApplicationWindowsSafely)
     ANGRY_ASSERT(!added, "expected add_existing_application_windows to return false on null ref");
 }
 
+ANGRY_TEST(reportsNoUntrackedWindowsWhenVerboseIsDisabled)
+{
+    bool orig = g_verbose;
+    g_verbose = false;
+    int count = window_manager_report_untracked_windows(&g_window_manager, NULL, "test");
+    g_verbose = orig;
+    ANGRY_ASSERT(count == 0, "expected the untracked window check to stay off without debug_output");
+}
+
+ANGRY_TEST(reportsNoUntrackedWindowsForApplicationWithoutWindows)
+{
+    ProcessSerialNumber psn = {0};
+    GetProcessForPID(getpid(), &psn);
+    struct process proc = { .pid = getpid(), .psn = psn, .name = "yabai_tests" };
+    struct application *app = application_create(&proc);
+    bool orig = g_verbose;
+    g_verbose = true;
+    int count = window_manager_report_untracked_windows(&g_window_manager, app, "test");
+    g_verbose = orig;
+    application_destroy(app);
+    ANGRY_ASSERT(count == 0, "expected no untracked windows for an application that has none");
+}
+
 ANGRY_TEST(refusesInsertionPointForWindowOutsideTheLayout)
 {
     g_mock_active_space = 0x7E574001ULL;
