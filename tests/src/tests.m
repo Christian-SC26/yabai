@@ -1219,6 +1219,7 @@ static void tests_isolate_scripting_addition(void)
     ANGRY_ENTRY(addsApplicationWindowsSafely)                                   \
     ANGRY_ENTRY(addsExistingApplicationWindowsSafely)                           \
     ANGRY_ENTRY(reportsNoUntrackedWindowsWhenVerboseIsDisabled)                 \
+    ANGRY_ENTRY(reportsNoLeakedWindowsWhenVerboseIsDisabled)                    \
     ANGRY_ENTRY(reportsNoUntrackedWindowsForApplicationWithoutWindows)          \
     ANGRY_ENTRY(refusesInsertionPointForWindowOutsideTheLayout)                 \
     ANGRY_ENTRY(stacksWindowReturningErrorOnSelfStack)                          \

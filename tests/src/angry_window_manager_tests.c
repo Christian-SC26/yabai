@@ -566,6 +566,15 @@ ANGRY_TEST(reportsNoUntrackedWindowsWhenVerboseIsDisabled)
     ANGRY_ASSERT(count == 0, "expected the untracked window check to stay off without debug_output");
 }
 
+ANGRY_TEST(reportsNoLeakedWindowsWhenVerboseIsDisabled)
+{
+    bool orig = g_verbose;
+    g_verbose = false;
+    int count = window_manager_report_leaked_windows("test");
+    g_verbose = orig;
+    ANGRY_ASSERT(count == 0, "expected the leaked window check to stay off without debug_output");
+}
+
 ANGRY_TEST(reportsNoUntrackedWindowsForApplicationWithoutWindows)
 {
     ProcessSerialNumber psn = {0};

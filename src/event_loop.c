@@ -1798,6 +1798,7 @@ static EVENT_HANDLER(SPACE_CHANGED)
     }
 
     window_manager_report_untracked_windows(&g_window_manager, NULL, "space changed");
+    window_manager_report_leaked_windows("space changed");
 
     if (!mission_control_is_active() && space_is_user(g_space_manager.current_space_id)) {
         window_manager_validate_and_check_for_windows_on_space(&g_space_manager, &g_window_manager, g_space_manager.current_space_id);

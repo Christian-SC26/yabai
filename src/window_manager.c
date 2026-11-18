@@ -1927,6 +1927,101 @@ int window_manager_report_untracked_windows(struct window_manager *wm, struct ap
     return count;
 }
 
+// NOTE: a window that is drawn while none of its spaces is visible shows over other spaces -- Rex's child
+// window did this and came forward during native fullscreen transitions of other applications. Nothing in
+// yabai's own state shows it, so look at what is on screen.
+static uint32_t *g_reported_leaked;
+
+int window_manager_report_leaked_windows(const char *reason)
+{
+    if (!g_verbose) return 0;
+
+    int display_count;
+    uint32_t *display_list = display_manager_active_display_list(&display_count);
+    if (!display_list) return 0;
+
+    uint64_t visible_sids[16];
+    int visible_count = 0;
+    for (int i = 0; i < display_count && visible_count < 16; ++i) {
+        uint64_t sid = display_space_id(display_list[i]);
+        if (sid) visible_sids[visible_count++] = sid;
+    }
+
+    CFArrayRef window_list = CGWindowListCopyWindowInfo(kCGWindowListOptionOnScreenOnly | kCGWindowListExcludeDesktopElements, kCGNullWindowID);
+    if (!window_list) return 0;
+
+    int count = 0;
+    uint32_t *leaked = NULL;
+
+    for (int i = 0; i < CFArrayGetCount(window_list); ++i) {
+        CFDictionaryRef info = CFArrayGetValueAtIndex(window_list, i);
+        int layer = 0;
+        uint32_t wid = 0;
+        int pid = 0;
+
+        CFNumberRef layer_ref = CFDictionaryGetValue(info, kCGWindowLayer);
+        CFNumberRef wid_ref = CFDictionaryGetValue(info, kCGWindowNumber);
+        CFNumberRef pid_ref = CFDictionaryGetValue(info, kCGWindowOwnerPID);
+        if (!layer_ref || !wid_ref) continue;
+
+        CFNumberGetValue(layer_ref, kCFNumberIntType, &layer);
+        CFNumberGetValue(wid_ref, kCFNumberSInt32Type, &wid);
+        if (pid_ref) CFNumberGetValue(pid_ref, kCFNumberIntType, &pid);
+        if (layer != 0 || !wid) continue;
+
+        CFArrayRef wid_ref_list = cfarray_of_cfnumbers(&wid, sizeof(uint32_t), 1, kCFNumberSInt32Type);
+        CFArrayRef space_list = SLSCopySpacesForWindows(g_connection, 0x7, wid_ref_list);
+        CFRelease(wid_ref_list);
+        if (!space_list) continue;
+
+        int space_count = CFArrayGetCount(space_list);
+        uint64_t first_sid = 0;
+        bool on_visible_space = false;
+
+        for (int j = 0; j < space_count; ++j) {
+            uint64_t sid = 0;
+            CFNumberGetValue(CFArrayGetValueAtIndex(space_list, j), kCFNumberSInt64Type, &sid);
+            if (j == 0) first_sid = sid;
+            for (int k = 0; k < visible_count; ++k) {
+                if (visible_sids[k] == sid) on_visible_space = true;
+            }
+        }
+        CFRelease(space_list);
+
+        // NOTE: a window on no space at all is one in transition; only a window that belongs elsewhere is leaked.
+        if (space_count == 0 || on_visible_space) continue;
+
+        ts_buf_push(leaked, wid);
+
+        bool reported = false;
+        for (int j = 0; j < buf_len(g_reported_leaked); ++j) {
+            if (g_reported_leaked[j] == wid) reported = true;
+        }
+        if (reported) continue;
+
+        CFStringRef owner_ref = CFDictionaryGetValue(info, kCGWindowOwnerName);
+        char *owner = owner_ref ? ts_cfstring_copy(owner_ref) : NULL;
+        debug("%s: LEAKED WINDOW %s (%d) %d belongs to space %lld but is on screen (on %s)\n", __FUNCTION__,
+              owner ? owner : "<unknown>", pid, wid, first_sid, reason);
+
+        buf_push(g_reported_leaked, wid);
+        ++count;
+    }
+
+    CFRelease(window_list);
+
+    // NOTE: forget windows that are no longer leaked, so a window that leaks again is reported again.
+    for (int j = buf_len(g_reported_leaked) - 1; j >= 0; --j) {
+        bool still = false;
+        for (int k = 0; k < ts_buf_len(leaked); ++k) {
+            if (leaked[k] == g_reported_leaked[j]) still = true;
+        }
+        if (!still) buf_del(g_reported_leaked, j);
+    }
+
+    return count;
+}
+
 bool window_manager_add_existing_application_windows(struct space_manager *sm, struct window_manager *wm, struct application *application, int refresh_index)
 {
     bool result = false;
