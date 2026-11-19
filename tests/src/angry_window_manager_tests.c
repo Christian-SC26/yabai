@@ -669,6 +669,20 @@ ANGRY_TEST(keepsShadowFlagWhenScriptingAdditionCannotChangeIt)
     ANGRY_ASSERT(window_check_flag(&win, WINDOW_SHADOW), "expected the shadow flag to stay while the scripting addition is unreachable");
 }
 
+ANGRY_TEST(reportsFailedShadowToggleWhenScriptingAdditionIsUnreachable)
+{
+    struct window win = { .id = 9353 };
+    bool toggled = window_manager_toggle_window_shadow(&win);
+    ANGRY_ASSERT(!toggled, "expected the shadow toggle to report failure while the scripting addition is unreachable");
+}
+
+ANGRY_TEST(reportsFailedPurifyWhenScriptingAdditionIsUnreachable)
+{
+    struct window win = { .id = 9354 };
+    bool purified = window_manager_purify_window(&g_window_manager, &win);
+    ANGRY_ASSERT(!purified, "expected purifying a window to report failure while the scripting addition is unreachable");
+}
+
 ANGRY_TEST(togglesScratchpadWindowByLabelReturningFalse)
 {
     bool toggled = window_manager_toggle_scratchpad_window_by_label(&g_window_manager, "missing_label");

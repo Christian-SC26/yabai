@@ -1373,11 +1373,17 @@ static void handle_domain_config(FILE *rsp, struct token domain, char *message)
             if (!token_is_valid(value)) {
                 fprintf(rsp, "%s\n", purify_mode_str[g_window_manager.purify_mode]);
             } else if (token_equals(value, ARGUMENT_COMMON_VAL_OFF)) {
-                window_manager_set_purify_mode(&g_window_manager, PURIFY_ALWAYS);
+                if (!window_manager_set_purify_mode(&g_window_manager, PURIFY_ALWAYS)) {
+                    daemon_fail(rsp, "could not change shadow of every window due to an error with the scripting-addition.\n");
+                }
             } else if (token_equals(value, ARGUMENT_CONFIG_SHADOW_FLT)) {
-                window_manager_set_purify_mode(&g_window_manager, PURIFY_MANAGED);
+                if (!window_manager_set_purify_mode(&g_window_manager, PURIFY_MANAGED)) {
+                    daemon_fail(rsp, "could not change shadow of every window due to an error with the scripting-addition.\n");
+                }
             } else if (token_equals(value, ARGUMENT_COMMON_VAL_ON)) {
-                window_manager_set_purify_mode(&g_window_manager, PURIFY_DISABLED);
+                if (!window_manager_set_purify_mode(&g_window_manager, PURIFY_DISABLED)) {
+                    daemon_fail(rsp, "could not change shadow of every window due to an error with the scripting-addition.\n");
+                }
             } else {
                 daemon_fail(rsp, "unknown value '%.*s' given to command '%.*s' for domain '%.*s'\n", value.length, value.text, command.length, command.text, domain.length, domain.text);
             }
@@ -2400,7 +2406,9 @@ static void handle_domain_window(FILE *rsp, struct token domain, char *message)
                 }
             } else if (token_equals(value, ARGUMENT_WINDOW_TOGGLE_SHADOW)) {
                 if (acting_window) {
-                    window_manager_toggle_window_shadow(acting_window);
+                    if (!window_manager_toggle_window_shadow(acting_window)) {
+                        daemon_fail(rsp, "could not toggle shadow of window with id '%d' due to an error with the scripting-addition.\n", acting_window->id);
+                    }
                 } else {
                     daemon_fail(rsp, "could not locate the window to act on!\n");
                 }

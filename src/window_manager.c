@@ -790,14 +790,18 @@ void window_manager_set_window_frame(struct window *window, float x, float y, fl
     });
 }
 
-void window_manager_set_purify_mode(struct window_manager *wm, enum purify_mode mode)
+bool window_manager_set_purify_mode(struct window_manager *wm, enum purify_mode mode)
 {
+    bool result = true;
+
     wm->purify_mode = mode;
     table_for (struct window *window, wm->window, {
         if (window_manager_is_window_eligible(window)) {
-            window_manager_purify_window(wm, window);
+            if (!window_manager_purify_window(wm, window)) result = false;
         }
     })
+
+    return result;
 }
 
 bool window_manager_set_opacity(struct window_manager *wm, struct window *window, float opacity)
@@ -903,7 +907,7 @@ bool window_manager_set_window_layer(struct window *window, int layer)
     return result;
 }
 
-void window_manager_purify_window(struct window_manager *wm, struct window *window)
+bool window_manager_purify_window(struct window_manager *wm, struct window *window)
 {
     int value;
 
@@ -915,13 +919,15 @@ void window_manager_purify_window(struct window_manager *wm, struct window *wind
         value = 0;
     }
 
-    if (scripting_addition_set_shadow(window->id, value)) {
-        if (value) {
-            window_set_flag(window, WINDOW_SHADOW);
-        } else {
-            window_clear_flag(window, WINDOW_SHADOW);
-        }
+    if (!scripting_addition_set_shadow(window->id, value)) return false;
+
+    if (value) {
+        window_set_flag(window, WINDOW_SHADOW);
+    } else {
+        window_clear_flag(window, WINDOW_SHADOW);
     }
+
+    return true;
 }
 
 int window_manager_find_rank_of_window_in_list(uint32_t wid, uint32_t *window_list, int window_count)
@@ -2677,18 +2683,20 @@ void window_manager_make_window_sticky(struct space_manager *sm, struct window_m
     }
 }
 
-void window_manager_toggle_window_shadow(struct window *window)
+bool window_manager_toggle_window_shadow(struct window *window)
 {
     TIME_FUNCTION;
 
     bool shadow = !window_check_flag(window, WINDOW_SHADOW);
-    if (scripting_addition_set_shadow(window->id, shadow)) {
-        if (shadow) {
-            window_set_flag(window, WINDOW_SHADOW);
-        } else {
-            window_clear_flag(window, WINDOW_SHADOW);
-        }
+    if (!scripting_addition_set_shadow(window->id, shadow)) return false;
+
+    if (shadow) {
+        window_set_flag(window, WINDOW_SHADOW);
+    } else {
+        window_clear_flag(window, WINDOW_SHADOW);
     }
+
+    return true;
 }
 
 void window_manager_wait_for_native_fullscreen_transition(struct window *window)
