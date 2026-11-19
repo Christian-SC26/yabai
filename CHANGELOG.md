@@ -6,6 +6,14 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [7.3.5] - 2026-11-20
+### Fixed
+- **Silent shadow failures**: `window --toggle shadow` and `config window_shadow` exited 0 and printed nothing when the scripting addition was not loaded in the Dock, so the shadow stayed as it was with no hint why. This happens after `--load-sa` updates an outdated payload: it installs the new files and restarts the Dock, and the payload is only injected by the next `--load-sa`, usually from the `dock_did_restart` signal. Both commands now fail with the same scripting addition error as `--sub-layer` and `--opacity`. `window_shadow` still keeps the chosen mode and applies it once the scripting addition is loaded (found while checking [#12](https://github.com/Christian-SC26/yabai/issues/12))
+- **Focus fight after leaving Mission Control**: after a Mission Control exit that counts as a cancellation, yabai could restore the top window of the previous space while also forcing the previous application back in front of a space where it had no window. Each round reordered windows across spaces, and a child window such as Rex's empty system dialog could be left over another application's native fullscreen animation. yabai now picks only eligible windows as the top window of a space, never a child or system window above its parent, and lets the front switch through when the activating application owns that window
+
+### Added
+- **Debug reports for lost windows**: with `debug_output on`, yabai logs every window an application lists but yabai does not track, checked on startup, space change, front switch and window destroy, and every window drawn on screen while none of its spaces is visible, checked on every space change. Each window is logged once, so the log marks when the problem starts
+
 ## [7.3.4] - 2026-11-16
 ### Fixed
 - **Moving windows to hidden spaces on macOS 27**: `window --space` exited 0 but left the window where it was when the target space was not visible, and moving it back to the visible space failed the same way. yabai used the bridged WindowServer operation whenever macOS offered it, and on macOS 27.2 that operation does nothing for hidden spaces. With the scripting addition loaded, yabai now asks the Dock to move the window first, on macOS 15 and later and on recent 12 to 14 point releases, and falls back to the previous ways when the scripting addition is not loaded, so nothing changes with SIP enabled ([#10](https://github.com/Christian-SC26/yabai/issues/10), [#11](https://github.com/Christian-SC26/yabai/pull/11) by @aiguofer)
@@ -1024,7 +1032,8 @@ The *window_destroyed* signal is now triggered for windows that are implicitly d
 ### Added
 - First official release
 
-[Unreleased]: https://github.com/Christian-SC26/yabai/compare/v7.3.4...HEAD
+[Unreleased]: https://github.com/Christian-SC26/yabai/compare/v7.3.5...HEAD
+[7.3.5]: https://github.com/Christian-SC26/yabai/compare/v7.3.4...v7.3.5
 [7.3.4]: https://github.com/Christian-SC26/yabai/compare/v7.3.3...v7.3.4
 [7.3.3]: https://github.com/Christian-SC26/yabai/compare/v7.3.2...v7.3.3
 [7.3.2]: https://github.com/Christian-SC26/yabai/compare/v7.3.1...v7.3.2
