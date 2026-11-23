@@ -521,7 +521,7 @@ static EVENT_HANDLER(APPLICATION_FRONT_SWITCHED)
     uint64_t prev_sid = __atomic_load_n(&g_mission_control_prev_sid, __ATOMIC_RELAXED);
     pid_t prev_pid = __atomic_load_n(&g_mission_control_prev_pid, __ATOMIC_RELAXED);
 
-    if (dt_mc_exit_ms < 600 && !mouse_clicked) {
+    if (dt_mc_exit_ms < 600 && !mouse_clicked && !mission_control_user_focused_space_since_exit()) {
         if (prev_pid && process->pid == prev_pid) {
             debug("%s: %s (%d) matches prev_pid, allowing restoration after mission control exit..\n", __FUNCTION__, process->name, process->pid);
         } else {
@@ -1227,7 +1227,7 @@ static EVENT_HANDLER(WINDOW_FOCUSED)
     bool mouse_clicked = __atomic_load_n(&g_mission_control_mouse_clicked, __ATOMIC_RELAXED);
     uint32_t prev_wid = __atomic_load_n(&g_mission_control_prev_wid, __ATOMIC_RELAXED);
 
-    if (dt_mc_exit_ms < 600 && !mouse_clicked) {
+    if (dt_mc_exit_ms < 600 && !mouse_clicked && !mission_control_user_focused_space_since_exit()) {
         if (prev_wid && window->id != prev_wid) {
             debug("%s: %s %d received focus after mission control cancellation (prev_wid=%d), ignoring..\n",
                   __FUNCTION__, window->application->name, window->id, prev_wid);
@@ -1767,7 +1767,7 @@ static EVENT_HANDLER(SPACE_CHANGED)
     bool mouse_clicked = __atomic_load_n(&g_mission_control_mouse_clicked, __ATOMIC_RELAXED);
     uint64_t prev_sid = __atomic_load_n(&g_mission_control_prev_sid, __ATOMIC_RELAXED);
 
-    if (dt_mc_exit_ms < 400 && !mouse_clicked) {
+    if (dt_mc_exit_ms < 400 && !mouse_clicked && !mission_control_user_focused_space_since_exit()) {
         uint64_t active_sid = space_manager_active_space();
         if (prev_sid && active_sid != prev_sid) {
             debug("%s: space changed to %lld after mission control cancellation, restoring prev_sid %lld..\n",
@@ -2544,6 +2544,8 @@ static EVENT_HANDLER(MISSION_CONTROL_EXIT)
     uint64_t prev_sid = __atomic_load_n(&g_mission_control_prev_sid, __ATOMIC_RELAXED);
 
     void (^restore_focus)(void) = ^{
+        if (mission_control_user_focused_space_since_exit()) return;
+
         uint64_t current_sid = space_manager_active_space();
         uint64_t now = read_os_timer();
         uint64_t last_gesture_time = __atomic_load_n(&__last_gesture_time, __ATOMIC_RELAXED);
