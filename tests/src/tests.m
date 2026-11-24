@@ -1254,7 +1254,14 @@ static void tests_isolate_scripting_addition(void)
     ANGRY_ENTRY(keepsSpacePaddingForPictureInPicture)                           \
     ANGRY_ENTRY(followsActivatedApplicationToSpaceOfItsShownTab)                \
     ANGRY_ENTRY(handsFocusAwayFromApplicationWhoseOnlyWindowOnSpaceIsHiddenTab) \
-    ANGRY_ENTRY(followsApplicationRunningUnderDebuggerToSpaceOfItsWindow)
+    ANGRY_ENTRY(followsApplicationRunningUnderDebuggerToSpaceOfItsWindow)       \
+    ANGRY_ENTRY(treatsSpaceFocusCommandAfterMissionControlExitAsUserChoice)     \
+    ANGRY_ENTRY(ignoresSpaceFocusCommandFromBeforeMissionControlExit)           \
+    ANGRY_ENTRY(ignoresSpaceFocusCommandWhenMissionControlNeverExited)          \
+    ANGRY_ENTRY(clearsUserSpaceFocusTimeWhenMissionControlRecordsNewSession)    \
+    ANGRY_ENTRY(recordsUserSpaceFocusForUserCommandsButNotInternalFocus)        \
+    ANGRY_ENTRY(keepsUserSpaceSwitchAndHandsFocusOnSpaceChangedRightAfterMissionControlExit) \
+    ANGRY_ENTRY(ignoresDuplicateMissionControlExitAfterUserSpaceSwitch)
 
 static struct test {
     char *name;
