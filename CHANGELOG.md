@@ -6,7 +6,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 ### Fixed
-- **Space switch undone right after leaving Mission Control**: after Mission Control was cancelled (escape, hotkey or gesture without a click), yabai went back to the space it was opened from when the space changed within 400 ms, and put the previous application and window back for 600 ms, to counter macOS 27.2 showing another space by itself ([#7](https://github.com/Christian-SC26/yabai/issues/7)). A `space --focus` sent in that time, such as a hotkey pressed right after closing Mission Control with `ctrl + up`, switched the space and was then sent back. yabai now leaves the change alone when a `space --focus` command made it after Mission Control closed
+- **Space switch undone right after leaving Mission Control**: after Mission Control was cancelled (escape, hotkey or gesture without a click), yabai went back to the space it was opened from when the space changed within 400 ms, and put the previous application and window back for 600 ms, to counter macOS 27.2 showing another space by itself ([#7](https://github.com/Christian-SC26/yabai/issues/7)). A `space --focus`, `space --switch` or `display --space` sent in that time, such as a hotkey pressed right after closing Mission Control with `ctrl + up`, switched the space and was then sent back. yabai now leaves the switch alone and hands focus to the new space when a user space-switch command made it after Mission Control closed ([#14](https://github.com/Christian-SC26/yabai/pull/14) by @pomortl)
 
 ## [7.3.5] - 2026-11-20
 ### Fixed
