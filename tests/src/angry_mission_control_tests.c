@@ -112,3 +112,36 @@ ANGRY_TEST(mapsMissionControlModesToExpectedStringRepresentations) {
     bool match = ANGRY_ALL(string_equals(mission_control_mode_str[MISSION_CONTROL_MODE_INACTIVE], "inactive"), string_equals(mission_control_mode_str[MISSION_CONTROL_MODE_SHOW], "show"), string_equals(mission_control_mode_str[MISSION_CONTROL_MODE_SHOW_ALL_WINDOWS], "show-all-windows"), string_equals(mission_control_mode_str[MISSION_CONTROL_MODE_SHOW_FRONT_WINDOWS], "show-front-windows"), string_equals(mission_control_mode_str[MISSION_CONTROL_MODE_SHOW_DESKTOP], "show-desktop"));
     ANGRY_ASSERT(match, "mission_control_mode_str contains incorrect string mappings");
 }
+
+ANGRY_TEST(treatsSpaceFocusCommandAfterMissionControlExitAsUserChoice) {
+    uint64_t saved_exit = __atomic_load_n(&g_mission_control_exit_time, __ATOMIC_RELAXED);
+    uint64_t saved_focus = __atomic_load_n(&g_mission_control_user_space_focus_time, __ATOMIC_RELAXED);
+    __atomic_store_n(&g_mission_control_exit_time, 1000, __ATOMIC_RELEASE);
+    __atomic_store_n(&g_mission_control_user_space_focus_time, 2000, __ATOMIC_RELEASE);
+    bool result = mission_control_user_focused_space_since_exit();
+    __atomic_store_n(&g_mission_control_exit_time, saved_exit, __ATOMIC_RELEASE);
+    __atomic_store_n(&g_mission_control_user_space_focus_time, saved_focus, __ATOMIC_RELEASE);
+    ANGRY_ASSERT(result, "expected a space focus command after the Mission Control exit to count as the user's choice");
+}
+
+ANGRY_TEST(ignoresSpaceFocusCommandFromBeforeMissionControlExit) {
+    uint64_t saved_exit = __atomic_load_n(&g_mission_control_exit_time, __ATOMIC_RELAXED);
+    uint64_t saved_focus = __atomic_load_n(&g_mission_control_user_space_focus_time, __ATOMIC_RELAXED);
+    __atomic_store_n(&g_mission_control_exit_time, 2000, __ATOMIC_RELEASE);
+    __atomic_store_n(&g_mission_control_user_space_focus_time, 1000, __ATOMIC_RELEASE);
+    bool result = mission_control_user_focused_space_since_exit();
+    __atomic_store_n(&g_mission_control_exit_time, saved_exit, __ATOMIC_RELEASE);
+    __atomic_store_n(&g_mission_control_user_space_focus_time, saved_focus, __ATOMIC_RELEASE);
+    ANGRY_ASSERT(!result, "expected a space focus command from before the Mission Control exit to be ignored");
+}
+
+ANGRY_TEST(ignoresSpaceFocusCommandWhenMissionControlNeverExited) {
+    uint64_t saved_exit = __atomic_load_n(&g_mission_control_exit_time, __ATOMIC_RELAXED);
+    uint64_t saved_focus = __atomic_load_n(&g_mission_control_user_space_focus_time, __ATOMIC_RELAXED);
+    __atomic_store_n(&g_mission_control_exit_time, 0, __ATOMIC_RELEASE);
+    __atomic_store_n(&g_mission_control_user_space_focus_time, 1000, __ATOMIC_RELEASE);
+    bool result = mission_control_user_focused_space_since_exit();
+    __atomic_store_n(&g_mission_control_exit_time, saved_exit, __ATOMIC_RELEASE);
+    __atomic_store_n(&g_mission_control_user_space_focus_time, saved_focus, __ATOMIC_RELEASE);
+    ANGRY_ASSERT(!result, "expected no user choice to be recorded before Mission Control has exited once");
+}

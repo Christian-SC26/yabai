@@ -1839,7 +1839,9 @@ static void handle_domain_space(FILE *rsp, struct token domain, char *message)
             struct selector selector = parse_space_selector(rsp, &message, acting_sid, false);
             if (selector.did_parse && selector.sid) {
                 enum space_op_error result = space_manager_focus_space(selector.sid);
-                if (result == SPACE_OP_ERROR_SAME_SPACE) {
+                if (result == SPACE_OP_ERROR_SUCCESS) {
+                    __atomic_store_n(&g_mission_control_user_space_focus_time, read_os_timer(), __ATOMIC_RELEASE);
+                } else if (result == SPACE_OP_ERROR_SAME_SPACE) {
                     daemon_fail(rsp, "cannot focus an already focused space.\n");
                 } else if (result == SPACE_OP_ERROR_DISPLAY_IS_ANIMATING) {
                     daemon_fail(rsp, "cannot focus space because the display is in the middle of an animation.\n");
