@@ -1327,6 +1327,7 @@ static void tests_reset_shared_state(void)
     g_mission_control_prev_pid = 0;
     g_mission_control_mouse_clicked = false;
     g_mission_control_exit_time = 0;
+    g_mission_control_user_space_focus_time = 0;
     g_mission_control_posted_exit = false;
     g_mission_control_hover_wid = 0;
     g_mission_control_cursor_moved = false;

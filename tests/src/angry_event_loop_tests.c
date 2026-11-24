@@ -325,3 +325,52 @@ ANGRY_TEST(followsApplicationRunningUnderDebuggerToSpaceOfItsWindow)
                      angry_sa_opcode(&server) == SA_OPCODE_SPACE_FOCUS,
                      requested == other_sid);
 }
+
+ANGRY_TEST(keepsUserSpaceSwitchAndHandsFocusOnSpaceChangedRightAfterMissionControlExit)
+{
+    struct angry_tabbed_application t;
+    angry_tabbed_application_begin(&t, getpid());
+    GetCurrentProcess(&t.app.psn);
+    g_mock_front_is_test_process = true;
+
+    uint64_t saved_current = g_space_manager.current_space_id;
+    uint64_t saved_last = g_space_manager.last_space_id;
+    g_space_manager.current_space_id = t.other_sid;
+    __atomic_store_n(&g_mission_control_prev_sid, t.other_sid, __ATOMIC_RELEASE);
+    __atomic_store_n(&g_mission_control_mouse_clicked, false, __ATOMIC_RELEASE);
+    __atomic_store_n(&g_mission_control_exit_time, read_os_timer() - 50000000ULL, __ATOMIC_RELEASE);
+    mission_control_note_user_space_focus();
+
+    EVENT_HANDLER_SPACE_CHANGED(NULL, 0);
+
+    uint64_t new_current = g_space_manager.current_space_id;
+    g_space_manager.current_space_id = saved_current;
+    g_space_manager.last_space_id = saved_last;
+    angry_tabbed_application_end(&t);
+
+    ANGRY_ASSERT_ALL("expected SPACE_CHANGED right after Mission Control exit to keep a user space switch and hand focus away from an off-space app",
+                     new_current == t.visible_sid,
+                     g_mock_event_post_count == 0,
+                     g_mock_front_process_count == 1,
+                     g_mock_front_process_wid == 0);
+}
+
+ANGRY_TEST(ignoresDuplicateMissionControlExitAfterUserSpaceSwitch)
+{
+    g_mock_dispatch_after = true;
+    g_mock_active_space = 0x7E578002ULL;
+    g_mission_control_mode = MISSION_CONTROL_MODE_INACTIVE;
+    __atomic_store_n(&g_mission_control_prev_sid, 0x7E578001ULL, __ATOMIC_RELEASE);
+    __atomic_store_n(&g_mission_control_mouse_clicked, false, __ATOMIC_RELEASE);
+
+    uint64_t exit_before = read_os_timer() - 50000000ULL;
+    __atomic_store_n(&g_mission_control_exit_time, exit_before, __ATOMIC_RELEASE);
+    mission_control_note_user_space_focus();
+
+    EVENT_HANDLER_MISSION_CONTROL_EXIT(NULL, 0);
+
+    ANGRY_ASSERT_ALL("expected a duplicate MISSION_CONTROL_EXIT after a user space switch to keep exit_time and skip restoring prev_sid",
+                     __atomic_load_n(&g_mission_control_exit_time, __ATOMIC_ACQUIRE) == exit_before,
+                     mission_control_user_focused_space_since_exit(),
+                     g_mock_event_post_count == 0);
+}

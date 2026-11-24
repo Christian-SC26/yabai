@@ -145,3 +145,51 @@ ANGRY_TEST(ignoresSpaceFocusCommandWhenMissionControlNeverExited) {
     __atomic_store_n(&g_mission_control_user_space_focus_time, saved_focus, __ATOMIC_RELEASE);
     ANGRY_ASSERT(!result, "expected no user choice to be recorded before Mission Control has exited once");
 }
+
+ANGRY_TEST(clearsUserSpaceFocusTimeWhenMissionControlRecordsNewSession) {
+    __atomic_store_n(&g_mission_control_prev_sid, 777, __ATOMIC_RELEASE);
+    __atomic_store_n(&g_mission_control_exit_time, 1000, __ATOMIC_RELEASE);
+    __atomic_store_n(&g_mission_control_user_space_focus_time, 2000, __ATOMIC_RELEASE);
+    mission_control_record_state();
+    ANGRY_ASSERT(!mission_control_user_focused_space_since_exit(), "expected entering Mission Control to clear the previous user space focus timestamp");
+}
+
+ANGRY_TEST(recordsUserSpaceFocusForUserCommandsButNotInternalFocus) {
+    uint64_t current_sid = 0x7E578001ULL;
+    uint64_t target_sid = 0x7E578002ULL;
+    g_mock_active_space = current_sid;
+    uint64_t exit_time = read_os_timer() - 1000000ULL;
+    __atomic_store_n(&g_mission_control_exit_time, exit_time, __ATOMIC_RELEASE);
+
+    struct angry_sa_server server;
+
+    __atomic_store_n(&g_mission_control_user_space_focus_time, 0, __ATOMIC_RELEASE);
+    angry_sa_server_begin(&server);
+    enum space_op_error internal_err = space_manager_focus_space(target_sid);
+    angry_sa_server_end(&server);
+    bool internal_marked = mission_control_user_focused_space_since_exit();
+
+    __atomic_store_n(&g_mission_control_user_space_focus_time, 0, __ATOMIC_RELEASE);
+    angry_sa_server_begin(&server);
+    enum space_op_error focus_err = space_manager_focus_space_by_user(target_sid);
+    angry_sa_server_end(&server);
+    bool focus_marked = mission_control_user_focused_space_since_exit();
+
+    __atomic_store_n(&g_mission_control_user_space_focus_time, 0, __ATOMIC_RELEASE);
+    angry_sa_server_begin(&server);
+    enum space_op_error switch_err = space_manager_switch_space(target_sid);
+    angry_sa_server_end(&server);
+    bool switch_marked = mission_control_user_focused_space_since_exit();
+
+    __atomic_store_n(&g_mission_control_user_space_focus_time, 0, __ATOMIC_RELEASE);
+    angry_sa_server_begin(&server);
+    enum space_op_error display_err = display_manager_focus_space(CGMainDisplayID(), target_sid);
+    angry_sa_server_end(&server);
+    bool display_marked = mission_control_user_focused_space_since_exit();
+
+    ANGRY_ASSERT_ALL("expected user space commands to mark a user choice without marking internal focus calls",
+                     internal_err == SPACE_OP_ERROR_SUCCESS, !internal_marked,
+                     focus_err == SPACE_OP_ERROR_SUCCESS, focus_marked,
+                     switch_err == SPACE_OP_ERROR_SUCCESS, switch_marked,
+                     display_err == SPACE_OP_ERROR_SUCCESS, display_marked);
+}
