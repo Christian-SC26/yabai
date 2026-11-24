@@ -1105,7 +1105,7 @@ bool space_manager_focus_space_using_gesture(uint32_t new_did, uint64_t new_sid)
 }
 #pragma clang diagnostic pop
 
-enum space_op_error space_manager_focus_space(uint64_t sid)
+static enum space_op_error space_manager_focus_space_internal(uint64_t sid, bool by_user)
 {
     bool is_in_mc = mission_control_is_active();
     if (is_in_mc) return SPACE_OP_ERROR_IN_MISSION_CONTROL;
@@ -1121,9 +1121,13 @@ enum space_op_error space_manager_focus_space(uint64_t sid)
     bool is_animating = display_manager_display_is_animating(new_did);
     if (is_animating) return SPACE_OP_ERROR_DISPLAY_IS_ANIMATING;
 
-    __atomic_store_n(&__last_space_change_time, read_os_timer(), __ATOMIC_RELEASE);
+    uint64_t now = read_os_timer();
+    __atomic_store_n(&__last_space_change_time, now, __ATOMIC_RELEASE);
+    if (by_user) {
+        __atomic_store_n(&g_mission_control_user_space_focus_time, now, __ATOMIC_RELEASE);
+    }
     if (!window_manager_find_window_on_space_by_rank_filtering_window(&g_window_manager, sid, 1, 0)) {
-        __atomic_store_n(&__last_empty_space_focus_time, read_os_timer(), __ATOMIC_RELEASE);
+        __atomic_store_n(&__last_empty_space_focus_time, now, __ATOMIC_RELEASE);
     }
 
     bool disable_sa = getenv("YABAI_DISABLE_SA") != NULL || getenv("YABAI_SIMULATE_SIP_ON") != NULL;
@@ -1136,6 +1140,16 @@ enum space_op_error space_manager_focus_space(uint64_t sid)
     }
 
     return SPACE_OP_ERROR_SUCCESS;
+}
+
+enum space_op_error space_manager_focus_space(uint64_t sid)
+{
+    return space_manager_focus_space_internal(sid, false);
+}
+
+enum space_op_error space_manager_focus_space_by_user(uint64_t sid)
+{
+    return space_manager_focus_space_internal(sid, true);
 }
 
 enum space_op_error space_manager_switch_space(uint64_t sid)
@@ -1156,6 +1170,8 @@ enum space_op_error space_manager_switch_space(uint64_t sid)
 
     bool is_dst_animating = display_manager_display_is_animating(did);
     if (is_dst_animating) return SPACE_OP_ERROR_DISPLAY_IS_ANIMATING;
+
+    mission_control_note_user_space_focus();
 
     if (cur_did != did) {
         space_manager_swap_space_with_space_on_display(cur_did, cur_sid, did, sid);

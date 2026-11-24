@@ -19,12 +19,18 @@ volatile int g_mission_control_reverted_activations = 0;
 CGPoint g_mission_control_enter_cursor;
 
 //
-// NOTE: A space --focus command that arrives after Mission Control has closed is a choice the user made, not the
-// activation macOS 27.2 performs by itself when Mission Control is cancelled. Remember when it happened, so that the
-// logic that restores the previous space and window shortly after the exit does not undo it.
+// NOTE: A space-switching command (space --focus, space --switch, display --space) that runs after Mission Control
+// has closed is a choice the user made, not the activation macOS 27.2 performs by itself when Mission Control is
+// cancelled. Remember when it started, so that the logic that restores the previous space and window shortly after
+// the exit does not undo it.
 //
 
 volatile uint64_t g_mission_control_user_space_focus_time = 0;
+
+static inline void mission_control_note_user_space_focus(void)
+{
+    __atomic_store_n(&g_mission_control_user_space_focus_time, read_os_timer(), __ATOMIC_RELEASE);
+}
 
 static inline bool mission_control_user_focused_space_since_exit(void)
 {

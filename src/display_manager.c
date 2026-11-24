@@ -506,6 +506,8 @@ enum space_op_error display_manager_focus_space(uint32_t did, uint64_t sid)
     uint32_t space_did = space_display_id(sid);
     if (space_did != did) return SPACE_OP_ERROR_SAME_DISPLAY;
 
+    mission_control_note_user_space_focus();
+
     bool disable_sa = getenv("YABAI_DISABLE_SA") != NULL || getenv("YABAI_SIMULATE_SIP_ON") != NULL;
     if (!disable_sa && scripting_addition_focus_space(sid)) {
         return SPACE_OP_ERROR_SUCCESS;
