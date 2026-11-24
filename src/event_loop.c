@@ -683,7 +683,7 @@ allow:
     }
 
     if (!window) {
-        if (dt_mc_exit_ms < 800) {
+        if (dt_mc_exit_ms < 800 && !mission_control_user_focused_space_since_exit()) {
             struct window *curr_win = window_manager_find_window_on_space_by_rank_filtering_window(&g_window_manager, g_space_manager.current_space_id, 1, 0);
             if (curr_win) {
                 debug("%s: suppressing front switch to %s with no windows on current space %lld, restoring %s %d\n",
@@ -732,7 +732,7 @@ static EVENT_HANDLER(DEBUGGED_APPLICATION_FRONT_SWITCHED)
     uint64_t now = read_os_timer();
     uint64_t last_mc_exit = __atomic_load_n(&g_mission_control_exit_time, __ATOMIC_RELAXED);
     uint64_t dt_mc_exit_ms = (now > last_mc_exit) ? (now - last_mc_exit) / 1000000ULL : 0;
-    if (dt_mc_exit_ms < 600) {
+    if (dt_mc_exit_ms < 600 && !mission_control_user_focused_space_since_exit()) {
         debug("%s: %d front switched right after mission control, ignoring..\n", __FUNCTION__, pid);
         return;
     }
@@ -1820,7 +1820,7 @@ static EVENT_HANDLER(SPACE_CHANGED)
         // Hand focus to the top window of the new space, the same way a native space switch would.
         //
 
-        if (dt_mc_exit_ms >= 800) {
+        if (dt_mc_exit_ms >= 800 || mission_control_user_focused_space_since_exit()) {
             struct application *front_application = window_manager_focused_application(&g_window_manager);
             if (front_application) {
                 bool has_visible_window = false;
@@ -2489,6 +2489,11 @@ static EVENT_HANDLER(MISSION_CONTROL_CHECK_FOR_EXIT)
 static EVENT_HANDLER(MISSION_CONTROL_EXIT)
 {
     debug("%s:\n", __FUNCTION__);
+
+    if (g_mission_control_mode == MISSION_CONTROL_MODE_INACTIVE && mission_control_user_focused_space_since_exit()) {
+        debug("%s: ignoring duplicate exit after user space switch..\n", __FUNCTION__);
+        return;
+    }
 
     uint64_t exit_now = read_os_timer();
     __atomic_store_n(&g_mission_control_exit_time, exit_now, __ATOMIC_RELEASE);

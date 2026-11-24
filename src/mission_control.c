@@ -28,13 +28,15 @@ volatile uint64_t g_mission_control_user_space_focus_time = 0;
 
 static inline bool mission_control_user_focused_space_since_exit(void)
 {
-    uint64_t exit_time  = __atomic_load_n(&g_mission_control_exit_time, __ATOMIC_RELAXED);
-    uint64_t focus_time = __atomic_load_n(&g_mission_control_user_space_focus_time, __ATOMIC_RELAXED);
+    uint64_t exit_time  = __atomic_load_n(&g_mission_control_exit_time, __ATOMIC_ACQUIRE);
+    uint64_t focus_time = __atomic_load_n(&g_mission_control_user_space_focus_time, __ATOMIC_ACQUIRE);
     return exit_time && focus_time > exit_time;
 }
 
 static void mission_control_record_state_on_thread(bool on_event_tap)
 {
+    __atomic_store_n(&g_mission_control_user_space_focus_time, 0, __ATOMIC_RELEASE);
+
     if (!__atomic_load_n(&g_mission_control_prev_sid, __ATOMIC_RELAXED)) {
         uint32_t wid = g_window_manager.focused_window_id ? g_window_manager.focused_window_id : g_window_manager.last_window_id;
         uint64_t sid = g_space_manager.current_space_id;
