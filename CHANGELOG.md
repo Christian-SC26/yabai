@@ -6,6 +6,10 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [7.3.7] - 2026-11-28
+### Fixed
+- **Windows hidden without quitting left a gap in the layout**: Electron apps such as Slack and Signal can hide their window (`orderOut:`) instead of closing it when you close the window without quitting. When the app does not emit `kAXUIElementDestroyedNotification`, yabai missed the transition and kept the window in the tiling tree even though `is-visible` became `false`, and space validation skipped it because `window_space` falls back to the display's active space. yabai now untiles ordered-out windows on the WindowServer visibility-off notification (`816`) when the space is visible, catches them during space validation, and re-tiles them on the visibility-on notification (`815`) when shown again ([#15](https://github.com/Christian-SC26/yabai/issues/15))
+
 ## [7.3.6] - 2026-11-24
 ### Fixed
 - **Space switch undone right after leaving Mission Control**: after Mission Control was cancelled (escape, hotkey or gesture without a click), yabai went back to the space it was opened from when the space changed within 400 ms, and put the previous application and window back for 600 ms, to counter macOS 27.2 showing another space by itself ([#7](https://github.com/Christian-SC26/yabai/issues/7)). A `space --focus`, `space --switch` or `display --space` sent in that time, such as a hotkey pressed right after closing Mission Control with `ctrl + up`, switched the space and was then sent back. yabai now leaves the switch alone and hands focus to the new space when a user space-switch command made it after Mission Control closed ([#14](https://github.com/Christian-SC26/yabai/pull/14) by @pomortl)
@@ -1036,7 +1040,8 @@ The *window_destroyed* signal is now triggered for windows that are implicitly d
 ### Added
 - First official release
 
-[Unreleased]: https://github.com/Christian-SC26/yabai/compare/v7.3.6...HEAD
+[Unreleased]: https://github.com/Christian-SC26/yabai/compare/v7.3.7...HEAD
+[7.3.7]: https://github.com/Christian-SC26/yabai/compare/v7.3.6...v7.3.7
 [7.3.6]: https://github.com/Christian-SC26/yabai/compare/v7.3.5...v7.3.6
 [7.3.5]: https://github.com/Christian-SC26/yabai/compare/v7.3.4...v7.3.5
 [7.3.4]: https://github.com/Christian-SC26/yabai/compare/v7.3.3...v7.3.4
