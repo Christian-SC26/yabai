@@ -1287,6 +1287,7 @@ static void tests_isolate_scripting_addition(void)
     ANGRY_ENTRY(untilesOrderedOutWindowDuringSpaceValidation)                   \
     ANGRY_ENTRY(keepsOrderedInWindowOnSameSpaceDuringSpaceValidation)           \
     ANGRY_ENTRY(untilesOrderedOutWindowOnSlsWindowHidden)                       \
+    ANGRY_ENTRY(ignoresSlsWindowHiddenOnInvisibleSpace)                         \
     ANGRY_ENTRY(ignoresSlsWindowHiddenWhileWindowIsStillOrderedIn)              \
     ANGRY_ENTRY(retilesOrderedInWindowOnSlsWindowVisible)                       \
     ANGRY_ENTRY(postsVisibilityEventsFromConnectionHandlerWithoutNativeTabs)

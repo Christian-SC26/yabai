@@ -1700,7 +1700,7 @@ static EVENT_HANDLER(SLS_WINDOW_HIDDEN)
     if (window_has_native_tab_group(window)) return;
 
     struct view *view = window_manager_find_managed_window(&g_window_manager, window);
-    if (!view) return;
+    if (!view || !space_is_visible(view->sid)) return;
 
     if (window->id == g_window_manager.last_window_id) {
         g_window_manager.last_window_id = g_window_manager.focused_window_id;

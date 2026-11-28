@@ -378,6 +378,7 @@ ANGRY_TEST(ignoresDuplicateMissionControlExitAfterUserSpaceSwitch)
 ANGRY_TEST(untilesOrderedOutWindowOnSlsWindowHidden)
 {
     uint64_t sid = 0x7E578010ULL;
+    g_mock_active_space = sid;
     struct application app = { .pid = 4420 };
     struct window win = { .id = 94020, .application = &app, .is_root = true };
     win.id_ptr = &win.id;
@@ -399,6 +400,32 @@ ANGRY_TEST(untilesOrderedOutWindowOnSlsWindowHidden)
                      !still_managed,
                      still_tracked,
                      root.window_count == 0);
+}
+
+ANGRY_TEST(ignoresSlsWindowHiddenOnInvisibleSpace)
+{
+    uint64_t sid = 0x7E578014ULL;
+    g_mock_active_space = 0x7E578015ULL;
+    struct application app = { .pid = 4424 };
+    struct window win = { .id = 94024, .application = &app, .is_root = true };
+    win.id_ptr = &win.id;
+    struct window_node root = { .area = { 0, 0, 800, 600 }, .window_count = 1 };
+    root.window_list[0] = root.window_order[0] = win.id;
+    struct view view = { .sid = sid, .layout = VIEW_BSP, .root = &root };
+
+    table_add(&g_window_manager.window, &win.id, &win);
+    table_add(&g_window_manager.managed_window, &win.id, &view);
+    angry_set_window_ordered_in(win.id, 0);
+
+    EVENT_HANDLER_SLS_WINDOW_HIDDEN((void *)(intptr_t) win.id, 0);
+
+    bool still_managed = window_manager_find_managed_window(&g_window_manager, &win) == &view;
+    table_remove(&g_window_manager.managed_window, &win.id);
+    table_remove(&g_window_manager.window, &win.id);
+
+    ANGRY_ASSERT_ALL("expected SLS_WINDOW_HIDDEN on an invisible space to leave the layout untouched",
+                     still_managed,
+                     root.window_count == 1);
 }
 
 ANGRY_TEST(ignoresSlsWindowHiddenWhileWindowIsStillOrderedIn)
