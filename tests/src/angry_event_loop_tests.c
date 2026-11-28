@@ -374,3 +374,107 @@ ANGRY_TEST(ignoresDuplicateMissionControlExitAfterUserSpaceSwitch)
                      mission_control_user_focused_space_since_exit(),
                      g_mock_event_post_count == 0);
 }
+
+ANGRY_TEST(untilesOrderedOutWindowOnSlsWindowHidden)
+{
+    uint64_t sid = 0x7E578010ULL;
+    struct application app = { .pid = 4420 };
+    struct window win = { .id = 94020, .application = &app, .is_root = true };
+    win.id_ptr = &win.id;
+    struct window_node root = { .area = { 0, 0, 800, 600 }, .window_count = 1 };
+    root.window_list[0] = root.window_order[0] = win.id;
+    struct view view = { .sid = sid, .layout = VIEW_BSP, .root = &root };
+
+    table_add(&g_window_manager.window, &win.id, &win);
+    table_add(&g_window_manager.managed_window, &win.id, &view);
+    angry_set_window_ordered_in(win.id, 0);
+
+    EVENT_HANDLER_SLS_WINDOW_HIDDEN((void *)(intptr_t) win.id, 0);
+
+    bool still_managed = window_manager_find_managed_window(&g_window_manager, &win) != NULL;
+    bool still_tracked = window_manager_find_window(&g_window_manager, win.id) != NULL;
+    table_remove(&g_window_manager.window, &win.id);
+
+    ANGRY_ASSERT_ALL("expected SLS_WINDOW_HIDDEN for an ordered-out window to untile it without dropping it",
+                     !still_managed,
+                     still_tracked,
+                     root.window_count == 0);
+}
+
+ANGRY_TEST(ignoresSlsWindowHiddenWhileWindowIsStillOrderedIn)
+{
+    uint64_t sid = 0x7E578011ULL;
+    struct application app = { .pid = 4421 };
+    struct window win = { .id = 94021, .application = &app, .is_root = true };
+    win.id_ptr = &win.id;
+    struct window_node root = { .area = { 0, 0, 800, 600 }, .window_count = 1 };
+    root.window_list[0] = root.window_order[0] = win.id;
+    struct view view = { .sid = sid, .layout = VIEW_BSP, .root = &root };
+
+    table_add(&g_window_manager.window, &win.id, &win);
+    table_add(&g_window_manager.managed_window, &win.id, &view);
+    angry_set_window_ordered_in(win.id, 1);
+
+    EVENT_HANDLER_SLS_WINDOW_HIDDEN((void *)(intptr_t) win.id, 0);
+
+    bool still_managed = window_manager_find_managed_window(&g_window_manager, &win) == &view;
+    table_remove(&g_window_manager.managed_window, &win.id);
+    table_remove(&g_window_manager.window, &win.id);
+
+    ANGRY_ASSERT_ALL("expected stale SLS_WINDOW_HIDDEN to keep a window that is ordered in",
+                     still_managed,
+                     root.window_count == 1);
+}
+
+ANGRY_TEST(retilesOrderedInWindowOnSlsWindowVisible)
+{
+    uint64_t sid = 0x7E578012ULL;
+    g_mock_active_space = 0x7E578013ULL;
+    struct view *view = space_manager_find_view(&g_space_manager, sid);
+    view->layout = VIEW_BSP;
+    view_clear(view);
+
+    struct application app = { .pid = 4422 };
+    struct window win = { .id = 94022, .application = &app, .is_root = true };
+    win.id_ptr = &win.id;
+    window_set_rule_flag(&win, WINDOW_RULE_MANAGED);
+
+    table_add(&g_window_manager.window, &win.id, &win);
+    angry_place_window(win.id, sid);
+    angry_set_window_ordered_in(win.id, 1);
+
+    EVENT_HANDLER_SLS_WINDOW_VISIBLE((void *)(intptr_t) win.id, 0);
+
+    bool managed_on_view = window_manager_find_managed_window(&g_window_manager, &win) == view;
+    bool in_tree = view_find_window_node(view, win.id) != NULL;
+    table_remove(&g_window_manager.managed_window, &win.id);
+    table_remove(&g_window_manager.window, &win.id);
+    view_clear(view);
+
+    ANGRY_ASSERT_ALL("expected SLS_WINDOW_VISIBLE for an unmanaged ordered-in window to tile it again",
+                     managed_on_view,
+                     in_tree);
+}
+
+ANGRY_TEST(postsVisibilityEventsFromConnectionHandlerWithoutNativeTabs)
+{
+    bool saved_tabs = g_window_manager.window_native_tabs;
+    g_window_manager.window_native_tabs = false;
+    uint32_t wid = 94023;
+
+    connection_handler(816, &wid, sizeof(wid), NULL, 0);
+    enum event_type hidden_type = angry_last_posted_event()->type;
+    uint32_t hidden_wid = (uint32_t)(intptr_t)angry_last_posted_event()->context;
+
+    connection_handler(815, &wid, sizeof(wid), NULL, 0);
+    enum event_type visible_type = angry_last_posted_event()->type;
+    uint32_t visible_wid = (uint32_t)(intptr_t)angry_last_posted_event()->context;
+
+    g_window_manager.window_native_tabs = saved_tabs;
+
+    ANGRY_ASSERT_ALL("expected connection_handler to post SLS_WINDOW_HIDDEN and SLS_WINDOW_VISIBLE even when window_native_tabs is off",
+                     hidden_type == SLS_WINDOW_HIDDEN,
+                     hidden_wid == wid,
+                     visible_type == SLS_WINDOW_VISIBLE,
+                     visible_wid == wid);
+}

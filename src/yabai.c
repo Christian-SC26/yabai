@@ -340,7 +340,9 @@ int main(int argc, char **argv)
 
     // NOTE: 808 fires only for a re-order among windows already ordered in; a hidden tab coming
     // forward takes the ordered-in transition instead, which posts 815 and a 1325/1326 pair.
+    // 816 fires when a window is ordered out (hidden without being destroyed).
     SLSRegisterConnectionNotifyProc(g_connection, connection_handler, 815, NULL);
+    SLSRegisterConnectionNotifyProc(g_connection, connection_handler, 816, NULL);
     SLSRegisterConnectionNotifyProc(g_connection, connection_handler, 1325, NULL);
     SLSRegisterConnectionNotifyProc(g_connection, connection_handler, 1326, NULL);
 
@@ -353,9 +355,7 @@ int main(int argc, char **argv)
     window_manager_begin(&g_space_manager, &g_window_manager);
     window_manager_report_untracked_windows(&g_window_manager, NULL, "startup");
 
-    if (workspace_is_macos_sequoia() || (workspace_is_macos_tahoe() || workspace_is_macos_goldengate())) {
-        update_window_notifications();
-    }
+    update_window_notifications();
 
     if (!message_loop_begin(g_socket_file)) {
         error("yabai: could not start message loop! abort..\n");

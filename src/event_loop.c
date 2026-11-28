@@ -22,21 +22,12 @@ void update_window_notifications(void)
     uint32_t *window_list = malloc(sizeof(uint32_t) * capacity);
     if (!window_list) return;
 
-    if (workspace_is_macos_sequoia() || (workspace_is_macos_tahoe() || workspace_is_macos_goldengate())) {
-        // NOTE(asmvik): Subscribe to all windows because of window_destroyed (and ordered) notifications
-        table_for (struct window *window, g_window_manager.window, {
-            if (window_count < capacity) {
-                window_list[window_count++] = window->id;
-            }
-        })
-    } else {
-        // NOTE(asmvik): Subscribe to windows that have a feedback_border because of window_ordered notifications
-        table_for (struct window_node *node, g_window_manager.insert_feedback, {
-            if (window_count < capacity) {
-                window_list[window_count++] = node->window_order[0];
-            }
-        })
-    }
+    // NOTE(asmvik): Subscribe to all windows for window_destroyed, ordered, and visibility notifications
+    table_for (struct window *window, g_window_manager.window, {
+        if (window_count < capacity) {
+            window_list[window_count++] = window->id;
+        }
+    })
 
     SLSRequestNotificationsForWindows(g_connection, window_list, window_count);
     free(window_list);
@@ -307,9 +298,7 @@ static EVENT_HANDLER(APPLICATION_LAUNCHED)
         view_clear_flag(view, VIEW_IS_DIRTY);
     }
 
-    if (workspace_is_macos_sequoia() || (workspace_is_macos_tahoe() || workspace_is_macos_goldengate())) {
-        update_window_notifications();
-    }
+    update_window_notifications();
 }
 
 static EVENT_HANDLER(APPLICATION_TERMINATED)
@@ -402,9 +391,7 @@ static EVENT_HANDLER(APPLICATION_TERMINATED)
         view_clear_flag(view, VIEW_IS_DIRTY);
     }
 
-    if (workspace_is_macos_sequoia() || (workspace_is_macos_tahoe() || workspace_is_macos_goldengate())) {
-        update_window_notifications();
-    }
+    update_window_notifications();
 
 out:
     process_destroy(process);
@@ -1050,9 +1037,7 @@ static EVENT_HANDLER(WINDOW_CREATED)
         event_signal_push(SIGNAL_WINDOW_CREATED, window);
     }
 
-    if (workspace_is_macos_sequoia() || (workspace_is_macos_tahoe() || workspace_is_macos_goldengate())) {
-        update_window_notifications();
-    }
+    update_window_notifications();
 }
 
 static struct {
@@ -1113,9 +1098,7 @@ static EVENT_HANDLER(WINDOW_DESTROYED)
     window_unobserve(window);
     window_destroy(window);
 
-    if (workspace_is_macos_sequoia() || (workspace_is_macos_tahoe() || workspace_is_macos_goldengate())) {
-        update_window_notifications();
-    }
+    update_window_notifications();
 
     if (application) window_manager_report_untracked_windows(&g_window_manager, application, "window destroyed");
 }
@@ -1645,15 +1628,87 @@ static EVENT_HANDLER(SLS_WINDOW_ORDERED)
     if (node) SLSOrderWindow(g_connection, node->feedback_window.id, 1, node->window_order[0]);
 }
 
+static bool window_has_native_tab_group(struct window *window)
+{
+    if (!g_window_manager.window_native_tabs) return false;
+
+    int app_window_count = 0;
+    table_for (struct window *it, g_window_manager.window, {
+        if (it->application == window->application && ++app_window_count > 1) {
+            return window_ax_tab_count(window) > 1;
+        }
+    })
+
+    return false;
+}
+
 static EVENT_HANDLER(SLS_WINDOW_VISIBLE)
 {
-    if (!g_window_manager.window_native_tabs) return;
-
     uint32_t wid = (uint64_t)(intptr_t) context;
     debug("%s: %d\n", __FUNCTION__, wid);
 
     struct window *window = window_manager_find_window(&g_window_manager, wid);
-    if (window && window_check_flag(window, WINDOW_TAB_MEMBER)) tabbed_window_promote(window);
+    if (!window) return;
+
+    if (!__sync_bool_compare_and_swap(&window->id_ptr, &window->id, &window->id)) {
+        debug("%s: %d has been marked invalid by the system, ignoring event..\n", __FUNCTION__, wid);
+        return;
+    }
+
+    if (g_window_manager.window_native_tabs && window_check_flag(window, WINDOW_TAB_MEMBER)) {
+        tabbed_window_promote(window);
+        return;
+    }
+
+    if (mission_control_is_active()) return;
+    if (window_check_flag(window, WINDOW_FULLSCREEN) || window_check_flag(window, WINDOW_TAB_MEMBER)) return;
+    if (window_manager_find_managed_window(&g_window_manager, window)) return;
+
+    uint8_t ordered_in = 0;
+    SLSWindowIsOrderedIn(g_connection, window->id, &ordered_in);
+    if (!ordered_in) return;
+
+    if (!window_manager_should_manage_window(window)) return;
+    if (window_has_native_tab_group(window)) return;
+
+    uint64_t sid = window_space(window->id);
+    if (!sid || !space_is_user(sid)) return;
+
+    struct view *view = space_manager_tile_window_on_space(&g_space_manager, window, sid);
+    window_manager_add_managed_window(&g_window_manager, window, view);
+}
+
+static EVENT_HANDLER(SLS_WINDOW_HIDDEN)
+{
+    uint32_t wid = (uint64_t)(intptr_t) context;
+    debug("%s: %d\n", __FUNCTION__, wid);
+
+    if (mission_control_is_active()) return;
+
+    struct window *window = window_manager_find_window(&g_window_manager, wid);
+    if (!window) return;
+
+    if (!__sync_bool_compare_and_swap(&window->id_ptr, &window->id, &window->id)) {
+        debug("%s: %d has been marked invalid by the system, ignoring event..\n", __FUNCTION__, wid);
+        return;
+    }
+
+    uint8_t ordered_in = 0;
+    SLSWindowIsOrderedIn(g_connection, window->id, &ordered_in);
+    if (ordered_in) return;
+
+    if (window_has_native_tab_group(window)) return;
+
+    struct view *view = window_manager_find_managed_window(&g_window_manager, window);
+    if (!view) return;
+
+    if (window->id == g_window_manager.last_window_id) {
+        g_window_manager.last_window_id = g_window_manager.focused_window_id;
+    }
+
+    space_manager_untile_window(view, window);
+    window_manager_remove_managed_window(&g_window_manager, window->id);
+    window_manager_purify_window(&g_window_manager, window);
 }
 
 static struct {
