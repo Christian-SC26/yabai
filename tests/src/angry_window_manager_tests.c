@@ -991,3 +991,59 @@ ANGRY_TEST(keepsSpacePaddingForPictureInPicture)
     CGRect expected = CGRectMake(b.origin.x + 30, b.origin.y + 10, b.size.width - 70, b.size.height - 30);
     ANGRY_ASSERT(CGRectEqualToRect(requested, expected), "expected the padding of the space to stay around the scaled window");
 }
+
+ANGRY_TEST(untilesOrderedOutWindowDuringSpaceValidation)
+{
+    uint64_t sid = 0x7E575010ULL;
+    struct application app = { .pid = 4410 };
+    struct window win = { .id = 94010, .application = &app };
+    win.id_ptr = &win.id;
+    struct window_node root = { .area = { 0, 0, 800, 600 }, .window_count = 1 };
+    root.window_list[0] = root.window_order[0] = win.id;
+    struct view view = { .sid = sid, .layout = VIEW_BSP, .root = &root };
+
+    table_add(&g_window_manager.window, &win.id, &win);
+    table_add(&g_window_manager.managed_window, &win.id, &view);
+    angry_place_window(win.id, sid);
+    angry_set_window_ordered_in(win.id, 0);
+
+    window_manager_validate_windows_on_space(&g_window_manager, &view, NULL, 0);
+
+    bool still_managed = window_manager_find_managed_window(&g_window_manager, &win) != NULL;
+    bool still_tracked = window_manager_find_window(&g_window_manager, win.id) != NULL;
+    bool dirty = view_is_dirty(&view);
+    table_remove(&g_window_manager.window, &win.id);
+
+    ANGRY_ASSERT_ALL("expected an ordered-out window missing from the space list to be untiled without destroying it",
+                     !still_managed,
+                     still_tracked,
+                     root.window_count == 0,
+                     dirty,
+                     g_mock_event_post_count == 0);
+}
+
+ANGRY_TEST(keepsOrderedInWindowOnSameSpaceDuringSpaceValidation)
+{
+    uint64_t sid = 0x7E575011ULL;
+    struct application app = { .pid = 4411 };
+    struct window win = { .id = 94011, .application = &app };
+    win.id_ptr = &win.id;
+    struct window_node root = { .area = { 0, 0, 800, 600 }, .window_count = 1 };
+    root.window_list[0] = root.window_order[0] = win.id;
+    struct view view = { .sid = sid, .layout = VIEW_BSP, .root = &root };
+
+    table_add(&g_window_manager.window, &win.id, &win);
+    table_add(&g_window_manager.managed_window, &win.id, &view);
+    angry_place_window(win.id, sid);
+    angry_set_window_ordered_in(win.id, 1);
+
+    window_manager_validate_windows_on_space(&g_window_manager, &view, NULL, 0);
+
+    bool still_managed = window_manager_find_managed_window(&g_window_manager, &win) == &view;
+    table_remove(&g_window_manager.managed_window, &win.id);
+    table_remove(&g_window_manager.window, &win.id);
+
+    ANGRY_ASSERT_ALL("expected an ordered-in window on the same space to stay tiled",
+                     still_managed,
+                     root.window_count == 1);
+}

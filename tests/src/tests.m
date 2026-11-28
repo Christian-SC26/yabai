@@ -392,6 +392,28 @@ uint64_t SLSManagedDisplayGetCurrentSpace(int cid, CFStringRef uuid)
 // is on the fake active space when there is one, and where WindowServer says
 // otherwise.
 //
+static struct { uint32_t wid; uint8_t ordered_in; } g_mock_window_ordered_in[8];
+static int g_mock_window_ordered_in_count;
+
+static void angry_set_window_ordered_in(uint32_t wid, uint8_t ordered_in)
+{
+    g_mock_window_ordered_in[g_mock_window_ordered_in_count++] = (typeof(g_mock_window_ordered_in[0])) { wid, ordered_in };
+}
+
+CGError SLSWindowIsOrderedIn(int cid, uint32_t wid, uint8_t *value)
+{
+    for (int i = 0; i < g_mock_window_ordered_in_count; ++i) {
+        if (g_mock_window_ordered_in[i].wid == wid) {
+            if (value) *value = g_mock_window_ordered_in[i].ordered_in;
+            return kCGErrorSuccess;
+        }
+    }
+    typedef CGError (*real_fn)(int, uint32_t, uint8_t *);
+    static real_fn r = NULL;
+    if (!r) r = (real_fn)dlsym(RTLD_NEXT, "SLSWindowIsOrderedIn");
+    return r ? r(cid, wid, value) : kCGErrorSuccess;
+}
+
 static struct { uint32_t wid; uint64_t sid; } g_mock_window_space[8];
 static int g_mock_window_space_count;
 
@@ -1261,7 +1283,9 @@ static void tests_isolate_scripting_addition(void)
     ANGRY_ENTRY(clearsUserSpaceFocusTimeWhenMissionControlRecordsNewSession)    \
     ANGRY_ENTRY(recordsUserSpaceFocusForUserCommandsButNotInternalFocus)        \
     ANGRY_ENTRY(keepsUserSpaceSwitchAndHandsFocusOnSpaceChangedRightAfterMissionControlExit) \
-    ANGRY_ENTRY(ignoresDuplicateMissionControlExitAfterUserSpaceSwitch)
+    ANGRY_ENTRY(ignoresDuplicateMissionControlExitAfterUserSpaceSwitch)         \
+    ANGRY_ENTRY(untilesOrderedOutWindowDuringSpaceValidation)                   \
+    ANGRY_ENTRY(keepsOrderedInWindowOnSameSpaceDuringSpaceValidation)
 
 static struct test {
     char *name;
@@ -1308,6 +1332,7 @@ static void tests_reset_shared_state(void)
     g_mock_cursor_warp_count = 0;
     g_mock_event_post_count = 0;
     g_mock_current_space_set = 0;
+    g_mock_window_ordered_in_count = 0;
     g_mock_window_space_count = 0;
     g_mock_mouse_event_count = 0;
     g_mock_front_is_test_process = false;

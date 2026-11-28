@@ -3009,8 +3009,11 @@ static void window_manager_validate_windows_on_space(struct window_manager *wm, 
             struct window *window = window_manager_find_window(wm, view_window_list[i]);
             if (!window) continue;
 
+            uint8_t ordered_in = 0;
+            SLSWindowIsOrderedIn(g_connection, window->id, &ordered_in);
+
             uint64_t w_sid = window_space(window->id);
-            if (space_is_fullscreen(w_sid) || w_sid == view->sid) {
+            if (space_is_fullscreen(w_sid) || (ordered_in && w_sid == view->sid)) {
                 continue;
             }
 
